@@ -59,6 +59,8 @@ export class Kart {
     this.driftGrip = 2.6 * (race.trackDef.grip ?? 1) * (st.grip ?? 1);
     // How well the tyres put power down (snow and ice tracks are below 1).
     this.traction = race.trackDef.traction ?? 1;
+    // Low gravity on the moon: longer, floatier jumps.
+    this.gravityK = race.trackDef.gravity ?? 1;
     this.patch = null;
     this.path = race.track;
     this.gliding = false;
@@ -123,6 +125,8 @@ export class Kart {
     this.wallBump = 0;
     this.wrongWay = 0;
     this.stuck = 0;
+    this.progT = 0;
+    this.progAt = 0;
     this.visualYaw = 0;
     this.spinAngle = 0;
     this.wheelSpin = 0;
@@ -490,9 +494,9 @@ export class Kart {
     this.lastRamp = ramp;
     if (!this.grounded) {
       if (this.gliding) {
-        this.vy -= GRAVITY * 0.28 * dt;
+        this.vy -= GRAVITY * this.gravityK * 0.28 * dt;
         if (this.vy < -5) this.vy = -5;
-      } else this.vy -= GRAVITY * dt;
+      } else this.vy -= GRAVITY * this.gravityK * dt;
       this.pos.y += this.vy * dt;
       this.airTime += dt;
       if (this.pos.y <= groundY) {
@@ -526,7 +530,12 @@ export class Kart {
     const trying = (c.throttle > 0 || c.brake) && !spinning && this.respawnT <= 0 && this.grounded;
     if (trying && this.speed < 2.5) this.stuck += dt;
     else this.stuck = Math.max(0, this.stuck - dt * 2);
-    if (this.stuck > 2.8) this._rescue();
+    // Also catch bouncing back and forth against a wall without getting anywhere.
+    if (trying && c.throttle > 0) {
+      this.progT += dt;
+      if (Math.abs(this.total - this.progAt) > 12) { this.progAt = this.total; this.progT = 0; }
+    } else this.progT = 0;
+    if (this.stuck > 2.8 || this.progT > 5) this._rescue();
 
     // Item button edge
     const itemEdge = c.item && !this.prevItem;
@@ -538,6 +547,7 @@ export class Kart {
   // the middle of the road, facing the right way.
   _rescue() {
     this.stuck = 0;
+    this.progT = 0;
     this.safeS = this.path === this.track ? this.trk.s : this.safeS;
     this._fall();
   }

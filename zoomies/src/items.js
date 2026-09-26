@@ -58,6 +58,9 @@ const OBSTACLES = {
   fireball: { r: 1.5, hit: 'spin', col: '#ff6a1a', col2: '#ffd23f', y: 1.5, jump: true, glow: true },
   boulder: { r: 2.0, hit: 'spin', col: '#3b3134', col2: '#5a4d50', y: 2.0 },
   balloon: { r: 1.5, hit: 'bump', col: '#ff9ecb', col2: '#9ee7ff', y: 2.2, bounce: 0.8 },
+  ghost: { r: 1.4, hit: 'bump', col: '#f2f0ff', col2: '#9dff8a', y: 1.6, bounce: 0.6 },
+  barrel: { r: 1.3, hit: 'spin', col: '#3a6ab0', col2: '#ffcf2a', y: 1.2 },
+  rover: { r: 1.6, hit: 'bump', col: '#e8ecf4', col2: '#6fd8ff', y: 0.2 },
 };
 
 let _geo = null;
@@ -170,6 +173,23 @@ function geos() {
       case 'boulder':
         b.add(new THREE.DodecahedronGeometry(1.9, 0), o.col);
         b.add(new THREE.DodecahedronGeometry(0.9, 0), '#ff6a1a', [0.9, 0.6, 1.1], [0, 0, 0], 1, 'glowHot');
+        break;
+      case 'ghost':
+        b.add(new THREE.SphereGeometry(1, 16, 12), o.col, [0, 0.4, 0], [0, 0, 0], 1, [0.6, 0, 0.3]);
+        b.add(new THREE.ConeGeometry(1, 1.8, 16, 1, true), o.col, [0, -0.6, 0], [Math.PI, 0, 0], 1, [0.6, 0, 0.3]);
+        for (const x of [-0.35, 0.35]) b.add(new THREE.SphereGeometry(0.16, 8, 6), o.col2, [x, 0.55, 0.88], [0, 0, 0], 1, 'glowHot');
+        break;
+      case 'barrel':
+        b.add(new THREE.CylinderGeometry(1, 1, 2, 16), o.col, [0, 0, 0], [0, 0, Math.PI / 2], 1, 'paint');
+        for (const x of [-0.6, 0.6]) b.add(new THREE.TorusGeometry(1.01, 0.07, 5, 18), '#2a2632', [x, 0, 0], [0, Math.PI / 2, 0], 1, 'metal');
+        b.add(new THREE.BoxGeometry(0.1, 0.6, 0.9), o.col2, [1.01, 0, 0], [0, 0, 0], 1, 'paint');
+        break;
+      case 'rover':
+        b.add(new THREE.BoxGeometry(2, 0.8, 2.6), o.col, [0, 1, 0], [0, 0, 0], 1, 'paint');
+        b.add(new THREE.BoxGeometry(1.6, 0.1, 1.2), '#2a3a6a', [0, 1.46, -0.4], [0, 0, 0], 1, [0.15, 0.6, 0]);
+        for (const x of [-1.1, 1.1]) for (const z of [-0.9, 0.9]) b.add(new THREE.CylinderGeometry(0.45, 0.45, 0.35, 12), '#3a3448', [x, 0.45, z], [0, 0, Math.PI / 2], 1, 'rubber');
+        b.add(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 5), '#c8ccd4', [0.6, 2.1, 0.8], [0, 0, 0], 1, 'metal');
+        b.add(new THREE.SphereGeometry(0.14, 8, 6), o.col2, [0.6, 2.85, 0.8], [0, 0, 0], 1, 'glowHot');
         break;
       case 'balloon':
         b.add(new THREE.SphereGeometry(1.3, 24, 16), '#ffffff', [0, 0.4, 0], [0, 0, 0], [1, 1.2, 1]);
@@ -637,7 +657,8 @@ export class ItemSystem {
       o.pos.set(fr.x + fr.rx * d, y, fr.z + fr.rz * d);
       o.d = d;
       o.mesh.rotation.y = Math.atan2(fr.tx, fr.tz) + (o.type === 'crab' ? Math.PI / 2 : 0);
-      if (o.type === 'hay' || o.type === 'snowball' || o.type === 'boulder' || o.type === 'tumbleweed') o.mesh.rotation.x = -Math.cos(t) * t * 0.9;
+      if (o.type === 'hay' || o.type === 'snowball' || o.type === 'boulder' || o.type === 'tumbleweed' || o.type === 'barrel') o.mesh.rotation.x = -Math.cos(t) * t * 0.9;
+      if (o.type === 'rover') o.mesh.rotation.y += Math.cos(t) > 0 ? Math.PI / 2 : -Math.PI / 2;
       if (o.type === 'fireball') o.mesh.rotation.x = t * 3;
       if (o.def.glow && Math.random() < 0.5) fx.glow.emit(o.pos.x, o.pos.y, o.pos.z, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, (Math.random() - 0.5) * 2, o.def.col2, 0.8, 0.1, 0.4, -2, 1);
       for (const k of karts) {

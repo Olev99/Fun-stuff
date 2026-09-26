@@ -54,6 +54,48 @@ export const THEMES = {
     groundTint: ['#ffffff', '#d8c6c0', '#b8a6a6'], beach: null, water: null, lake: ['#ff3a00', '#ffc23a'],
     mountains: ['#2b2426', '#3b3134', '#4b3f42', '#6b3a2a'], volcano: true, clouds: 0, dust: '#6a5d60', wallSide: '#221c1d', glowRoad: true,
   },
+  haunted: {
+    sky: ['#140d24', '#4a3a6a', '#1c1430'], sunGlow: '#c8ffe0', stars: 0.7, fogNear: 90, fogFar: 520,
+    sun: '#b8c8ff', sunI: 1.3, sunDir: [-0.4, 0.6, 0.5], hemi: ['#8a8ac8', '#2a2438', 1.4],
+    road: 'cobble', ground: 'darkgrass', wall: 'iron', curb: ['#8a3aff', '#2a2438'],
+    groundTint: ['#ffffff', '#c8d0c0', '#b0b8a8'], beach: null, water: null, lake: ['#10201c', '#2f5a48'],
+    mountains: ['#221c30', '#2e2840', '#3a3452', '#5a5480'], clouds: 0, dust: '#5a5a6a', wallSide: '#231f2c',
+  },
+  jungle: {
+    sky: ['#3a8fd8', '#c8f0d8', '#e8fff0'], sunGlow: '#fff6c0', stars: 0, fogNear: 120, fogFar: 600,
+    sun: '#fff2cc', sunI: 2.4, sunDir: [0.3, 0.85, -0.4], hemi: ['#d8f0c8', '#2f6a2a', 1.4],
+    road: 'slabs', ground: 'jungle', wall: 'mossstone', curb: ['#e8b83a', '#3a5a2a'],
+    groundTint: ['#ffffff', '#cfe8b0', '#e0f5c8'], beach: '#c8b078', water: null, lake: ['#127064', '#4fc8a8'],
+    mountains: ['#2f6a3a', '#3f8a4a', '#5aa860', '#8ac880'], clouds: 10, dust: '#8ab870', wallSide: '#6a6450',
+  },
+  factory: {
+    sky: ['#5a4e62', '#e8b890', '#f4d8b8'], sunGlow: '#ffd8a0', stars: 0, fogNear: 110, fogFar: 560,
+    sun: '#ffe0c0', sunI: 2.3, sunDir: [0.5, 0.55, 0.4], hemi: ['#f0d8c0', '#5a5050', 1.3],
+    road: 'plate', ground: 'gravel', wall: 'hazard', curb: ['#ffcf2a', '#1d1a22'],
+    groundTint: ['#ffffff', '#d8d4cc', '#c8c4bc'], beach: null, water: null, lake: ['#1e1c26', '#3c3a4a'],
+    mountains: null, clouds: 6, dust: '#9a948a', wallSide: '#3a3640', skyline: true,
+  },
+  moon: {
+    sky: ['#02030a', '#10142a', '#05060e'], sunGlow: '#ffffff', stars: 1.3, fogNear: 220, fogFar: 950,
+    sun: '#ffffff', sunI: 3.0, sunDir: [-0.6, 0.5, 0.3], hemi: ['#8a9ab8', '#3a3c44', 1.1],
+    road: 'regolith', ground: 'moondust', wall: 'barrier', curb: ['#6fd8ff', '#e6e9ef'],
+    groundTint: ['#ffffff', '#d8dade', '#c8cace'], beach: null, water: null, lake: null,
+    mountains: ['#4a4c54', '#5a5c64', '#6a6c74', '#8a8c94'], clouds: 0, dust: '#b0b2b8', wallSide: '#4a4c54', earth: true,
+  },
+  autumn: {
+    sky: ['#4a8ad8', '#ffe0b8', '#fff0dc'], sunGlow: '#ffe0a0', stars: 0, fogNear: 150, fogFar: 700,
+    sun: '#ffe2c0', sunI: 2.6, sunDir: [-0.45, 0.7, 0.4], hemi: ['#ffe8d0', '#8a5a2a', 1.35],
+    road: 'leafy', ground: 'leaves', wall: 'fence', curb: ['#d9412a', '#fff2dc'],
+    groundTint: ['#ffffff', '#f0d8b0', '#e8c8a0'], beach: null, water: null, lake: ['#2a6a8a', '#6ab0c8'],
+    mountains: ['#8a4a2a', '#b8602a', '#d88a3a', '#f0c070'], clouds: 16, dust: '#c8903a', wallSide: '#6a4a2a',
+  },
+  garden: {
+    sky: ['#6aa8e8', '#ffe8f0', '#fff4f8'], sunGlow: '#fff8e0', stars: 0, fogNear: 150, fogFar: 700,
+    sun: '#fff4ec', sunI: 2.5, sunDir: [0.4, 0.8, 0.35], hemi: ['#fff0f4', '#6a8a4a', 1.4],
+    road: 'paving', ground: 'moss', wall: 'bamboo', curb: ['#c83a2a', '#fff6e6'],
+    groundTint: ['#ffffff', '#e0f0c8', '#f0fae0'], beach: '#e8dcc0', water: null, lake: ['#2a7ab0', '#6ad0e8'],
+    mountains: ['#5a8a6a', '#7aa880', '#a8c8a8', '#ffffff'], clouds: 14, dust: '#c8d8a0', wallSide: '#8a7a5a',
+  },
   cloud: {
     sky: ['#7fb8ff', '#ffe9f6', '#fff6fb'], sunGlow: '#fffbe6', stars: 0, fogNear: 170, fogFar: 760,
     sun: '#fffaf0', sunI: 2.5, sunDir: [-0.3, 0.9, 0.4], hemi: ['#ffffff', '#c7b8ff', 1.55],
@@ -90,6 +132,31 @@ export const THEME_FX = {
   volcano: {
     grade: { bloom: 1.45, threshold: 0.85, tint: '#fff1e8', vignette: 0.45, contrast: 0.16, flare: 0.4 }, weather: 'embers', roadRough: 0.65, clouds: 0.3, hills: 24,
     cloudCol: ['#5a3a3a', '#1e1214'], env: 1.0,
+  },
+  haunted: {
+    grade: { bloom: 1.35, threshold: 0.85, saturation: 1.05, vignette: 0.55, contrast: 0.18, tint: '#eef2ff', flare: 0 }, weather: 'wisps',
+    roadRough: 0.55, clouds: 0.3, cloudCol: ['#4a4060', '#1a1428'], hills: 22, grass: ['#2c4433', '#4a6a50'], env: 1.15, fill: 0.85,
+    nebula: ['#3a2a6a', '#1a5a4a'],
+  },
+  jungle: {
+    grade: { saturation: 1.15, tint: '#f4fff0', bloom: 0.7 }, weather: 'jleaves', roadRough: 0.85, clouds: 0.4, hills: 32,
+    grass: ['#2a6a26', '#6ab84f'], env: 1.0,
+  },
+  factory: {
+    grade: { saturation: 1.0, contrast: 0.16, tint: '#fff4ea', bloom: 0.9, flare: 0.8 }, weather: 'sparks', roadRough: 0.42, clouds: 0.55,
+    cloudCol: ['#9a8a88', '#4a4048'], hills: 0, env: 1.0,
+  },
+  moon: {
+    grade: { contrast: 0.2, saturation: 1.05, bloom: 1.0, vignette: 0.45 }, weather: null, roadRough: 0.8, clouds: 0, hills: 28,
+    nebula: ['#1a2a6a', '#4a1a5a'], env: 0.9, fill: 0.7,
+  },
+  autumn: {
+    grade: { saturation: 1.12, tint: '#fff4e6', bloom: 0.7 }, weather: 'autumn', roadRough: 0.8, clouds: 0.45, hills: 34,
+    grass: ['#8a7a2a', '#d0a040'], env: 1.0,
+  },
+  garden: {
+    grade: { saturation: 1.12, tint: '#fffaf6', bloom: 0.75 }, weather: 'petals', roadRough: 0.7, clouds: 0.4, hills: 20,
+    grass: ['#4a7a32', '#8ac860'], env: 1.0,
   },
   cloud: {
     grade: { exposure: 0.88, saturation: 1.22, contrast: 0.2, bloom: 0.8, threshold: 1.1 }, weather: 'sparkles', roadRough: 0.4, clouds: 0.6, env: 1.0, fill: 0.4,
@@ -758,11 +825,12 @@ export class World {
     const shadows = !!this.quality.shadows;
     const vc = pbrMat();
     const W = sc.wd[Math.floor(sc.count / 2)] + 0.8;
-    if (deco === 'barn' || deco === 'house') {
+    if (deco === 'barn' || deco === 'house' || deco === 'warehouse') {
       const { g } = this._frameGroup(sc, mid);
-      const B = new GeoBuilder(deco === 'barn' ? 'wood' : 'candy');
-      const wallC = deco === 'barn' ? '#c8372d' : '#b8743e', trim = deco === 'barn' ? '#ffffff' : '#fff4f8';
-      const roofC = deco === 'barn' ? '#5b3a29' : '#ff8fc7';
+      const wh = deco === 'warehouse';
+      const B = new GeoBuilder(deco === 'barn' ? 'wood' : wh ? [0.4, 0.6, 0] : 'candy');
+      const wallC = deco === 'barn' ? '#c8372d' : wh ? '#7c828e' : '#b8743e', trim = deco === 'barn' ? '#ffffff' : wh ? '#ffcf2a' : '#fff4f8';
+      const roofC = deco === 'barn' ? '#5b3a29' : wh ? '#4a4e58' : '#ff8fc7';
       const L = 16, H = 7;
       for (const s of [-1, 1]) {
         B.add(new THREE.BoxGeometry(1, H, L), wallC, [s * W, H / 2, 0]);
@@ -777,6 +845,9 @@ export class World {
         B.add(new THREE.ConeGeometry(0.7, 2.2, 8), '#ffffff', [0, H + W * 0.8, 0], [0, 0, 0], 1, 'frosting');
         // warm windows glowing from inside
         for (const s of [-1, 1]) B.add(new THREE.BoxGeometry(0.2, 1.6, 2.4), '#ffc46b', [s * (W + 0.52), 3.6, 0], [0, 0, 0], 1, 'glow');
+      } else if (wh) {
+        for (const z of [-5, 0, 5]) B.add(new THREE.BoxGeometry(W * 1.6, 0.25, 0.6), '#ffe8b0', [0, H - 0.4, z], [0, 0, 0], 1, 'glowHot');
+        for (const s2 of [-1, 1]) B.add(new THREE.CylinderGeometry(0.35, 0.35, L, 10), '#c8ccd4', [s2 * (W - 0.8), H - 1.2, 0], [Math.PI / 2, 0, 0], 1, 'metal');
       } else {
         B.add(new THREE.BoxGeometry(0.4, 3, 0.4), trim, [W + 0.7, 1.5, L / 2 + 0.3], [0, 0, 0.6]);
         B.add(new THREE.CylinderGeometry(1.2, 1.2, 1.4, 12), '#e8c65a', [W + 3, 0.7, 4], [0, 0, Math.PI / 2], 1, 'fabric');
@@ -786,13 +857,14 @@ export class World {
       const m = new THREE.Mesh(B.build(), vc);
       m.castShadow = shadows;
       g.add(m);
-    } else if (deco === 'cave' || deco === 'iceArch') {
+    } else if (deco === 'cave' || deco === 'iceArch' || deco === 'crypt' || deco === 'ruins' || deco === 'log') {
       const ice = deco === 'iceArch';
+      const CAVE = { cave: ['#b8643a', '#8a4527', '#ffd23f'], crypt: ['#3a3448', '#2a2438', '#9dff8a'], ruins: ['#8a8268', '#6a6450', '#ffcf5a'], log: ['#8a5a36', '#6a4424', '#ffb347'], iceArch: ['#bfe6ff', '#e8f7ff', '#9ff6ff'] }[deco];
       const s0 = sc.length * (ice ? 0.3 : 0.18), s1 = sc.length * (ice ? 0.7 : 0.82);
       const segsA = 9;
       const pos = [], col = [];
       const fr = {};
-      const c1 = new THREE.Color(ice ? '#bfe6ff' : '#b8643a'), c2 = new THREE.Color(ice ? '#e8f7ff' : '#8a4527');
+      const c1 = new THREE.Color(CAVE[0]), c2 = new THREE.Color(CAVE[1]);
       const rows = [];
       for (let s = s0; s <= s1 + 0.01; s += 2) {
         sc.frame(s, fr);
@@ -829,7 +901,7 @@ export class World {
         const base = sc.heightAtFrame(fr, 0);
         for (const side of [-1, 1]) {
           const d = side * (W - 0.2);
-          B.add(new THREE.OctahedronGeometry(0.6, 0), ice ? '#9ff6ff' : '#ffd23f', [fr.x + fr.rx * d, base + 3.2, fr.z + fr.rz * d]);
+          B.add(new THREE.OctahedronGeometry(0.6, 0), CAVE[2], [fr.x + fr.rx * d, base + 3.2, fr.z + fr.rz * d]);
         }
       }
       if (B.parts.length) this.group.add(new THREE.Mesh(B.build(), new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, color: hdr('#ffffff', 3) })));
@@ -851,11 +923,11 @@ export class World {
           this.animated.push((dt, t) => { m.rotation.z = t * (k % 2 ? 1 : -1) * 0.8; });
         }
       }
-    } else if (deco === 'lavaRocks' || deco === 'cotton' || deco === 'palms') {
+    } else if (deco === 'lavaRocks' || deco === 'cotton' || deco === 'palms' || deco === 'bamboo') {
       const B = new GeoBuilder();
       const fr = {};
       const r = this.r;
-      for (let s = 6; s < sc.length - 6; s += deco === 'palms' ? 26 : 9) {
+      for (let s = 6; s < sc.length - 6; s += deco === 'palms' ? 26 : deco === 'bamboo' ? 8 : 9) {
         if (sc.isVoid(s)) continue;
         sc.frame(s, fr);
         const base = sc.heightAtFrame(fr, 0);
@@ -864,6 +936,7 @@ export class World {
           const x = fr.x + fr.rx * d, z = fr.z + fr.rz * d;
           if (deco === 'lavaRocks') B.add(new THREE.ConeGeometry(1.2 + r(), 3 + r() * 5, 5), r() < 0.5 ? '#2b2527' : '#3d3336', [x, base + 1, z], [r() * 0.3, r() * 6, r() * 0.3], 1, 'stone');
           else if (deco === 'cotton') B.add(new THREE.IcosahedronGeometry(1.6 + r(), 2), ['#ffc6e4', '#c8e8ff', '#fff0f8'][Math.floor(r() * 3)], [x, base + 0.6, z], [0, 0, 0], 1, 'fabric');
+          else if (deco === 'bamboo') B.addRaw(translate(P.bamboo(), x, base - 0.2, z, 0.8 + r() * 0.4));
           else {
             B.addRaw(P.palmAt(x, base - 0.2, z, 0.9 + r() * 0.3, r() * 6));
           }
@@ -1138,6 +1211,52 @@ export class World {
       this._ferrisWheel();
       this._balloons(8);
     }
+    else if (theme === 'haunted') {
+      this._instanced(P.deadTree(), vc, S(90, 2, 90, 7), { scale: [1, 1.8] });
+      this._instanced(P.pumpkin(), vc, S(50, 0.5, 30, 6), { scale: [0.8, 1.6], castShadow: false });
+      this._instanced(P.grave(), vc, S(70, 1, 40, 4), { scale: [0.8, 1.2], tilt: 0.25 });
+      this._instanced(P.lamp('#9dff8a'), vc, S(24, 0.5, 6, 18), { scale: [1, 1.1], castShadow: false });
+      this._instanced(P.rock('#4a4458'), vc, S(40, 1, 80, 6), { scale: [0.7, 2.2], tilt: 0.5 });
+      this._mansion();
+      this._ghosts(7);
+    } else if (theme === 'jungle') {
+      this._instanced(P.jungleTree(), vc, S(90, 4, 100, 10), { scale: [0.8, 1.4] });
+      this._instanced(P.palm(), vc, S(50, 2, 60, 8), { scale: [0.9, 1.4] });
+      this._instanced(P.fern(), vc, S(160, 0.5, 40, 3), { scale: [0.8, 1.6], castShadow: false });
+      this._instanced(P.flowers(), vc, S(90, 0, 40, 3), { scale: [0.9, 1.4], castShadow: false, colors: ['#ff3d6a', '#ffd23f', '#ff8a2b', '#c77dff'] });
+      this._instanced(P.rock('#7d7862', true), vc, S(40, 1, 70, 6), { scale: [0.8, 2.6], tilt: 0.5 });
+      this._temple();
+    } else if (theme === 'factory') {
+      this._instanced(P.tank(), vc, S(26, 8, 70, 18), { scale: [0.8, 1.3] });
+      this._instanced(P.crates(), vc, S(60, 1, 30, 6), { scale: [0.8, 1.3] });
+      this._instanced(P.gear(), vc, S(30, 3, 50, 10), { scale: [0.8, 1.6], tilt: 0.3 });
+      this._instanced(P.lamp('#ffd27a'), vc, S(30, 0.5, 6, 18), { scale: [1, 1.2], castShadow: false });
+      this._smokestacks();
+      this._skyline(['#8a8e98', '#6e727c', '#9a8a7a', '#7a6a6a'], 0.7);
+    } else if (theme === 'moon') {
+      this._instanced(P.crater(), vc, S(60, 3, 120, 16), { scale: [1, 3.4], castShadow: false });
+      this._instanced(P.rock('#8a8c92'), vc, S(70, 1, 100, 6), { scale: [0.6, 2.6], tilt: 0.6 });
+      this._instanced(P.dome(), vc, S(8, 12, 70, 30), { scale: [1, 1.5] });
+      this._instanced(P.antenna(), vc, S(10, 6, 50, 20), { scale: [0.9, 1.3] });
+      this._instanced(P.lamp('#6fd8ff'), vc, S(24, 0.5, 6, 18), { scale: [1, 1.1], castShadow: false });
+    } else if (theme === 'autumn') {
+      this._instanced(P.tree('#d9602a', '#f09a3a'), vc, S(110, 3, 100, 7), { scale: [0.9, 1.5] });
+      this._instanced(P.tree('#c8402a', '#e8b83a'), vc, S(70, 3, 90, 7), { scale: [0.8, 1.4] });
+      this._instanced(P.pine(), vc, S(50, 4, 100, 8), { scale: [0.9, 1.6] });
+      this._instanced(P.pumpkin(), vc, S(30, 0.5, 25, 6), { scale: [0.8, 1.4], castShadow: false });
+      this._instanced(P.hay(), vc, S(24, 2, 40, 10), { scale: [0.9, 1.2] });
+      this._instanced(P.bush('#b8602a'), vc, S(70, 1, 30, 4), { scale: [0.7, 1.4] });
+      this._landmarkWindmill();
+      this._balloons(3);
+    } else if (theme === 'garden') {
+      this._instanced(P.tree('#ff9ecb', '#ffc2de'), vc, S(90, 3, 90, 7), { scale: [0.8, 1.4] });
+      this._instanced(P.bamboo(), vc, S(80, 1, 50, 5), { scale: [0.8, 1.3] });
+      this._instanced(P.lantern(), vc, S(40, 0.5, 20, 8), { scale: [0.9, 1.2], castShadow: false });
+      this._instanced(P.bush('#4ea83f'), vc, S(70, 1, 30, 4), { scale: [0.6, 1.2] });
+      this._instanced(P.rock('#a8a498'), vc, S(40, 1, 60, 6), { scale: [0.6, 1.8], tilt: 0.4 });
+      this._pagoda();
+      this._torii(5);
+    }
     const gq = this.quality.grass ?? 1;
     if (this.fx.grass && gq > 0) {
       const spots = this._grassSpots(Math.round(3200 * gq * this.lenScale), 26);
@@ -1220,6 +1339,158 @@ export class World {
     blades.translateZ(3.2);
     this.group.add(blades);
     this.animated.push((dt) => { blades.rotateZ(dt * 0.9); });
+  }
+
+  // Wobbly sheet ghosts floating by the road.
+  _ghosts(count) {
+    const B = new GeoBuilder([0.6, 0, 0.3]);
+    B.add(new THREE.SphereGeometry(1, 16, 12), '#f2f0ff', [0, 1.4, 0]);
+    B.add(new THREE.ConeGeometry(1, 2.2, 16, 1, true), '#f2f0ff', [0, 0.2, 0], [Math.PI, 0, 0]);
+    for (const x of [-0.35, 0.35]) B.add(new THREE.SphereGeometry(0.16, 8, 6), '#9dff8a', [x, 1.55, 0.88], [0, 0, 0], 1, 'glowHot');
+    const geo = B.build();
+    const mat = pbrMat({ transparent: true, opacity: 0.72, depthWrite: false });
+    const spots = this._scatter(count, 8, 40, 20);
+    spots.forEach(([x, z, y], i) => {
+      const m = new THREE.Mesh(geo, mat);
+      this.group.add(m);
+      const ph = i * 1.7;
+      this.animated.push((dt, t) => {
+        m.position.set(x + Math.sin(t * 0.3 + ph) * 6, y + 4 + Math.sin(t * 1.3 + ph) * 1.2, z + Math.cos(t * 0.3 + ph) * 6);
+        m.rotation.y = t * 0.3 + ph + Math.PI / 2;
+      });
+    });
+  }
+
+  _mansion() {
+    const spots = this._scatter(1, 30, 80, 40);
+    if (!spots.length) return;
+    const [x, z, gy] = spots[0];
+    const B = new GeoBuilder('matte');
+    B.add(new THREE.BoxGeometry(16, 10, 10), '#3a3448', [0, 5, 0]);
+    B.add(new THREE.BoxGeometry(6, 16, 6), '#453e56', [-9, 8, 0]);
+    B.add(new THREE.ConeGeometry(4.6, 7, 4), '#1f1a28', [-9, 19.5, 0], [0, Math.PI / 4, 0]);
+    B.add(new THREE.ConeGeometry(11, 6, 4), '#1f1a28', [2, 13, 0], [0, Math.PI / 4, 0], [1, 1, 0.6]);
+    for (let k = 0; k < 6; k++) B.add(new THREE.BoxGeometry(1.4, 2, 0.2), k % 3 ? '#ffcf5a' : '#9dff8a', [-5 + (k % 3) * 5, 3.5 + Math.floor(k / 3) * 4, 5.05], [0, 0, 0], 1, 'glow');
+    B.add(new THREE.BoxGeometry(1.4, 1.8, 0.2), '#ffcf5a', [-9, 12, 3.05], [0, 0, 0], 1, 'glow');
+    const m = new THREE.Mesh(B.build(), this.propMat);
+    m.position.set(x, gy, z);
+    m.rotation.y = Math.atan2(this.track.center.x - x, this.track.center.z - z);
+    m.castShadow = !!this.quality.shadows;
+    this.group.add(m);
+  }
+
+  _temple() {
+    const spots = this._scatter(1, 30, 90, 40);
+    if (!spots.length) return;
+    const [x, z, gy] = spots[0];
+    const B = new GeoBuilder('stone');
+    for (let k = 0; k < 5; k++) B.add(new THREE.BoxGeometry(26 - k * 5, 4, 26 - k * 5), ['#9a9278', '#8a8268', '#a8a086'][k % 3], [0, 2 + k * 4, 0]);
+    B.add(new THREE.BoxGeometry(5, 5, 5), '#8a8268', [0, 22.5, 0]);
+    B.add(new THREE.BoxGeometry(2, 3, 0.3), '#ffcf5a', [0, 22, 2.55], [0, 0, 0], 1, 'glow');
+    B.add(new THREE.BoxGeometry(4, 20, 1.2), '#8a8268', [0, 10, 13.5], [-0.45, 0, 0]);
+    blotchMoss(B, 12);
+    const m = new THREE.Mesh(B.build(), this.propMat);
+    m.position.set(x, gy, z);
+    m.rotation.y = Math.atan2(this.track.center.x - x, this.track.center.z - z);
+    m.castShadow = !!this.quality.shadows;
+    this.group.add(m);
+  }
+
+  _smokestacks() {
+    const spots = this._scatter(3, 30, 90, 30);
+    const smoke = new THREE.IcosahedronGeometry(1, 1);
+    const smat = stdMat({ color: '#8a8488', roughness: 1, transparent: true, opacity: 0.55, depthWrite: false });
+    for (const [x, z, gy] of spots) {
+      const B = new GeoBuilder('paint');
+      for (let k = 0; k < 6; k++) B.add(new THREE.CylinderGeometry(2.4 - k * 0.12, 2.5 - k * 0.12, 6, 14), k % 2 ? '#f2f2f2' : '#c83a2a', [0, 3 + k * 6, 0]);
+      B.add(new THREE.CylinderGeometry(1.8, 1.8, 0.6, 14), '#1d1a22', [0, 36.3, 0], [0, 0, 0], 1, 'metal');
+      B.add(new THREE.SphereGeometry(0.4, 8, 6), '#ff3d3d', [2.3, 34, 0], [0, 0, 0], 1, 'glowHot');
+      const m = new THREE.Mesh(B.build(), this.propMat);
+      m.position.set(x, gy, z);
+      m.castShadow = !!this.quality.shadows;
+      this.group.add(m);
+      const puffs = [];
+      for (let k = 0; k < 6; k++) {
+        const p = new THREE.Mesh(smoke, smat);
+        this.group.add(p);
+        puffs.push({ p, t: k / 6 });
+      }
+      this.animated.push((dt) => {
+        for (const q of puffs) {
+          q.t = (q.t + dt * 0.12) % 1;
+          const sc = 2 + q.t * 7;
+          q.p.scale.setScalar(sc);
+          q.p.position.set(x + q.t * 10, gy + 38 + q.t * 30, z + q.t * 4);
+        }
+      });
+    }
+  }
+
+  // A distant skyline of plain buildings with lit windows.
+  _skyline(cols, glow = 0.7) {
+    const win = this._tex(TX.windowsTexture(13));
+    const bmat = stdMat({ map: win, emissiveMap: win, emissive: new THREE.Color('#ffd8a0'), emissiveIntensity: glow, roughness: 0.6 });
+    const bgeo = new THREE.BoxGeometry(1, 1, 1);
+    bgeo.translate(0, 0.5, 0);
+    const spots = this._scatter(Math.round(50 * this.lenScale), 60, 190, 20);
+    const bm = new THREE.InstancedMesh(bgeo, bmat, spots.length);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
+    const r = this.r;
+    spots.forEach(([x, z, y], i) => {
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * Math.PI);
+      m.compose(new THREE.Vector3(x, y - 0.3, z), q, new THREE.Vector3(10 + r() * 14, 10 + r() * 34, 10 + r() * 14));
+      bm.setMatrixAt(i, m);
+      bm.setColorAt(i, c.set(cols[i % cols.length]));
+    });
+    bm.instanceMatrix.needsUpdate = true;
+    bm.computeBoundingSphere();
+    bm.receiveShadow = !!this.quality.shadows;
+    this.group.add(bm);
+  }
+
+  _pagoda() {
+    const spots = this._scatter(1, 25, 70, 40);
+    if (!spots.length) return;
+    const [x, z, gy] = spots[0];
+    const B = new GeoBuilder('wood');
+    let y = 0;
+    for (let k = 0; k < 5; k++) {
+      const w = 12 - k * 1.8;
+      B.add(new THREE.BoxGeometry(w * 0.7, 4, w * 0.7), '#c83a2a', [0, y + 2, 0], [0, 0, 0], 1, 'paint');
+      B.add(new THREE.ConeGeometry(w * 0.85, 2.2, 4), '#2a2a36', [0, y + 4.8, 0], [0, Math.PI / 4, 0], [1, 1, 1], 'metal');
+      B.add(new THREE.BoxGeometry(w * 0.5, 1.2, 0.2), '#ffd27a', [0, y + 2.4, w * 0.35 + 0.05], [0, 0, 0], 1, 'glow');
+      y += 5;
+    }
+    B.add(new THREE.CylinderGeometry(0.15, 0.15, 5, 6), '#ffcf5a', [0, y + 2.5, 0], [0, 0, 0], 1, 'metal');
+    const m = new THREE.Mesh(B.build(), this.propMat);
+    m.position.set(x, gy, z);
+    m.castShadow = !!this.quality.shadows;
+    this.group.add(m);
+  }
+
+  // Red torii gates spanning the road.
+  _torii(count) {
+    const tr = this.track;
+    for (let k = 0; k < count; k++) {
+      const fr = tr.frame(tr.length * (0.08 + k / count), {});
+      const W = fr.wd + 1.5, base = tr.heightAtFrame(fr, 0) - 0.2;
+      const yaw = Math.atan2(fr.tx, fr.tz);
+      const g = new THREE.Group();
+      const P2 = new GeoBuilder('paint');
+      for (const s2 of [-1, 1]) {
+        P2.add(new THREE.CylinderGeometry(0.55, 0.65, 11, 12), '#d8342a', [s2 * W, 5.5, 0]);
+        P2.add(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 12), '#2a2a36', [s2 * W, 0.3, 0], [0, 0, 0], 1, 'metal');
+      }
+      P2.add(new THREE.BoxGeometry(W * 2 + 4, 0.9, 1.2), '#2a2a36', [0, 11.2, 0], [0, 0, 0], 1, 'metal');
+      P2.add(new THREE.BoxGeometry(W * 2 + 2.4, 0.8, 0.9), '#d8342a', [0, 10.2, 0]);
+      P2.add(new THREE.BoxGeometry(W * 2 + 0.5, 0.6, 0.7), '#d8342a', [0, 8.2, 0]);
+      const m = new THREE.Mesh(P2.build(), this.propMat);
+      m.castShadow = !!this.quality.shadows;
+      g.add(m);
+      g.position.set(fr.x, base, fr.z);
+      g.rotation.y = yaw;
+      this.group.add(g);
+    }
   }
 
   _balloons(count) {
@@ -1391,6 +1662,20 @@ export class World {
     }
   }
 
+  // The Earth hanging in the moon's black sky.
+  _earth() {
+    const tr = this.track;
+    const tex = this._tex(TX.earthTexture());
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(70, 48, 32), stdMat({ map: tex, roughness: 0.6, emissiveMap: tex, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.25, fog: false }));
+    earth.position.set(tr.center.x - 380, 230, tr.center.z - 460);
+    earth.rotation.z = 0.4;
+    this.group.add(earth);
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(74, 32, 24), new THREE.MeshBasicMaterial({ color: hdr('#6fb8ff', 0.6), transparent: true, opacity: 0.25, side: THREE.BackSide, fog: false, depthWrite: false }));
+    halo.position.copy(earth.position);
+    this.group.add(halo);
+    this.animated.push((dt) => { earth.rotation.y += dt * 0.01; });
+  }
+
   _planet(c1, c2) {
     const tr = this.track;
     const planet = new THREE.Mesh(new THREE.SphereGeometry(60, 48, 32), stdMat({ color: c1, roughness: 0.7, emissive: new THREE.Color(c1), emissiveIntensity: 0.35, fog: false }));
@@ -1435,6 +1720,7 @@ export class World {
       }
       this.group.add(new THREE.Mesh(B.build(), stdMat({ vertexColors: true, flatShading: true, roughness: 1 })));
     }
+    if (th.earth) this._earth();
     if (th.volcano) {
       // The big volcano with a glowing crater.
       const a = 0.8;
@@ -1505,6 +1791,14 @@ export class World {
     disposeObject(this.group);
     for (const t of this.textures) t.dispose();
     if (this.envRT) this.envRT.dispose();
+  }
+}
+
+// Moss patches on stone landmarks.
+function blotchMoss(B, n) {
+  for (let k = 0; k < n; k++) {
+    const a = k * 2.3, r = 6 + (k % 4) * 2.5;
+    B.add(new THREE.SphereGeometry(1.2 + (k % 3) * 0.4, 8, 6), '#5a8a3a', [Math.cos(a) * r, 2 + (k % 5) * 3.6, Math.sin(a) * r], [0, 0, 0], [1.4, 0.35, 1.4], 'leaf');
   }
 }
 
@@ -1730,6 +2024,120 @@ const P = {
     const B = new GeoBuilder('matte');
     B.add(new THREE.TorusGeometry(2, 0.95, 12, 24), '#e0a860', [0, 1, 0], [Math.PI / 2, 0, 0]);
     B.add(new THREE.TorusGeometry(2, 0.7, 10, 24), '#ffffff', [0, 1.45, 0], [Math.PI / 2, 0, 0], [1, 1, 0.6], 'candy');
+    return B.build();
+  },
+  pumpkin() {
+    const B = new GeoBuilder([0.5, 0, 0]);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      B.add(new THREE.SphereGeometry(0.62, 12, 10), '#ff7a1a', [Math.cos(a) * 0.36, 0.62, Math.sin(a) * 0.36], [0, 0, 0], [0.7, 0.9, 0.7]);
+    }
+    B.add(new THREE.CylinderGeometry(0.08, 0.12, 0.35, 6), '#4a6a2a', [0, 1.25, 0], [0.2, 0, 0.1], 1, 'leaf');
+    // glowing carved face
+    for (const x of [-0.2, 0.2]) B.add(new THREE.ConeGeometry(0.1, 0.16, 3), '#ffd23f', [x, 0.78, 0.86], [Math.PI / 2, 0, 0], 1, 'glowHot');
+    B.add(new THREE.BoxGeometry(0.46, 0.08, 0.05), '#ffd23f', [0, 0.52, 0.86], [0, 0, 0], 1, 'glowHot');
+    return B.build();
+  },
+  grave() {
+    const B = new GeoBuilder('stone');
+    B.add(new THREE.BoxGeometry(0.9, 1.2, 0.25), '#8a8698', [0, 0.6, 0]);
+    B.add(new THREE.CylinderGeometry(0.45, 0.45, 0.25, 12, 1, false, 0, Math.PI), '#8a8698', [0, 1.2, 0], [Math.PI / 2, Math.PI / 2, 0]);
+    B.add(new THREE.BoxGeometry(1.1, 0.14, 0.5), '#6a6678', [0, 0.07, 0]);
+    return B.build();
+  },
+  lamp(glow = '#ffd27a') {
+    const B = new GeoBuilder('metal');
+    B.add(new THREE.CylinderGeometry(0.1, 0.14, 4.2, 6), '#2a2632', [0, 2.1, 0]);
+    B.add(new THREE.BoxGeometry(0.5, 0.6, 0.5), '#2a2632', [0, 4.4, 0]);
+    B.add(new THREE.BoxGeometry(0.36, 0.44, 0.36), glow, [0, 4.4, 0], [0, 0, 0], 1, 'glowHot');
+    return B.build();
+  },
+  jungleTree() {
+    const B = new GeoBuilder('leaf');
+    B.add(new THREE.CylinderGeometry(0.45, 0.8, 9, 8), '#6a4a2a', [0, 4.5, 0], [0, 0, 0], 1, 'wood');
+    B.add(new THREE.CylinderGeometry(0.2, 0.3, 3, 6), '#6a4a2a', [1.2, 7.5, 0], [0, 0, -0.7], 1, 'wood');
+    B.add(new THREE.SphereGeometry(3.4, 12, 8), '#2f8a34', [0, 9.5, 0], [0, 0, 0], [1.3, 0.55, 1.3]);
+    B.add(new THREE.SphereGeometry(2.4, 10, 8), '#3fa044', [2.2, 8.6, 1], [0, 0, 0], [1.2, 0.6, 1.2]);
+    B.add(new THREE.SphereGeometry(2.2, 10, 8), '#27782c', [-2, 8.9, -1.2], [0, 0, 0], [1.2, 0.6, 1.2]);
+    return B.build();
+  },
+  fern() {
+    const B = new GeoBuilder('leaf');
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2;
+      B.add(new THREE.ConeGeometry(0.35, 2.2, 4), k % 2 ? '#3fa044' : '#5ab84e', [Math.cos(a) * 0.7, 0.6, Math.sin(a) * 0.7], [Math.sin(a) * 1.1, 0, -Math.cos(a) * 1.1], [1, 1, 0.3]);
+    }
+    return B.build();
+  },
+  tank() {
+    const B = new GeoBuilder('metal');
+    B.add(new THREE.CylinderGeometry(3, 3, 7, 18), '#c8ccd4', [0, 3.5, 0], [0, 0, 0], 1, [0.35, 0.8, 0]);
+    B.add(new THREE.SphereGeometry(3, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), '#c8ccd4', [0, 7, 0], [0, 0, 0], 1, [0.35, 0.8, 0]);
+    B.add(new THREE.TorusGeometry(3.05, 0.12, 6, 24), '#ffcf2a', [0, 5, 0], [Math.PI / 2, 0, 0], 1, 'paint');
+    B.add(new THREE.CylinderGeometry(0.3, 0.3, 8, 8), '#5a5e6a', [3.4, 4, 0], [0, 0, 0], 1, 'metal');
+    return B.build();
+  },
+  crates() {
+    const B = new GeoBuilder('wood');
+    B.add(new THREE.BoxGeometry(1.8, 1.8, 1.8), '#b8864e', [0, 0.9, 0]);
+    B.add(new THREE.BoxGeometry(1.6, 1.6, 1.6), '#a8764a', [1.9, 0.8, 0.3], [0, 0.3, 0]);
+    B.add(new THREE.BoxGeometry(1.5, 1.5, 1.5), '#c89a5e', [0.8, 2.55, 0.2], [0, 0.6, 0]);
+    B.add(new THREE.BoxGeometry(1.2, 1.3, 1.2), '#3a6ab0', [-1.6, 0.65, 0.4], [0, 0.2, 0], 1, 'paint');
+    return B.build();
+  },
+  gear() {
+    const B = new GeoBuilder('metal');
+    B.add(new THREE.CylinderGeometry(2.2, 2.2, 0.6, 20), '#8a8e98', [0, 0, 0], [Math.PI / 2, 0, 0], 1, [0.4, 0.9, 0]);
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      B.add(new THREE.BoxGeometry(0.7, 0.7, 0.6), '#8a8e98', [Math.cos(a) * 2.4, Math.sin(a) * 2.4, 0], [0, 0, a], 1, [0.4, 0.9, 0]);
+    }
+    B.add(new THREE.CylinderGeometry(0.6, 0.6, 0.8, 12), '#ffcf2a', [0, 0, 0], [Math.PI / 2, 0, 0], 1, 'paint');
+    return B.build();
+  },
+  dome() {
+    const B = new GeoBuilder('metal');
+    B.add(new THREE.CylinderGeometry(4.2, 4.4, 1.2, 20), '#d8dce4', [0, 0.6, 0], [0, 0, 0], 1, 'paint');
+    B.add(new THREE.SphereGeometry(4, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), '#9fdcff', [0, 1.2, 0], [0, 0, 0], 1, [0.05, 0, 0.35]);
+    B.add(new THREE.SphereGeometry(0.4, 10, 8), '#ff3d6a', [0, 5.3, 0], [0, 0, 0], 1, 'glowHot');
+    return B.build();
+  },
+  antenna() {
+    const B = new GeoBuilder('metal');
+    B.add(new THREE.CylinderGeometry(0.15, 0.3, 6, 6), '#c8ccd4', [0, 3, 0]);
+    B.add(new THREE.SphereGeometry(1.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), '#e8ecf4', [0, 6.2, 0.3], [-1.1, 0, 0], 1, 'paint');
+    B.add(new THREE.SphereGeometry(0.18, 8, 6), '#6fd8ff', [0, 6.6, 1.3], [0, 0, 0], 1, 'glowHot');
+    return B.build();
+  },
+  crater() {
+    const B = new GeoBuilder('stone');
+    B.add(new THREE.TorusGeometry(3, 0.8, 6, 18), '#8a8c92', [0, 0.1, 0], [Math.PI / 2, 0, 0], [1, 1, 0.45]);
+    B.add(new THREE.CircleGeometry(2.6, 18), '#6a6c72', [0, 0.02, 0], [-Math.PI / 2, 0, 0]);
+    return B.build();
+  },
+  hay() {
+    const B = new GeoBuilder('fabric');
+    B.add(new THREE.CylinderGeometry(1.2, 1.2, 1.8, 16), '#e8c65a', [0, 1.2, 0], [0, 0, Math.PI / 2]);
+    B.add(new THREE.TorusGeometry(1.2, 0.06, 4, 18), '#a8864a', [0.5, 1.2, 0], [0, Math.PI / 2, 0]);
+    B.add(new THREE.TorusGeometry(1.2, 0.06, 4, 18), '#a8864a', [-0.5, 1.2, 0], [0, Math.PI / 2, 0]);
+    return B.build();
+  },
+  bamboo() {
+    const B = new GeoBuilder([0.45, 0, 0]);
+    for (let k = 0; k < 5; k++) {
+      const x = Math.cos(k * 2.4) * 0.6, z = Math.sin(k * 2.4) * 0.6, h = 6 + (k % 3) * 1.6;
+      B.add(new THREE.CylinderGeometry(0.16, 0.18, h, 6), k % 2 ? '#8ab84a' : '#9ac85a', [x, h / 2, z]);
+      for (let j = 1; j < 4; j++) B.add(new THREE.ConeGeometry(0.4, 1.4, 3), '#5a9a3a', [x + 0.4, h * (0.5 + j * 0.15), z], [0, j, -1.2], [1, 1, 0.3], 'leaf');
+    }
+    return B.build();
+  },
+  lantern() {
+    const B = new GeoBuilder('stone');
+    B.add(new THREE.CylinderGeometry(0.5, 0.7, 0.4, 6), '#a8a498', [0, 0.2, 0]);
+    B.add(new THREE.CylinderGeometry(0.18, 0.22, 1.4, 6), '#a8a498', [0, 1.1, 0]);
+    B.add(new THREE.BoxGeometry(0.9, 0.7, 0.9), '#a8a498', [0, 2.1, 0]);
+    B.add(new THREE.BoxGeometry(0.5, 0.4, 0.95), '#ffcf7a', [0, 2.1, 0], [0, 0, 0], 1, 'glowHot');
+    B.add(new THREE.ConeGeometry(0.9, 0.6, 4), '#8a8678', [0, 2.75, 0], [0, Math.PI / 4, 0]);
     return B.build();
   },
   cloudPuff() {

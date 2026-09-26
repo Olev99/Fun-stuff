@@ -10,6 +10,10 @@ const TYPES = {
   sprinkles: { count: 520, box: [70, 30, 70], vel: [0.4, -1.8, 0.2], sway: 1.1, size: 0.2, rainbow: true, k: 1.1, alpha: 1 },
   motes: { count: 650, box: [80, 30, 80], vel: [0.2, 0.7, 0.1], sway: 1.3, size: 0.17, colors: ['#39f5ff', '#ff3dc8'], k: 3, additive: true, alpha: 1 },
   embers: { count: 750, box: [70, 30, 70], vel: [0.6, 3.2, 0.3], sway: 1.1, size: 0.15, colors: ['#ff5a1a', '#ffd23f'], k: 4, additive: true, alpha: 1, flicker: true },
+  wisps: { count: 260, box: [80, 20, 80], vel: [0.3, 0.4, 0.2], sway: 2.2, size: 0.22, colors: ['#9dff8a', '#6fe8ff'], k: 3, additive: true, alpha: 1, flicker: true },
+  jleaves: { count: 300, box: [80, 26, 80], vel: [0.8, -1.2, 0.5], sway: 1.8, size: 0.26, colors: ['#4fa83a', '#9ad85a'], k: 1, alpha: 0.95 },
+  autumn: { count: 420, box: [80, 26, 80], vel: [1.6, -1.3, 0.8], sway: 1.8, size: 0.28, colors: ['#e8762a', '#d9412a'], k: 1.05, alpha: 0.95 },
+  sparks: { count: 380, box: [60, 26, 60], vel: [0.4, -5.5, 0.2], sway: 0.4, size: 0.12, colors: ['#ffb13d', '#ffe07a'], k: 4, additive: true, alpha: 1, flicker: true },
   sparkles: { count: 420, box: [80, 30, 80], vel: [0.1, 0.35, 0.1], sway: 0.8, size: 0.2, colors: ['#ffffff', '#ffe9a8'], k: 2.6, additive: true, alpha: 1, flicker: true },
 };
 

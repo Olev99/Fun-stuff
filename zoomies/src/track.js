@@ -586,8 +586,21 @@ export class Shortcut extends Path {
       const yy = y !== undefined && y !== null ? y : Math.abs(d) <= fr.wd ? main.heightAtFrame(fr, dd) : main.heightAtFrame(fr, Math.sign(d) * fr.wd);
       P.push(new THREE.Vector3(fr.x + fr.rx * d, yy, fr.z + fr.rz * d));
     };
-    main.frame(from * L, fr);
-    add(from, side * Math.max(1, fr.hw - 3));
+    // `lead` (metres): branch off earlier and peel away gently instead of
+    // turning straight across the kerb, and rejoin the same way.
+    const lead = (def.lead || 0) / L;
+    const wrap = (a) => (a + 1) % 1;
+    if (lead) {
+      main.frame(from * L, fr);
+      const out = side * (fr.wd + 5);
+      from = wrap(from - lead);
+      main.frame(from * L, fr);
+      add(from, side * Math.max(1, fr.hw - 3));
+      add(wrap(from + lead), out);
+    } else {
+      main.frame(from * L, fr);
+      add(from, side * Math.max(1, fr.hw - 3));
+    }
     for (const p of inner) add(p[0], p[1], p[2]);
     const tmp = {};
     for (const w of world) {
@@ -597,11 +610,18 @@ export class Shortcut extends Path {
       }
       P.push(w);
     }
+    if (lead) {
+      main.frame(to * L, fr);
+      add(to, side * (fr.wd + 5));
+      to = wrap(to + lead);
+    }
     main.frame(to * L, fr);
     add(to, side * Math.max(1, fr.hw - 3));
     const surf = SURFACES[def.surface] || SURFACES.road;
+    // With a lead-in the mouths flare out into a funnel that is easy to hit.
+    const widths = lead ? P.map((_, i) => (i === 0 || i === P.length - 1 ? 1.8 : i === 1 || i === P.length - 2 ? 1.5 : 1)) : undefined;
     super(P, { closed: false, width: def.width ?? 10, curb: 0.6, shoulder: def.shoulder ?? 1.4, wallH: def.wallH ?? 1.1, bank: 0,
-      offroad: !!surf.offroad, grip: surf.grip });
+      offroad: !!surf.offroad, grip: surf.grip, widths });
     this.main = main;
     this.id = id;
     this.def = def;

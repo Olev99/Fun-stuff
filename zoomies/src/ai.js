@@ -62,10 +62,12 @@ export class AIDriver {
     this.dodge += (avoid - this.dodge) * Math.min(1, dt * 3);
 
     const wobble = this.pilot ? 0 : Math.sin(time * 0.35 + this.phase) * 1.8;
+    let approach = false;
     if (k.path !== main) {
       // Following a shortcut branch.
       const p = k.path;
       const s = k.trk.s + look;
+      approach = k.trk.s < 40;
       if (s < p.length) {
         p.frame(s, this.fr);
         lane = clamp(this.dodge * 0.6, -(this.fr.hw - 1.2), this.fr.hw - 1.2);
@@ -89,8 +91,14 @@ export class AIDriver {
           this.plan[sc.id] = Math.random() < p;
           this.boostAt = sc.offroadAll && boost ? sc.id : -1;
         }
+        // Missed the turn-in: give up instead of grinding along the wall.
+        if (this.plan[sc.id] && dist < -4 && main.gap[sc.side > 0 ? 1 : 0][k.trk.idx] !== sc.id + 1) {
+          this.plan[sc.id] = false;
+          continue;
+        }
         // Commit early and keep aiming into the branch until we are on it.
         if (this.plan[sc.id] && dist < look + 45 && dist > -45) {
+          approach = dist < look + 15;
           sc.frame(clamp(look - dist + 10, 8, sc.length), this.fr);
           lane = 0;
           if (this.boostAt === sc.id && dist < 10 && k.item && k.rolling <= 0) {
@@ -110,6 +118,11 @@ export class AIDriver {
     c.throttle = 1;
     c.brake = false;
     if (Math.abs(diff) > 1.3 && spd > 12 && !this.pilot) c.brake = true;
+    // Cutting into a branch on the inside of a bend: scrub speed to make the turn.
+    if (approach && spd > 16 && Math.abs(diff) > 0.3) {
+      c.throttle = 0.2;
+      if (Math.abs(diff) > 0.45) c.brake = true;
+    }
 
     if (spd < 2 && this.race.raceTime > 4 && !this.pilot) {
       this.stuck = (this.stuck || 0) + dt;

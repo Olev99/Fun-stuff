@@ -5,7 +5,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 ## What's in it
 
 - **8 original racers:** Mochi the cat, Pip the penguin, Bruno the bear, Rexi the dino, Volt the robot, Ember the fox, Zorp the alien and Hopper the frog. Each has its own speed, acceleration, handling and weight.
-- **8 tracks in 3 sizes,** each also playable in reverse. Every track hides at least one secret shortcut.
+- **18 tracks in 3 sizes and 14 themes,** each also playable in reverse. Every track hides at least one secret shortcut.
 
   | Track | Size | Theme | Secret shortcut |
   | --- | --- | --- | --- |
@@ -17,10 +17,20 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   | Neon Nebula | Long | Night city, figure-eight flyover | **Hyperlane Leap:** a ramp jump over a gap |
   | Magma Mountain | Long | Volcano climb, lava | **Crater Leap:** jump the lava pit |
   | Cloud Carnival | Long | Floating fairground, glide ramps | **Rainbow Leap** (glide over a gap) and **Cotton Candy Cut** |
+  | Windmill Downs | Medium | Farmland esses, windmill, pond | **Cart Track:** a dirt lane past the barn |
+  | Tidal Twist | Short | Seaside figure-eight with a bridge | **Lagoon Boardwalk:** across the lagoon |
+  | Glacier Gorge | Long | Sheer ice, black-ice sheets, frozen lake | **Crevasse** (ice) and **Snowdrift Cut** |
+  | Obsidian Rush | Long | Black-glass highway, lava lakes | **Magma Chute** and **Glass Bridge** (jump the gap) |
+  | Spooky Hollow | Medium | Haunted manor, ghosts, mud | **Crypt Passage:** through the crypt |
+  | Jungle Ruins | Medium | Vines, temple, rolling boulders | **Temple Tunnel:** through the ruins |
+  | Gearworks | Medium | Factory figure-eight, oil slicks, barrels | **Loading Bay** and **Scrap Alley** |
+  | Moonbase Loop | Long | Low gravity, craters, Earth overhead | **Crater Hop:** a floaty jump over a crater |
+  | Maple Ridge | Medium | Autumn ridge climb and descent | **Lumber Run:** down through the logging trail |
+  | Blossom Gardens | Short | Cherry trees, koi pond, torii gates | **Bamboo Grove:** through the bamboo |
 
 - **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders and balloons. There are also boost pads, jump ramps, glide ramps with a pop-out glider, and gems.
 - **Modes:**
-  - Grand Prix: 4 cups of 4 races with points.
+  - Grand Prix: 9 cups of 4 races with points.
   - Quick Race.
   - Time Trial, with saved records.
   - Multiplayer.
