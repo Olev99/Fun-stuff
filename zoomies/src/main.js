@@ -64,6 +64,8 @@ class App {
     addEventListener('orientationchange', () => setTimeout(() => this.resize(), 250));
     document.addEventListener('visibilitychange', () => this.onVisibility());
     document.addEventListener('gesturestart', (e) => e.preventDefault());
+    // iOS only applies :active styles when a touch listener exists.
+    document.addEventListener('touchstart', () => {}, { passive: true });
     document.addEventListener('dblclick', (e) => e.preventDefault());
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape' || e.code === 'KeyP') {
@@ -175,6 +177,7 @@ class App {
   }
 
   showShowroom() {
+    clearTimeout(this._prevT);
     this.disposeRace();
     this.view = this.showroom;
   }

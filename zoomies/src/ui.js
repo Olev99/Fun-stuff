@@ -18,7 +18,7 @@ export class UI {
     document.querySelectorAll('.screen').forEach((sc) => {
       sc.addEventListener('click', (e) => {
         const b = e.target.closest('[data-go]');
-        if (b) this._go(sc.id.replace('scr-', ''), b.dataset.go, b);
+        if (b) this._go(sc.id.replace('scr-', ''), b.dataset.go);
       });
     });
     $('btn-pause').addEventListener('click', () => this.app.pause());
@@ -38,7 +38,7 @@ export class UI {
     this.show('__none__');
   }
 
-  _go(screen, action, el) {
+  _go(screen, action) {
     const app = this.app;
     const snd = action === 'back' || action === 'close' || action === 'quit' ? 'uiBack' : 'ui';
     app.firstGesture(action);
@@ -70,7 +70,6 @@ export class UI {
         app.onResultsAction(action);
         break;
     }
-    void el;
   }
 
   overlay(name, from) {

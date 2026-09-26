@@ -10,7 +10,7 @@ varying float vAlpha;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = min(size * uScale / max(-mv.z, 0.1), 256.0);
+  gl_PointSize = min(size * uScale / max(-mv.z, 0.1), 96.0);
   vColor = color;
   vAlpha = alpha;
 }`;

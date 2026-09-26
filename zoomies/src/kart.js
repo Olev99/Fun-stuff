@@ -462,9 +462,8 @@ export class Kart {
     const trk = this.trk;
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     const along = fx * trk.tx + fz * trk.tz;
-    const side = fx * trk.rx + fz * trk.rz;
     const pitchT = this.grounded ? -Math.atan(trk.grade * along) : clamp(-this.vy * 0.02, -0.35, 0.35);
-    const slopeRel = trk.slope * (-fz * trk.rx + fx * trk.rz) + trk.grade * side * 0;
+    const slopeRel = trk.slope * (-fz * trk.rx + fx * trk.rz);
     const rollT = this.grounded ? -Math.atan(slopeRel) : 0;
     const b = this.body;
     b.rotation.order = 'YXZ';
@@ -558,7 +557,7 @@ export class Kart {
     // Rainbow sparkle trail
     if (this.starTime > 0 && Math.random() < 0.8) {
       local((Math.random() - 0.5) * 1.6, 0.4 + Math.random(), -1, v);
-      fx.glow.emit(v[0], v[1], v[2], 0, 1, 0, `hsl(${Math.floor(Math.random() * 360)},100%,65%)`, 0.6, 0.1, 0.6, -1, 1);
+      fx.glow.emit(v[0], v[1], v[2], 0, 1, 0, `hsl(${Math.floor(Math.random() * 360)},100%,65%)`, 0.4, 0.08, 0.5, -1, 1);
     }
   }
 }

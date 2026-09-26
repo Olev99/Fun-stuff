@@ -497,6 +497,15 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 <div id="rotate"><div class="phone"></div><p>Turn your phone sideways</p><span>Zoomies is played in landscape, like a steering wheel.</span></div>
 <div id="loading"><div class="logo">ZOOMIES!</div><div class="bar2"><i></i></div><p id="loading-msg">Warming up the engines…</p></div>
 
+<script>
+  // If the game has not started after a while, say why instead of spinning forever.
+  setTimeout(function () {
+    if (!window.zoomies) {
+      var m = document.getElementById('loading-msg');
+      if (m && m.textContent.indexOf('Could not') < 0) m.textContent = 'Still loading… If this never finishes, update Safari (iOS 16.4 or newer is needed) and reload.';
+    }
+  }, 9000);
+</script>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 <script type="module" src="./src/main.js"></script>
 </body>

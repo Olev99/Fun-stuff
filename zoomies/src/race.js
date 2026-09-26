@@ -347,7 +347,7 @@ export class Race {
     k.speedMul = 0.92;
     this._positions();
     const place = this.mode === 'tt' ? 1 : k.place;
-    this.app.hud.finish(place, this.mode === 'tt' ? null : place);
+    this.app.hud.finish(this.mode === 'tt' ? null : place);
     this.app.audio.play(place <= 3 ? 'finish' : 'lose');
     this.app.input.resetButtons();
     this.fx.burst(k.pos.x, k.pos.y + 2, k.pos.z, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], 60, 14, 0.6, 1.4, 12);
@@ -423,17 +423,15 @@ export class Race {
 
   // Thunder Cloud: zap everyone ahead of the user.
   storm(user) {
-    let any = false;
     for (const k of this.karts) {
       if (k === user || k.place > user.place) continue;
-      if (k.hit('zap')) any = true;
+      k.hit('zap');
       for (let n = 0; n < 10; n++) {
         this.fx.glow.emit(k.pos.x + (Math.random() - 0.5), k.pos.y + 1 + n * 1.4, k.pos.z + (Math.random() - 0.5), 0, 0, 0, n % 2 ? '#fff6a0' : '#9fe8ff', 1.2, 0.4, 0.35);
       }
     }
     if (this.player && (user === this.player || this.player.place < user.place)) this.flash = 0.8;
     this.app.audio.play('zap');
-    void any;
   }
 
   onBoxHit(k) {
@@ -456,14 +454,14 @@ export class Race {
     if (!k) return;
     this.camYaw = k.yaw;
     if (this.state === 'intro') {
-      this._introCam(0);
+      this._introCam();
     } else {
       this._chase(1, true, k);
     }
     if (snap) this.camera.position.copy(this.camPos);
   }
 
-  _introCam(dt) {
+  _introCam() {
     const tr = this.track;
     const t = this.stateTime / 3.2;
     const fr = tr.frame(tr.length - 20, {});
@@ -476,7 +474,6 @@ export class Race {
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(this.camLook);
     this.fov = 60;
-    void dt;
   }
 
   _chase(dt, snap = false, target = null, far = 0) {
@@ -549,7 +546,7 @@ export class Race {
 
   _updateCamera(dt) {
     if (this.mode === 'demo') this._demoCam(dt);
-    else if (this.state === 'intro') this._introCam(dt);
+    else if (this.state === 'intro') this._introCam();
     else if (this.state === 'finished' || this.state === 'done') this._orbitCam(dt, this.player);
     else this._chase(dt, this.stateTime < 0.02 && this.state === 'countdown');
     if (Math.abs(this.camera.fov - this.fov) > 0.05) {

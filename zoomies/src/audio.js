@@ -294,7 +294,6 @@ export class Audio {
         if (s % 4 === 0) {
           const tones = [chord, chord + 2, chord + 4].map((d) => d + 7);
           cur = tones.reduce((a, b2) => (Math.abs(b2 - cur) < Math.abs(a - cur) ? b2 : a));
-          if (r() < 0.3) cur += 7 * (r() < 0.5 ? 0 : 0);
         } else {
           cur += r() < 0.5 ? 1 : -1;
           if (r() < 0.2) cur += r() < 0.5 ? 2 : -2;
@@ -347,10 +346,9 @@ export class Audio {
     if (st % 2 === 0) this._noise(0.035, 0.12, 'highpass', 7000, 0, when, M);
     // bass
     if (st % 2 === 0) {
-      const pat = [0, 0, 7, 0, 0, 7, 4, 7];
-      const deg = chord + (pat[st / 2] === 7 ? 7 : pat[st / 2] === 4 ? 4 : 0);
-      this._tone('triangle', mtof(s.note(chord) - 12 + (pat[st / 2] === 7 ? 12 : pat[st / 2] === 4 ? 7 : 0)), 0, dur * 1.8, 0.5, when, M);
-      void deg;
+      // root / octave / fifth pattern
+      const off = [0, 0, 12, 0, 0, 12, 7, 12][st / 2];
+      this._tone('triangle', mtof(s.note(chord) - 12 + off), 0, dur * 1.8, 0.5, when, M);
     }
     // arpeggio
     const arp = [0, 2, 4, 7][st % 4];
