@@ -64,6 +64,7 @@ uniform sampler2D tScene; uniform sampler2D tBloom;
 uniform float bloom; uniform float exposure; uniform float saturation; uniform float contrast;
 uniform float vignette; uniform float boost; uniform float time; uniform float aspect;
 uniform vec3 tint; uniform vec3 lift;
+uniform vec2 sunPos; uniform float sunOn;
 varying vec2 vUv;
 
 // Khronos PBR Neutral: keeps saturated base colours true, rolls off highlights.
@@ -106,6 +107,28 @@ void main() {
     col = texture2D(tScene, vUv).rgb;
   }
   col += texture2D(tBloom, vUv).rgb * bloom;
+  if (sunOn > 0.0) {
+    // Lens flare: ghosts along the line through the screen centre, faded by
+    // how bright the (bloomed) sun is, which drops when something hides it.
+    vec3 sb = texture2D(tBloom, sunPos).rgb;
+    float vis = clamp(dot(sb, vec3(0.3)) * 0.5, 0.0, 1.0) * sunOn;
+    if (vis > 0.01) {
+      vec2 axis = vec2(0.5) - sunPos;
+      vec3 fl = vec3(0.0);
+      for (int i = 0; i < 5; i++) {
+        float fi = float(i);
+        vec2 gp = sunPos + axis * (0.55 + fi * 0.38);
+        float d = length((vUv - gp) * vec2(aspect, 1.0));
+        float sz = 0.018 + fi * 0.014;
+        vec3 gc = mod(fi, 2.0) < 1.0 ? vec3(0.55, 0.8, 1.0) : vec3(1.0, 0.7, 0.45);
+        fl += gc * (smoothstep(sz, sz * 0.4, d) * 0.22 + smoothstep(sz * 1.2, sz, d) * smoothstep(sz * 0.8, sz, d) * 0.3);
+      }
+      float dh = length((vUv - sunPos) * vec2(aspect, 1.0));
+      fl += vec3(1.0, 0.9, 0.75) * smoothstep(0.012, 0.0, abs(dh - 0.19)) * 0.1;
+      fl += vec3(1.0, 0.95, 0.85) * exp(-dh * 9.0) * 0.35;
+      col += fl * vis;
+    }
+  }
   col *= exposure;
   col = neutral(col);
   float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
@@ -168,6 +191,7 @@ export class PostFX {
       tScene: { value: null }, tBloom: { value: null }, bloom: { value: 0 }, exposure: { value: 1 }, saturation: { value: 1 },
       contrast: { value: 0 }, vignette: { value: 0 }, boost: { value: 0 }, time: { value: 0 }, aspect: { value: 1 },
       tint: { value: new THREE.Color(1, 1, 1) }, lift: { value: new THREE.Color(0, 0, 0) },
+      sunPos: { value: new THREE.Vector2(0.5, 0.5) }, sunOn: { value: 0 },
     });
     this.black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
     this.black.needsUpdate = true;
@@ -293,6 +317,8 @@ export class PostFX {
     u.aspect.value = this.w / this.h;
     u.tint.value.set(g.tint ?? GRADE.tint);
     u.lift.value.set(g.lift ?? GRADE.lift).convertLinearToSRGB();
+    u.sunOn.value = bloom && g.sunOn ? g.sunOn * (g.flare ?? 1) : 0;
+    if (g.sunOn) u.sunPos.value.set(g.sunX, g.sunY);
     this._pass(this.mComp, null);
     r.autoClear = autoClear;
   }

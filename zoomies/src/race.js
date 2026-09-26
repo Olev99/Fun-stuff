@@ -975,6 +975,15 @@ export class Race {
     const bt = pk && this.state === 'race' && (pk.boostTime > 0 || pk.rocketTime > 0) ? (pk.rocketTime > 0 ? 1.3 : 1) : 0;
     this.grade.boost = damp(this.grade.boost, bt, bt ? 8 : 3, dt);
     if (this.grade.boost < 0.01) this.grade.boost = 0;
+    // Where the sun is on screen, for the lens flare.
+    if ((this.grade.flare ?? 1) > 0) {
+      this.camera.updateMatrixWorld();
+      const v = (this._sunV || (this._sunV = new THREE.Vector3())).copy(this.world.sunDir).multiplyScalar(600).add(this.camera.position).project(this.camera);
+      const inView = v.z < 1 && Math.abs(v.x) < 1.2 && Math.abs(v.y) < 1.2;
+      this.grade.sunOn = inView ? 1 - Math.max(0, Math.max(Math.abs(v.x), Math.abs(v.y)) - 0.9) / 0.3 : 0;
+      this.grade.sunX = v.x * 0.5 + 0.5;
+      this.grade.sunY = v.y * 0.5 + 0.5;
+    }
     this.fill.position.copy(this.camera.position);
     this.fill.position.y += 4;
     this.fill.target.position.copy(this.camLook);

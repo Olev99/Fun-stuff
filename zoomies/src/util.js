@@ -160,9 +160,18 @@ function matOf(m) {
 
 // Physically based material driven by the per-vertex "pbr" attribute that
 // GeoBuilder writes, so one draw call can mix paint, rubber, chrome and lights.
+// physical: clear-coated paint (MeshPhysicalMaterial) on the glossy,
+// non-metal parts; used for the karts.
 export function pbrMat(opts = {}) {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 1, ...opts });
+  const { physical, ...rest } = opts;
+  const m = physical
+    ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 1, metalness: 1, clearcoat: 1, clearcoatRoughness: 0.07, ...rest })
+    : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 1, ...rest });
   m.onBeforeCompile = (sh) => {
+    if (physical) {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <lights_physical_fragment>',
+        '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat *= step( vPbr.x, 0.42 ) * ( 1.0 - vPbr.y );\n#endif');
+    }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 pbr;\nvarying vec3 vPbr;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = pbr;');
@@ -172,7 +181,7 @@ export function pbrMat(opts = {}) {
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = metalness * vPbr.y;')
       .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance += diffuseColor.rgb * vPbr.z;');
   };
-  m.customProgramCacheKey = () => 'pbr1';
+  m.customProgramCacheKey = () => (physical ? 'pbr1p' : 'pbr1');
   return m;
 }
 

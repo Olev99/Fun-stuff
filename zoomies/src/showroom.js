@@ -59,7 +59,7 @@ export class Showroom {
 
     this.turn = new THREE.Group();
     this.scene.add(this.turn);
-    this.mat = pbrMat();
+    this.mat = pbrMat({ physical: true });
     this.chassis = new THREE.Mesh(undefined, this.mat);
     this.driver = new THREE.Mesh(undefined, this.mat);
     this.turn.add(this.chassis, this.driver);

@@ -425,3 +425,54 @@ export function patchTexture(seed = 3) {
   ctx.putImageData(img, 0, 0);
   return toTex(c, { repeat: false });
 }
+
+// Normal and roughness maps derived from a colour texture's brightness, so
+// roads, ground and walls catch the light with a little relief and their
+// shine varies across the surface. Both are linear data textures.
+export function surfaceMaps(tex, { bump = 2.2, rough = [0.55, 0.95], invert = false } = {}) {
+  const src = tex.image;
+  const W = src.width, H = src.height;
+  const sctx = src.getContext('2d');
+  const d = sctx.getImageData(0, 0, W, H).data;
+  const L = new Float32Array(W * H);
+  let lo = 1, hi = 0;
+  for (let i = 0; i < W * H; i++) {
+    const v = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255;
+    L[i] = v;
+    lo = Math.min(lo, v);
+    hi = Math.max(hi, v);
+  }
+  const span = Math.max(1e-3, hi - lo);
+  const at = (x, y) => L[((y + H) % H) * W + ((x + W) % W)];
+  const [nc, nctx] = makeCanvas(W, H);
+  const [rc, rctx] = makeCanvas(W, H);
+  const nImg = nctx.createImageData(W, H), rImg = rctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)) - (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
+      const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)) - (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1));
+      let nx = -dx * bump, ny = -dy * bump;
+      const l = Math.hypot(nx, ny, 1);
+      const o = (y * W + x) * 4;
+      nImg.data[o] = ((nx / l) * 0.5 + 0.5) * 255;
+      nImg.data[o + 1] = ((ny / l) * 0.5 + 0.5) * 255;
+      nImg.data[o + 2] = ((1 / l) * 0.5 + 0.5) * 255;
+      nImg.data[o + 3] = 255;
+      let t = (L[y * W + x] - lo) / span;
+      if (invert) t = 1 - t;
+      const rv = (rough[0] + (rough[1] - rough[0]) * t) * 255;
+      rImg.data[o] = rImg.data[o + 1] = rImg.data[o + 2] = rv;
+      rImg.data[o + 3] = 255;
+    }
+  }
+  nctx.putImageData(nImg, 0, 0);
+  rctx.putImageData(rImg, 0, 0);
+  const mk = (c) => {
+    const t = toTex(c, { srgb: false });
+    t.wrapS = tex.wrapS;
+    t.wrapT = tex.wrapT;
+    t.repeat.copy(tex.repeat);
+    return t;
+  };
+  return { normal: mk(nc), rough: mk(rc) };
+}

@@ -137,7 +137,7 @@ export class Kart {
     this.geoLo = kartGeometry(this.ch, { ...gopt, lo: true });
     this.lodFar = false;
     const sh = kartShared(this.race.shadowTex);
-    this.mat = pbrMat();
+    this.mat = pbrMat({ physical: true });
     this.root = new THREE.Group();
     this.body = new THREE.Group();
     this.root.add(this.body);

@@ -66,29 +66,29 @@ export const THEMES = {
 // Per-theme look: colour grade, weather, road gloss, sky clouds and grass.
 export const THEME_FX = {
   meadow: {
-    grade: { saturation: 1.12, tint: '#fff9f0', bloom: 0.7 }, weather: 'petals', roadRough: 0.8, clouds: 0.5,
+    grade: { saturation: 1.12, tint: '#fff9f0', bloom: 0.7 }, weather: 'petals', roadRough: 0.8, clouds: 0.5, hills: 26,
     grass: ['#3f8f2f', '#8fd05a'], env: 1.0,
   },
   beach: {
-    grade: { saturation: 1.12, tint: '#fffaf2', bloom: 0.7 }, weather: null, roadRough: 0.72, clouds: 0.35,
+    grade: { saturation: 1.12, tint: '#fffaf2', bloom: 0.7 }, weather: null, roadRough: 0.72, clouds: 0.35, hills: 10,
     grass: ['#8fa851', '#d6d38a'], env: 1.0,
   },
   desert: {
-    grade: { saturation: 1.0, tint: '#fff8f2', contrast: 0.16, bloom: 0.7 }, weather: 'dust', roadRough: 0.95, clouds: 0.22,
+    grade: { saturation: 1.0, tint: '#fff8f2', contrast: 0.16, bloom: 0.7 }, weather: 'dust', roadRough: 0.95, clouds: 0.22, hills: 18,
     grass: ['#b98f4a', '#e3c27e'], env: 1.0, fill: 0.7,
   },
   frost: {
-    grade: { exposure: 0.9, tint: '#f1f6ff', saturation: 1.05, bloom: 0.85 }, weather: 'snow', roadRough: 0.14, clouds: 0.55, env: 1.0,
+    grade: { exposure: 0.9, tint: '#f1f6ff', saturation: 1.05, bloom: 0.85 }, weather: 'snow', roadRough: 0.14, clouds: 0.55, env: 1.0, hills: 34,
   },
   candy: {
-    grade: { saturation: 1.12, tint: '#fff7fb', bloom: 0.8 }, weather: 'sprinkles', roadRough: 0.32, clouds: 0.45, env: 1.05,
+    grade: { saturation: 1.12, tint: '#fff7fb', bloom: 0.8 }, weather: 'sprinkles', roadRough: 0.32, clouds: 0.45, env: 1.05, hills: 22,
   },
   neon: {
-    grade: { bloom: 1.7, threshold: 0.8, saturation: 1.15, vignette: 0.5, contrast: 0.16 }, weather: 'motes', roadRough: 0.3, clouds: 0,
+    grade: { bloom: 1.7, threshold: 0.8, saturation: 1.15, vignette: 0.5, contrast: 0.16, flare: 0 }, weather: 'motes', roadRough: 0.3, clouds: 0,
     nebula: ['#6a2bd6', '#ff3dc8'], env: 1.1, fill: 0.8,
   },
   volcano: {
-    grade: { bloom: 1.45, threshold: 0.85, tint: '#fff1e8', vignette: 0.45, contrast: 0.16 }, weather: 'embers', roadRough: 0.65, clouds: 0.3,
+    grade: { bloom: 1.45, threshold: 0.85, tint: '#fff1e8', vignette: 0.45, contrast: 0.16, flare: 0.4 }, weather: 'embers', roadRough: 0.65, clouds: 0.3, hills: 24,
     cloudCol: ['#5a3a3a', '#1e1214'], env: 1.0,
   },
   cloud: {
@@ -228,6 +228,31 @@ void main() {
   #include <fog_fragment>
 }`;
 
+const smooth = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+function hash2(i, j) {
+  let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function vnoise(x, z) {
+  const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j;
+  const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+  const a = hash2(i, j), b = hash2(i + 1, j), c = hash2(i, j + 1), d = hash2(i + 1, j + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm2(x, z) {
+  let s = 0, a = 0.5, f = 1;
+  for (let o = 0; o < 4; o++) {
+    s += a * vnoise(x * f, z * f);
+    f *= 2.03;
+    a *= 0.5;
+  }
+  return s / 0.9375;
+}
+
 // An HDR colour: values above 1 feed the bloom.
 const hdr = (c, k) => new THREE.Color(c).multiplyScalar(k);
 const glowMat = (c, k, extra = {}) => new THREE.MeshBasicMaterial({ color: hdr(c, k), fog: true, ...extra });
@@ -361,7 +386,10 @@ export class World {
     }
     const hasWater = !!th.water;
     const R = tr.radius + (th.seaNear ? 150 : 230);
-    const rings = 22, segs = 90;
+    this.groundR = hasWater ? R : R * 1.7;
+    this._buildRoadField(this.groundR + 30);
+    const amp = this.fx.hills || 0;
+    const rings = 64, segs = 180;
     const pos = [], col = [], uv = [], idx = [];
     const r = rng(42);
     const tints = th.groundTint.map((c) => new THREE.Color(c));
@@ -373,15 +401,19 @@ export class World {
       for (let s = 0; s <= segs; s++) {
         const a = (s / segs) * Math.PI * 2;
         const n = noise[s % segs] * (0.94 + 0.06 * Math.sin(a * 5 + 1.3));
-        const rad = hasWater ? R * f * (i === rings ? n : i === rings - 1 ? (n + 1) / 2 : 1) : R * 1.7 * f;
+        // wavy coastline: the outer rings take on the shoreline noise
+        const rad = this.groundR * f * (hasWater ? 1 + (n - 1) * smooth(0.9, 1, f) : 1);
         const x = tr.center.x + Math.cos(a) * rad;
         const z = tr.center.z + Math.sin(a) * rad;
         let y = -0.25;
-        if (hasWater && i >= rings - 1) y = i === rings ? -3 : -0.6;
+        const h = this.hillHeight(x, z);
+        if (hasWater && f > 0.93) y = -0.25 - 2.75 * smooth(0.93, 1, f);
+        else y += h;
         pos.push(x, y, z);
         uv.push(x / 14, z / 14);
         const c = tints[Math.floor(r() * tints.length)].clone();
-        if (beach && i >= rings - 2) c.copy(beach);
+        if (amp) c.multiplyScalar(0.94 + 0.14 * Math.min(1, h / amp));
+        if (beach && f > 0.9) c.lerp(beach, smooth(0.9, 0.93, f));
         col.push(c.r, c.g, c.b);
       }
     }
@@ -398,7 +430,9 @@ export class World {
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const tex = this._tex(TX.groundTexture(th.ground));
-    const ground = new THREE.Mesh(geo, stdMat({ map: tex, vertexColors: true, roughness: th.ground === 'snow' ? 0.6 : 0.95 }));
+    const gm = stdMat({ map: tex, vertexColors: true, roughness: th.ground === 'snow' ? 0.6 : 0.95 });
+    this._detail(gm, tex, { bump: 1.4, rough: th.ground === 'snow' ? [0.35, 0.7] : [0.8, 1] }, 0.55);
+    const ground = new THREE.Mesh(geo, gm);
     ground.receiveShadow = !!this.quality.shadows;
     this.group.add(ground);
     if (hasWater) {
@@ -407,6 +441,87 @@ export class World {
       water.position.set(tr.center.x, -1.1, tr.center.z);
       this.group.add(water);
     }
+  }
+
+  // Distance from every point to the nearest road (main track and
+  // shortcuts), on a 4-unit grid: road cells first, then a two-pass
+  // chamfer sweep. Used to keep hills and grass off the road.
+  _buildRoadField(extent) {
+    const tr = this.track;
+    const cell = 4;
+    const x0 = tr.center.x - extent, z0 = tr.center.z - extent;
+    const W = Math.ceil((2 * extent) / cell) + 1, H = W;
+    const D = new Float32Array(W * H).fill(1e9);
+    const mark = (p) => {
+      for (let i = 0; i < p.count; i++) {
+        const cr = (p.wd[i] + 2) / cell;
+        const cx = (p.px[i] - x0) / cell, cz = (p.pz[i] - z0) / cell;
+        for (let gz = Math.max(0, Math.floor(cz - cr)); gz <= Math.min(H - 1, Math.ceil(cz + cr)); gz++) {
+          for (let gx = Math.max(0, Math.floor(cx - cr)); gx <= Math.min(W - 1, Math.ceil(cx + cr)); gx++) {
+            if ((gx - cx) ** 2 + (gz - cz) ** 2 <= cr * cr) D[gz * W + gx] = 0;
+          }
+        }
+      }
+    };
+    mark(tr);
+    for (const sc of tr.shortcuts) mark(sc);
+    const c1 = cell, c2 = cell * 1.4142;
+    for (let z = 0; z < H; z++) {
+      for (let x = 0; x < W; x++) {
+        const i = z * W + x;
+        let v = D[i];
+        if (x > 0) v = Math.min(v, D[i - 1] + c1);
+        if (z > 0) {
+          v = Math.min(v, D[i - W] + c1);
+          if (x > 0) v = Math.min(v, D[i - W - 1] + c2);
+          if (x < W - 1) v = Math.min(v, D[i - W + 1] + c2);
+        }
+        D[i] = v;
+      }
+    }
+    for (let z = H - 1; z >= 0; z--) {
+      for (let x = W - 1; x >= 0; x--) {
+        const i = z * W + x;
+        let v = D[i];
+        if (x < W - 1) v = Math.min(v, D[i + 1] + c1);
+        if (z < H - 1) {
+          v = Math.min(v, D[i + W] + c1);
+          if (x < W - 1) v = Math.min(v, D[i + W + 1] + c2);
+          if (x > 0) v = Math.min(v, D[i + W - 1] + c2);
+        }
+        D[i] = v;
+      }
+    }
+    this._rf = { D, W, H, x0, z0, cell };
+  }
+
+  roadDist(x, z) {
+    const f = this._rf;
+    if (!f) return 1e9;
+    const gx = (x - f.x0) / f.cell, gz = (z - f.z0) / f.cell;
+    const ix = Math.floor(gx), iz = Math.floor(gz);
+    if (ix < 0 || iz < 0 || ix >= f.W - 1 || iz >= f.H - 1) return 1e9;
+    const tx = gx - ix, tz = gz - iz, D = f.D, i = iz * f.W + ix;
+    return (D[i] * (1 - tx) + D[i + 1] * tx) * (1 - tz) + (D[i + f.W] * (1 - tx) + D[i + f.W + 1] * tx) * tz;
+  }
+
+  // Rolling hills away from the road; flat near roads, lakes and the coast.
+  hillHeight(x, z) {
+    const amp = this.fx.hills || 0;
+    if (!amp || this.theme.floating) return 0;
+    let m = smooth(16, 75, this.roadDist(x, z));
+    if (m <= 0) return 0;
+    for (const l of this.lakes) m *= smooth(1.15, 1.9, Math.hypot((x - l.x) / l.rx, (z - l.z) / l.rz));
+    const tr = this.track;
+    if (this.theme.water) m *= 1 - smooth(0.7, 0.88, Math.hypot(x - tr.center.x, z - tr.center.z) / this.groundR);
+    if (m <= 0) return 0;
+    const n = fbm2(x * 0.0062 + 17.3, z * 0.0062 - 5.1);
+    return amp * m * smooth(0.28, 0.9, n) * (0.7 + 0.6 * fbm2(x * 0.02, z * 0.02));
+  }
+
+  // Height of the ground (not the road) at x, z.
+  groundAt(x, z) {
+    return -0.25 + this.hillHeight(x, z);
   }
 
   _buildLakes() {
@@ -445,9 +560,21 @@ export class World {
     return false;
   }
 
+  // Relief + varying shine for a colour texture (see TX.surfaceMaps).
+  _detail(mat, tex, opts, scale = 0.7) {
+    const m = TX.surfaceMaps(tex, opts);
+    mat.normalMap = this._tex(m.normal);
+    mat.normalScale.set(scale, scale);
+    mat.roughnessMap = this._tex(m.rough);
+    mat.roughness = 1;
+    return mat;
+  }
+
   _roadMaterials(th) {
     const rough = this.fx.roadRough ?? 0.8;
     const roadMat = stdMat({ map: this.roadTex, roughness: rough, metalness: 0 });
+    // Tarmac: glossier worn patches, rougher aggregate. Ice and neon stay glassy.
+    this._detail(roadMat, this.roadTex, { bump: 1.6, rough: [Math.max(0.05, rough - 0.22), Math.min(1, rough + 0.1)] }, rough < 0.3 ? 0.25 : 0.45);
     if (th.glowRoad) {
       roadMat.emissiveMap = this.roadTex;
       roadMat.emissive = new THREE.Color('#ffffff');
@@ -461,8 +588,11 @@ export class World {
       curbMat.emissiveIntensity = 1.6;
     }
     const shMat = stdMat({ map: this.groundTex, color: '#f4f4f4', roughness: 0.95 });
+    this._detail(shMat, this.groundTex, { bump: 1.6, rough: [0.75, 1] }, 0.6);
     const wallTex = this._tex(TX.wallTexture(th.wall));
-    const wallMat = stdMat({ map: wallTex, roughness: th.wall === 'snowbank' ? 0.6 : th.wall === 'candycane' ? 0.3 : 0.75 });
+    const wr = th.wall === 'snowbank' ? 0.6 : th.wall === 'candycane' ? 0.3 : 0.75;
+    const wallMat = stdMat({ map: wallTex, roughness: wr });
+    this._detail(wallMat, wallTex, { bump: 1.8, rough: [Math.max(0.1, wr - 0.2), Math.min(1, wr + 0.15)] }, 0.5);
     if (th.wall === 'neon' || th.wall === 'basalt') {
       wallMat.emissiveMap = wallTex;
       wallMat.emissive = new THREE.Color('#ffffff');
@@ -881,7 +1011,7 @@ export class World {
       const k = key(x, z);
       if (cell.has(k)) continue;
       cell.set(k, 1);
-      out.push([x, z, floating ? tr.py[i] - 5 - r() * 10 : -0.25]);
+      out.push([x, z, floating ? tr.py[i] - 5 - r() * 10 : this.groundAt(x, z)]);
     }
     return out;
   }
@@ -890,6 +1020,7 @@ export class World {
   // pass can skip the ones out of view.
   _instanced(geo, mat, spots, { scale = [1, 1], tilt = 0, castShadow = true, colors = null, yScale = null } = {}) {
     if (!spots.length) return null;
+    groundAO(geo);
     const r = this.r;
     const CH = 110;
     const buckets = new Map();
@@ -1057,7 +1188,7 @@ export class World {
       const gx = Math.floor((x - x0) / cell), gz = Math.floor((z - z0) / cell);
       if (gx < 0 || gz < 0 || gx >= W || gz >= H || grid[gz * W + gx]) continue;
       if (Math.hypot(x - tr.center.x, z - tr.center.z) > seaR || this.inLake(x, z, 2)) continue;
-      out.push([x, z, -0.25]);
+      out.push([x, z, this.groundAt(x, z)]);
     }
     return out;
   }
@@ -1066,13 +1197,13 @@ export class World {
     const tr = this.track;
     const spots = this._scatter(1, 16, 50, 30);
     if (!spots.length) return;
-    const [x, z] = spots[0];
+    const [x, z, gy] = spots[0];
     const B = new GeoBuilder('matte');
     B.add(new THREE.CylinderGeometry(2.2, 3.4, 16, 12), '#fff4e2', [0, 8, 0]);
     B.add(new THREE.ConeGeometry(3.2, 4, 12), '#e8413c', [0, 18, 0], [0, 0, 0], 1, 'paint');
     B.add(new THREE.BoxGeometry(1.6, 2.6, 0.4), '#7a4b2a', [0, 1.3, 3.1], [0, 0, 0], 1, 'wood');
     const tower = new THREE.Mesh(B.build(), this.propMat);
-    tower.position.set(x, -0.25, z);
+    tower.position.set(x, gy, z);
     tower.castShadow = !!this.quality.shadows;
     this.group.add(tower);
     const BB = new GeoBuilder('fabric');
@@ -1082,7 +1213,7 @@ export class World {
     }
     BB.add(new THREE.SphereGeometry(0.8, 12, 8), '#e8413c', [0, 0, 0], [0, 0, 0], 1, 'paint');
     const blades = new THREE.Mesh(BB.build(), this.propMat);
-    blades.position.set(x, 15.5, z);
+    blades.position.set(x, gy + 15.75, z);
     const look = Math.atan2(tr.center.x - x, tr.center.z - z);
     blades.rotation.y = look;
     tower.rotation.y = look;
@@ -1136,20 +1267,20 @@ export class World {
   _lighthouse() {
     const spots = this._scatter(1, 20, 60, 30);
     if (!spots.length) return;
-    const [x, z] = spots[0];
+    const [x, z, gy] = spots[0];
     const B = new GeoBuilder('paint');
     for (let k = 0; k < 5; k++) B.add(new THREE.CylinderGeometry(2.6 - k * 0.3, 2.9 - k * 0.3, 4, 16), k % 2 ? '#ffffff' : '#e8413c', [0, 2 + k * 4, 0]);
     B.add(new THREE.CylinderGeometry(1.8, 1.8, 2.4, 14), '#fff6c9', [0, 21.2, 0], [0, 0, 0], 1, 'glowHot');
     B.add(new THREE.ConeGeometry(2.2, 2.4, 14), '#1d1537', [0, 23.6, 0], [0, 0, 0], 1, 'metal');
     const m = new THREE.Mesh(B.build(), this.propMat);
-    m.position.set(x, -0.25, z);
+    m.position.set(x, gy, z);
     m.castShadow = !!this.quality.shadows;
     this.group.add(m);
     const beam = new THREE.Mesh(new THREE.ConeGeometry(3, 26, 16, 1, true), new THREE.MeshBasicMaterial({ color: hdr('#fff6c9', 1.5), transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
     beam.rotation.z = Math.PI / 2;
     beam.position.set(13, 0, 0);
     const pivot = new THREE.Group();
-    pivot.position.set(x, 21.2, z);
+    pivot.position.set(x, gy + 21.45, z);
     pivot.add(beam);
     this.group.add(pivot);
     this.animated.push((dt) => { pivot.rotation.y += dt * 0.8; });
@@ -1179,7 +1310,7 @@ export class World {
   _cake() {
     const spots = this._scatter(1, 18, 70, 30);
     if (!spots.length) return;
-    const [x, z] = spots[0];
+    const [x, z, gy] = spots[0];
     const B = new GeoBuilder('frosting');
     const tiers = [[14, 6, '#ffd6ea'], [10, 5, '#ffffff'], [6.5, 4.5, '#ff8fc7']];
     let y = 0;
@@ -1195,7 +1326,7 @@ export class World {
     }
     B.add(new THREE.SphereGeometry(1.6, 20, 14), '#e8413c', [0, y + 1.4, 0], [0, 0, 0], 1, 'gloss');
     const m = new THREE.Mesh(B.build(), this.propMat);
-    m.position.set(x, -0.25, z);
+    m.position.set(x, gy, z);
     m.castShadow = !!this.quality.shadows;
     this.group.add(m);
   }
@@ -1375,6 +1506,23 @@ export class World {
     for (const t of this.textures) t.dispose();
     if (this.envRT) this.envRT.dispose();
   }
+}
+
+// Darken the bottom of a prop a little, as if the ground shaded it; helps
+// scenery sit on the terrain instead of floating.
+function groundAO(geo) {
+  if (geo.userData.ao || !geo.attributes.color) return;
+  geo.userData.ao = true;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const h = Math.max(0.01, (bb.max.y - bb.min.y) * 0.35);
+  const p = geo.attributes.position, c = geo.attributes.color;
+  for (let i = 0; i < p.count; i++) {
+    const t = Math.min(1, Math.max(0, (p.getY(i) - bb.min.y) / h));
+    const k = 0.62 + 0.38 * t * t * (3 - 2 * t);
+    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k);
+  }
+  c.needsUpdate = true;
 }
 
 function translate(geo, x, y, z, s = 1) {

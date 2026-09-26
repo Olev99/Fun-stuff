@@ -12,6 +12,7 @@ import { setMaxAniso } from './textures.js';
 import { fmtTime, ordinal } from './util.js';
 import { NetSession } from './net.js';
 import { PostFX } from './post.js';
+import { installHeightFog } from './env.js';
 
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
 
@@ -44,6 +45,7 @@ class App {
     this.settings = loadSettings();
     this.records = loadRecords();
     this.canvas = $('gl');
+    installHeightFog();
     const r = (this.renderer = new THREE.WebGLRenderer({
       // With HDR post-processing the scene is drawn (with MSAA) into an
       // offscreen target, so the screen buffer needs no AA and no depth.

@@ -81,3 +81,28 @@ export function studioEnvironment(renderer) {
   });
   return rt;
 }
+
+// Height fog: the usual distance fog, thinned out with altitude so mountain
+// tops, balloons and floating islands stand out against the haze. Patched
+// into three's shared shader chunks once, before anything compiles.
+let _fogPatched = false;
+export function installHeightFog() {
+  if (_fogPatched) return;
+  _fogPatched = true;
+  const C = THREE.ShaderChunk;
+  C.fog_pars_vertex = '#ifdef USE_FOG\n\tvarying float vFogDepth;\n\tvarying float vFogH;\n#endif';
+  // world-space height from the view-space position (the view matrix is rigid)
+  C.fog_vertex = '#ifdef USE_FOG\n\tvFogDepth = - mvPosition.z;\n\tvFogH = ( ( mvPosition.xyz - viewMatrix[ 3 ].xyz ) * mat3( viewMatrix ) ).y;\n#endif';
+  C.fog_pars_fragment = C.fog_pars_fragment.replace('varying float vFogDepth;', 'varying float vFogDepth;\n\tvarying float vFogH;');
+  C.fog_fragment = [
+    '#ifdef USE_FOG',
+    '\t#ifdef FOG_EXP2',
+    '\t\tfloat fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );',
+    '\t#else',
+    '\t\tfloat fogFactor = smoothstep( fogNear, fogFar, vFogDepth );',
+    '\t#endif',
+    '\tfogFactor *= 1.0 - 0.6 * smoothstep( 6.0, 150.0, vFogH );',
+    '\tgl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
+    '#endif',
+  ].join('\n');
+}
