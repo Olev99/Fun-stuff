@@ -11,8 +11,23 @@ import { TRACKS, CUPS, trackById } from './tracks.js';
 import { setMaxAniso } from './textures.js';
 import { fmtTime, ordinal } from './util.js';
 import { NetSession } from './net.js';
+import { PostFX } from './post.js';
 
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
+
+// Can this browser render into half-float targets (needed for HDR bloom)?
+const HDR = (() => {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    if (!gl) return false;
+    const ok = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
+    const lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+    return ok;
+  } catch (e) {
+    return false;
+  }
+})();
 const isTouch = matchMedia('(pointer: coarse)').matches;
 const $ = (id) => document.getElementById(id);
 
@@ -30,10 +45,17 @@ class App {
     this.records = loadRecords();
     this.canvas = $('gl');
     const r = (this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas, antialias: true, powerPreference: 'high-performance', stencil: false,
+      // With HDR post-processing the scene is drawn (with MSAA) into an
+      // offscreen target, so the screen buffer needs no AA and no depth.
+      canvas: this.canvas, antialias: !HDR, depth: !HDR, powerPreference: 'high-performance', stencil: false,
     }));
     r.outputColorSpace = THREE.SRGBColorSpace;
+    // Only used if half-float render targets are missing and we draw straight
+    // to the screen; the post pipeline does its own tone mapping.
+    r.toneMapping = THREE.NeutralToneMapping;
     r.shadowMap.type = THREE.PCFShadowMap;
+    r.info.autoReset = false;
+    this.post = new PostFX(r);
     setMaxAniso(r.capabilities.getMaxAnisotropy());
     this.applyQuality(true);
 
@@ -67,6 +89,9 @@ class App {
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     // iOS only applies :active styles when a touch listener exists.
     document.addEventListener('touchstart', () => {}, { passive: true });
+    // Any tap unlocks (or, after a phone call or app switch, revives) audio.
+    const kick = () => { if (!this.paused && !this.audio.ready) this.audio.unlock(); };
+    for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, kick, { capture: true, passive: true });
     document.addEventListener('dblclick', (e) => e.preventDefault());
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape' || e.code === 'KeyP') {
@@ -96,6 +121,10 @@ class App {
     this.minPR = Math.min(dpr, this.quality.minPR);
     this.pr = Math.min(dpr, this.quality.startPR);
     this.renderer.shadowMap.enabled = !!this.quality.shadows;
+    this.post.configure({ samples: this.quality.msaa, bloom: this.quality.bloom });
+    this.drTimer = 0;
+    this.goodTime = 0;
+    this.blockRaise = 3;
     if (!initial) this.resize();
   }
 
@@ -105,6 +134,7 @@ class App {
     this.h = h;
     this.renderer.setPixelRatio(this.pr);
     this.renderer.setSize(w, h, false);
+    this.post.setSize(Math.floor(w * this.pr), Math.floor(h * this.pr));
     this.showroom.setSize(w, h);
     if (this.race) this.race.setSize(w, h, this.pr);
   }
@@ -603,10 +633,12 @@ class App {
     dt = Math.min(dt, 0.05);
 
     if (!this.paused && this.view) {
+      this.renderer.info.reset();
       this.view.update(dt);
       this._checkTilt();
       this._frameStats(dt);
-      this.renderer.render(this.view.scene, this.view.camera);
+      if (this.post.active) this.post.render(this.view.scene, this.view.camera, this.view.grade, dt);
+      else this.renderer.render(this.view.scene, this.view.camera);
     }
     this.ui.tick(dt);
   }
@@ -636,21 +668,34 @@ class App {
       this.fpsFrames = 0;
       this.fpsTime = 0;
     }
-    // Dynamic resolution
+    // Dynamic resolution. Low Power Mode caps Safari at 30 fps; a steady
+    // 30 fps cadence is treated as the target so we don't blur the picture
+    // for nothing.
+    this.dtHist = this.dtHist || [];
+    this.dtHist.push(dt);
+    if (this.dtHist.length > 90) this.dtHist.shift();
+    if (this.dtHist.length === 90 && this.fpsFrames === 0) {
+      const sorted = this.dtHist.slice().sort((a, b) => a - b);
+      const med = sorted[45];
+      const spread = sorted[80] - sorted[10];
+      if (med > 0.03 && med < 0.037 && spread < 0.004) this.capped = true;
+      else if (med < 0.022) this.capped = false;
+    }
+    const target = this.capped ? 1 / 30 : 1 / 60;
     if (this.blockRaise > 0) this.blockRaise -= dt;
     this.drTimer += dt;
-    if (this.ft > 1 / 50) {
+    if (this.ft > target * 1.18) {
       this.goodTime = 0;
       if (this.drTimer > 1.2 && this.pr > this.minPR + 0.01) {
-        this.pr = Math.max(this.minPR, this.pr - 0.25);
+        this.pr = Math.max(this.minPR, this.pr - (this.ft > target * 1.5 ? 0.3 : 0.15));
         this.drTimer = 0;
-        this.blockRaise = 20;
+        this.blockRaise = 15;
         this.resize();
       }
-    } else if (this.ft < 1 / 57) {
+    } else if (this.ft < target * 1.05) {
       this.goodTime += dt;
-      if (this.goodTime > 5 && this.blockRaise <= 0 && this.pr < this.maxPR - 0.01) {
-        this.pr = Math.min(this.maxPR, this.pr + 0.25);
+      if (this.goodTime > 4 && this.blockRaise <= 0 && this.pr < this.maxPR - 0.01) {
+        this.pr = Math.min(this.maxPR, this.pr + 0.15);
         this.goodTime = 0;
         this.drTimer = 0;
         this.resize();

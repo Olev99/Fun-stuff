@@ -52,9 +52,11 @@ export function saveRecords(r) {
   }
 }
 
-// Render quality presets. "auto" also scales resolution with frame time.
+// Render quality presets, tuned for iPhone 15 Pro and newer (A17 Pro GPU and
+// up). Every preset scales its render resolution with frame time between
+// minPR and maxPR to hold 60 fps.
 export const QUALITY = {
-  high: { name: 'high', shadows: 2048, treeShadows: true, density: 1, minPR: 1.25, maxPR: 2, startPR: 2 },
-  auto: { name: 'auto', shadows: 1024, treeShadows: false, density: 0.9, minPR: 1, maxPR: 2, startPR: 1.5 },
-  low: { name: 'low', shadows: 0, treeShadows: false, density: 0.6, minPR: 0.85, maxPR: 1.25, startPR: 1 },
+  high: { name: 'high', shadows: 2048, shadowRadius: 2.2, treeShadows: true, density: 1.15, msaa: 4, bloom: true, weather: 1, grass: 1, minPR: 1.8, maxPR: 3, startPR: 2.5 },
+  auto: { name: 'auto', shadows: 2048, shadowRadius: 2.2, treeShadows: true, density: 1, msaa: 4, bloom: true, weather: 1, grass: 1, minPR: 1.35, maxPR: 2.4, startPR: 2 },
+  low: { name: 'low', shadows: 1024, shadowRadius: 1.6, treeShadows: false, density: 0.7, msaa: 2, bloom: false, weather: 0.5, grass: 0.4, minPR: 1.2, maxPR: 1.6, startPR: 1.4 },
 };

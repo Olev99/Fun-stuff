@@ -31,14 +31,14 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 
 ## Playing on iPhone
 
-iOS only allows tilt controls on HTTPS pages opened directly in Safari, not inside frames. Multiplayer also needs the full page, because WebRTC is blocked inside frames. The easiest host is GitHub Pages:
+iOS only allows tilt controls on HTTPS pages opened directly in Safari, not inside frames. Multiplayer also needs the full page, because WebRTC is blocked inside frames. The repo is public, so GitHub Pages hosts it for free:
 
-1. Merge this branch into `main`.
-2. In the repo, go to **Settings → Pages → Build and deployment**. Choose **Deploy from a branch**, then `main` and `/ (root)`, and save.
-   GitHub Pages on a private repo needs a paid GitHub plan. On a free plan, make the repo public or host the `zoomies/` folder on any static host (Netlify, Cloudflare Pages, Vercel).
-3. Open `https://<your-username>.github.io/Fun-stuff/zoomies/` in Safari on the iPhone.
-4. Tap **Share → Add to Home Screen**. Launching from the icon gives full screen without Safari's bars.
-5. Tap a menu button and allow **Motion & Orientation** access when iOS asks.
+1. In the repo, go to **Settings → Pages → Build and deployment**. Set **Source** to **Deploy from a branch**, pick the branch and `/ (root)`, and save.
+   - Pick `main` once this work is merged.
+   - To try it before merging, pick `claude/iphone-racing-game-0wytrs`. Every push to that branch updates the site.
+2. Wait a minute for the first deploy (the **Actions** tab shows it), then open `https://olev99.github.io/Fun-stuff/` in Safari on the iPhone. It redirects to the game.
+3. Tap **Share → Add to Home Screen**. Launching from the icon gives full screen without Safari's bars.
+4. Tap a menu button and allow **Motion & Orientation** access when iOS asks.
 
 Hold the phone sideways like a steering wheel and turn it to steer. **Settings** has a live tilt check, a sensitivity slider and an invert option.
 
@@ -63,7 +63,7 @@ How it works:
 | Action | Touch | Keyboard |
 | --- | --- | --- |
 | Steer | Tilt the phone, or drag on the left side | ← → / A D |
-| Drift / hop / trick | Hold **DRIFT** while turning, release for a turbo; tap it in the air off a ramp | Space / Shift |
+| Drift / trick | Hold **DRIFT** while turning to slide (no jump), release for a turbo; tap it in the air off a ramp | Space / Shift |
 | Use item | **ITEM** | E / X / Enter |
 | Brake / reverse | **BRAKE** | ↓ / S |
 | Pause | **II** button | Esc / P |
@@ -74,10 +74,13 @@ How it works:
 
 ## Tech
 
-- **Rendering:** [three.js](https://threejs.org) (vendored in `vendor/`) with plain ES modules and no build step.
-- **Models:** every model is generated in code from primitives with baked vertex colours. Each kart is 3 draw calls, all wheels share one instanced draw, and scenery is instanced.
+- **Rendering:** [three.js](https://threejs.org) (vendored in `vendor/`) with plain ES modules and no build step. Graphics are tuned for iPhone 15 Pro and newer:
+  - HDR rendering into a 4× multisampled half-float target, then bloom, Khronos PBR Neutral tone mapping, a colour grade per track, vignette and a radial speed blur while boosting.
+  - Physically based materials lit by an environment map made from each track's sky, soft 2048 px sun shadows and a camera fill light.
+  - Sky with drifting procedural clouds (star field and nebula at night), water with Fresnel sky reflections, sun glints and shore foam, glowing lava, wind-blown grass, weather particles per track (snow, petals, embers and more) and tyre skid marks.
+- **Models:** every model is generated in code from primitives with baked vertex colours and a per-vertex surface preset (paint, chrome, rubber, glass, glowing lights and more), so one draw call can mix materials. Each kart is 3 draw calls, all wheels share one instanced draw, and scenery is instanced in spatial chunks so off-screen props are skipped.
 - **Tracks:** each track is a spline, and shortcuts are extra spline branches. Karts are simulated in "path space" (distance along the path + lateral offset) and switch between the main road and shortcuts through gaps in the walls. That keeps walls, banking, jumps, bridges and AI cheap. A full 8-kart physics step costs about 0.1–0.2 ms.
-- **Frame rate:** the Auto graphics setting scales render resolution with frame time to hold 60 fps.
+- **Frame rate:** every graphics setting scales render resolution with frame time to hold 60 fps. Auto renders at 1.35–2.4× (starting at 2×), Ultra at 1.8–3× and Battery at 1.2–1.6× without bloom. If Low Power Mode caps Safari at 30 fps, the game notices and doesn't lower the resolution for nothing.
 - **Audio:** all sound is synthesised with WebAudio, including the engine, effects and a procedural chiptune per track. There are no audio files.
 - **Networking:** [PeerJS](https://peerjs.com) (vendored). To test locally without the internet, add `?net=local` to the URL and open two tabs.
 
@@ -87,6 +90,10 @@ zoomies/
   src/main.js         app shell, menus, Grand Prix, multiplayer flow, dynamic resolution
   src/race.js         race loop, laps, positions, collisions, camera, network sync
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
+  src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur
+  src/env.js          image-based lighting (sky and studio environment maps)
+  src/weather.js      GPU weather particles and wind-blown grass
+  src/skids.js        tyre skid marks
   src/kart.js         kart physics (drift, boosts, jumps, glide, respawn) and visuals
   src/track.js        spline paths, shortcuts, bridges, path-space queries
   src/tracks.js       track layouts, shortcuts and cups

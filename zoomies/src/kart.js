@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp } from './util.js';
 import { kartGeometry, WHEELS } from './characters.js';
-import { toonMat, GeoBuilder } from './util.js';
+import { pbrMat, GeoBuilder } from './util.js';
 
 const GRAVITY = 34;
 const DRIFT_COLORS = [null, '#43c8ff', '#ff9a1f', '#d45cff'];
@@ -11,7 +11,7 @@ const DRIFT_BOOST = [0, 0.75, 1.25, 1.8];
 let _shieldGeo, _shieldMat, _shadowGeo, _shadowMat, _gliderGeo;
 function gliderGeometry() {
   if (_gliderGeo) return _gliderGeo;
-  const B = new GeoBuilder();
+  const B = new GeoBuilder('fabric');
   B.add(new THREE.BoxGeometry(4.2, 0.08, 1.3), '#ffffff', [0, 2.7, -0.3], [0.12, 0, 0]);
   B.add(new THREE.BoxGeometry(2.1, 0.1, 1.32), '#ff5a8a', [-1.05, 2.72, -0.3], [0.12, 0, 0]);
   B.add(new THREE.BoxGeometry(0.5, 0.12, 1.34), '#ffd23f', [0, 2.74, -0.3], [0.12, 0, 0]);
@@ -124,7 +124,7 @@ export class Kart {
   _buildVisual() {
     const geo = kartGeometry(this.ch);
     const sh = kartShared(this.race.shadowTex);
-    this.mat = toonMat({ vertexColors: true });
+    this.mat = pbrMat();
     this.root = new THREE.Group();
     this.body = new THREE.Group();
     this.root.add(this.body);
@@ -275,18 +275,15 @@ export class Kart {
     const top = this.topSpeed;
     const spd = Math.abs(vf);
 
-    // Drift input
+    // Drift input. No hop: holding DRIFT arms it, and the slide starts as
+    // soon as we're on the ground and steering (or at once if already turning).
     if (driftEdge && !spinning) {
-      if (this.grounded && spd > 7) {
-        this.vy = 5.2;
-        this.grounded = false;
-        this.driftPending = true;
-        this.emit('hop');
-      } else if (!this.grounded && this.rampAir && this.trickWindow > 0 && !this.trickDone) {
+      if (!this.grounded && this.rampAir && this.trickWindow > 0 && !this.trickDone) {
         this.trickDone = true;
         this.trickAnim = 1;
         this.emit('trick');
       }
+      if (spd > 7 || !this.grounded) this.driftPending = true;
     }
     if (driftRelease) {
       if (this.drifting && this.driftLevel > 0) this.startBoost(DRIFT_BOOST[this.driftLevel], 4 + this.driftLevel * 2);
@@ -301,6 +298,8 @@ export class Kart {
       this.driftCharge = 0;
       this.driftLevel = 0;
       this.driftPending = false;
+      this.squash = Math.max(this.squash, 0.45);
+      this.emit('driftStart');
     }
     if (this.drifting && (spd < 7 || spinning)) {
       this.drifting = false;

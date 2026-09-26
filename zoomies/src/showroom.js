@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { kartGeometry, wheelGeometry, WHEELS, CHARACTERS } from './characters.js';
-import { GeoBuilder, toonMat } from './util.js';
+import { GeoBuilder, pbrMat } from './util.js';
+import { studioEnvironment } from './env.js';
 
 const BG_VERT = /* glsl */ `
 varying vec2 vUv;
@@ -35,29 +36,33 @@ export class Showroom {
     bg.frustumCulled = false;
     bg.renderOrder = -1;
     this.scene.add(bg);
-    this.scene.add(new THREE.HemisphereLight('#fff4f8', '#4a3a80', 1.6));
-    const sun = new THREE.DirectionalLight('#ffffff', 2.2);
+    this.envRT = studioEnvironment(app.renderer);
+    this.scene.environment = this.envRT.texture;
+    this.scene.environmentIntensity = 0.9;
+    const sun = new THREE.DirectionalLight('#fff4e8', 2.6);
     sun.position.set(3, 6, 5);
     this.scene.add(sun);
-    const rim = new THREE.DirectionalLight('#9fe8ff', 1.2);
+    const rim = new THREE.DirectionalLight('#9fe8ff', 2.2);
     rim.position.set(-4, 3, -5);
     this.scene.add(rim);
+    // Soft grade with plenty of bloom on the kart lights.
+    this.grade = { exposure: 1.05, bloom: 0.8, threshold: 1.1, saturation: 1.1, contrast: 0.1, vignette: 0.55 };
 
     // Podium
-    const B = new GeoBuilder();
-    B.add(new THREE.CylinderGeometry(2.7, 2.9, 0.5, 40), '#1d1537', [0, -0.25, 0]);
-    B.add(new THREE.CylinderGeometry(2.55, 2.55, 0.06, 40), '#ffd23f', [0, 0.02, 0]);
-    B.add(new THREE.CylinderGeometry(2.3, 2.3, 0.08, 40), '#3d3270', [0, 0.04, 0]);
-    this.podium = new THREE.Mesh(B.build(), toonMat({ vertexColors: true }));
+    const B = new GeoBuilder('paint');
+    B.add(new THREE.CylinderGeometry(2.7, 2.9, 0.5, 64), '#1d1537', [0, -0.25, 0]);
+    B.add(new THREE.CylinderGeometry(2.55, 2.55, 0.06, 64), '#ffd23f', [0, 0.02, 0], [0, 0, 0], 1, 'glow');
+    B.add(new THREE.CylinderGeometry(2.3, 2.3, 0.08, 64), '#3d3270', [0, 0.04, 0], [0, 0, 0], 1, [0.18, 0.2, 0]);
+    this.podium = new THREE.Mesh(B.build(), pbrMat());
     this.scene.add(this.podium);
 
     this.turn = new THREE.Group();
     this.scene.add(this.turn);
-    this.mat = toonMat({ vertexColors: true });
+    this.mat = pbrMat();
     this.chassis = new THREE.Mesh(undefined, this.mat);
     this.driver = new THREE.Mesh(undefined, this.mat);
     this.turn.add(this.chassis, this.driver);
-    this.wheelMat = toonMat({ vertexColors: true });
+    this.wheelMat = pbrMat();
     this.wheels = WHEELS.map((w) => {
       const m = new THREE.Mesh(wheelGeometry(), this.wheelMat);
       m.position.set(w.x, w.y, w.z);

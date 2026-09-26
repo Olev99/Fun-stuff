@@ -22,6 +22,7 @@ export class AIDriver {
     this.fr2 = {};
     this.itemDelay = 1 + Math.random() * 3;
     this.driftCool = Math.random() * 2;
+    this.driftT = 0;
     this.dodge = 0;
     this.plan = {};
   }
@@ -127,15 +128,18 @@ export class AIDriver {
     path.frame(k.trk.s + 10 + spd * 0.5, this.fr2);
     const curvAhead = path.curvWide[this.fr2.i];
     const curvNow = path.curvWide[k.trk.idx ?? 0];
-    if (!k.drifting && !c.drift && this.driftCool <= 0 && spd > 19 && Math.abs(curvAhead) > 0.021 && Math.random() < this.diff.drift * this.skill) {
+    if (!k.drifting && !c.drift && this.driftCool <= 0 && spd > 19 && Math.abs(curvAhead) > 0.016 && Math.random() < this.diff.drift * this.skill) {
       c.drift = true;
+      this.driftT = 0;
     }
     if (c.drift) {
+      this.driftT += dt;
       const turnDir = -Math.sign(curvNow || curvAhead);
-      const wrongWay = k.drifting && k.driftDir !== turnDir && Math.abs(curvNow) > 0.01;
-      const straight = Math.abs(curvNow) < 0.009 && Math.abs(curvAhead) < 0.012;
-      const maxed = k.driftLevel >= (this.diff.drift > 0.9 ? 3 : 2) && Math.abs(curvAhead) < 0.018;
-      const failed = !k.drifting && k.grounded && !k.driftPending;
+      const wrongWay = k.drifting && k.driftDir !== turnDir && Math.abs(curvNow) > 0.006;
+      const straight = Math.abs(curvNow) < 0.006 && Math.abs(curvAhead) < 0.009;
+      const maxed = k.driftLevel >= (this.diff.drift > 0.9 ? 3 : 2) && Math.abs(curvAhead) < 0.012;
+      // The hop takes a moment: only call it a failed drift once it had time to start.
+      const failed = this.driftT > 0.35 && !k.drifting && k.grounded && (!k.driftPending || this.driftT > 1.2);
       if (wrongWay || straight || maxed || failed || Math.abs(diff) > 0.9) {
         c.drift = false;
         this.driftCool = 0.6 + Math.random() * 1.2;

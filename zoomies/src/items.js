@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GeoBuilder, toonMat } from './util.js';
+import { GeoBuilder, pbrMat, stdMat } from './util.js';
 import * as TX from './textures.js';
 
 export const ITEMS = {
@@ -53,33 +53,33 @@ const OBSTACLES = {
 let _geo = null;
 function geos() {
   if (_geo) return _geo;
-  const B = () => new GeoBuilder();
-  const honey = B()
+  const B = (m = null) => new GeoBuilder(m);
+  const honey = B('gloss')
     .add(new THREE.SphereGeometry(1.6, 16, 6), '#ffb21f', [0, 0.02, 0], [0, 0, 0], [1, 0.1, 1])
     .add(new THREE.SphereGeometry(0.7, 10, 6), '#ffc93f', [0.9, 0.05, 0.5], [0, 0, 0], [1, 0.15, 1])
-    .add(new THREE.CylinderGeometry(0.42, 0.36, 0.62, 12), '#d98a1a', [0, 0.36, 0])
-    .add(new THREE.CylinderGeometry(0.46, 0.46, 0.12, 12), '#fff3d6', [0, 0.7, 0])
-    .add(new THREE.CylinderGeometry(0.43, 0.43, 0.2, 12), '#fff3d6', [0, 0.36, 0])
+    .add(new THREE.CylinderGeometry(0.42, 0.36, 0.62, 20), '#d98a1a', [0, 0.36, 0], [0, 0, 0], 1, 'plastic')
+    .add(new THREE.CylinderGeometry(0.46, 0.46, 0.12, 20), '#fff3d6', [0, 0.7, 0], [0, 0, 0], 1, 'fabric')
+    .add(new THREE.CylinderGeometry(0.43, 0.43, 0.2, 20), '#fff3d6', [0, 0.36, 0], [0, 0, 0], 1, 'fabric')
     .build();
-  const ball = B()
-    .add(new THREE.SphereGeometry(0.62, 16, 12), '#d8ff3a')
+  const ball = B('plastic')
+    .add(new THREE.SphereGeometry(0.62, 24, 16), '#d8ff3a')
     .add(new THREE.TorusGeometry(0.62, 0.05, 6, 24), '#ffffff', [0, 0, 0], [0.5, 0.3, 0])
     .build();
-  const bee = B()
-    .add(new THREE.SphereGeometry(0.5, 14, 10), '#ffd21f', [0, 0, 0], [0, 0, 0], [0.9, 0.9, 1.25])
+  const bee = B('fur')
+    .add(new THREE.SphereGeometry(0.5, 20, 14), '#ffd21f', [0, 0, 0], [0, 0, 0], [0.9, 0.9, 1.25])
     .add(new THREE.TorusGeometry(0.44, 0.08, 6, 16), '#1d1537', [0, 0, 0.12])
     .add(new THREE.TorusGeometry(0.4, 0.08, 6, 16), '#1d1537', [0, 0, -0.22])
     .add(new THREE.ConeGeometry(0.12, 0.3, 6), '#1d1537', [0, 0, -0.72], [-Math.PI / 2, 0, 0])
-    .add(new THREE.SphereGeometry(0.34, 10, 6), '#e9f7ff', [0.36, 0.42, -0.05], [0, 0, 0.5], [0.5, 0.15, 1])
-    .add(new THREE.SphereGeometry(0.34, 10, 6), '#e9f7ff', [-0.36, 0.42, -0.05], [0, 0, -0.5], [0.5, 0.15, 1])
-    .add(new THREE.SphereGeometry(0.09, 8, 6), '#1d1537', [0.17, 0.12, 0.55])
-    .add(new THREE.SphereGeometry(0.09, 8, 6), '#1d1537', [-0.17, 0.12, 0.55])
+    .add(new THREE.SphereGeometry(0.34, 12, 8), '#e9f7ff', [0.36, 0.42, -0.05], [0, 0, 0.5], [0.5, 0.15, 1], 'gloss')
+    .add(new THREE.SphereGeometry(0.34, 12, 8), '#e9f7ff', [-0.36, 0.42, -0.05], [0, 0, -0.5], [0.5, 0.15, 1], 'gloss')
+    .add(new THREE.SphereGeometry(0.09, 10, 8), '#1d1537', [0.17, 0.12, 0.55], [0, 0, 0], 1, 'eye')
+    .add(new THREE.SphereGeometry(0.09, 10, 8), '#1d1537', [-0.17, 0.12, 0.55], [0, 0, 0], 1, 'eye')
     .build();
-  const boomerang = B()
+  const boomerang = B('paint')
     .add(new THREE.BoxGeometry(1.6, 0.16, 0.45), '#ff8a2b', [0.6, 0, 0], [0, 0.5, 0])
     .add(new THREE.BoxGeometry(1.6, 0.16, 0.45), '#ffd23f', [-0.6, 0, 0], [0, -0.5, 0])
     .build();
-  const crate = B()
+  const crate = B('wood')
     .add(new THREE.BoxGeometry(1.8, 1.8, 1.8), '#c9955d')
     .add(new THREE.BoxGeometry(1.86, 0.3, 1.86), '#8a5a36', [0, 0.75, 0])
     .add(new THREE.BoxGeometry(1.86, 0.3, 1.86), '#8a5a36', [0, -0.75, 0])
@@ -87,7 +87,7 @@ function geos() {
     .build();
   const obs = {};
   for (const [k, o] of Object.entries(OBSTACLES)) {
-    const b = B();
+    const b = B({ hay: 'fabric', crab: 'gloss', tumbleweed: 'wood', snowball: 'snow', penguin: 'plastic', gumball: 'candy', laser: 'metal', boulder: 'stone', balloon: [0.25, 0, 0] }[k] || null);
     switch (k) {
       case 'hay':
         b.add(new THREE.CylinderGeometry(1.2, 1.2, 2.2, 14), o.col, [0, 0, 0], [0, 0, Math.PI / 2]);
@@ -115,7 +115,7 @@ function geos() {
         b.add(new THREE.ConeGeometry(0.12, 0.3, 6), '#ff9a1f', [0, 1.4, 0.55], [Math.PI / 2, 0, 0]);
         break;
       case 'gumball':
-        b.add(new THREE.SphereGeometry(1.4, 14, 10), '#ffffff');
+        b.add(new THREE.SphereGeometry(1.4, 24, 16), '#ffffff');
         break;
       case 'laser':
         b.add(new THREE.BoxGeometry(0.4, 2.2, 0.4), '#ffffff', [0, 0, 0]);
@@ -127,10 +127,10 @@ function geos() {
         break;
       case 'boulder':
         b.add(new THREE.DodecahedronGeometry(1.9, 0), o.col);
-        b.add(new THREE.DodecahedronGeometry(0.9, 0), '#ff6a1a', [0.9, 0.6, 1.1]);
+        b.add(new THREE.DodecahedronGeometry(0.9, 0), '#ff6a1a', [0.9, 0.6, 1.1], [0, 0, 0], 1, 'glowHot');
         break;
       case 'balloon':
-        b.add(new THREE.SphereGeometry(1.3, 12, 10), '#ffffff', [0, 0.4, 0], [0, 0, 0], [1, 1.2, 1]);
+        b.add(new THREE.SphereGeometry(1.3, 24, 16), '#ffffff', [0, 0.4, 0], [0, 0, 0], [1, 1.2, 1]);
         b.add(new THREE.CylinderGeometry(0.03, 0.03, 2, 4), '#ffffff', [0, -1.6, 0]);
         break;
     }
@@ -155,8 +155,8 @@ export class ItemSystem {
     this.obstacles = [];
     this.crates = [];
     this.nextId = 1;
-    this.mat = toonMat({ vertexColors: true });
-    this.glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true });
+    this.mat = pbrMat();
+    this.glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, color: new THREE.Color(2.6, 2.6, 2.6) });
     this.geo = geos();
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
@@ -192,10 +192,10 @@ export class ItemSystem {
     }
     if (!this.boxes.length) return;
     this.qTex = TX.itemBoxTexture();
-    const mat = new THREE.MeshBasicMaterial({ map: this.qTex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ map: this.qTex, transparent: true, depthWrite: false, side: THREE.DoubleSide, color: new THREE.Color(1.35, 1.35, 1.35) });
     this.boxMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 1.7, 1.7), mat, this.boxes.length);
     this.boxMesh.renderOrder = 2;
-    this.coreMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.42, 0), new THREE.MeshBasicMaterial({ color: '#ffffff' }), this.boxes.length);
+    this.coreMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.42, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.2) }), this.boxes.length);
     for (let i = 0; i < this.boxes.length; i++) {
       this.boxMesh.setColorAt(i, this._c.set('#ffffff'));
       this.coreMesh.setColorAt(i, this._c.set('#ffffff'));
@@ -218,7 +218,7 @@ export class ItemSystem {
     }
     const geo = new THREE.OctahedronGeometry(0.5, 0);
     geo.scale(1, 1.35, 1);
-    const mat = new THREE.MeshLambertMaterial({ color: '#46f0ff', emissive: new THREE.Color('#1c8cff'), emissiveIntensity: 0.55 });
+    const mat = stdMat({ color: '#46f0ff', roughness: 0.08, metalness: 0.1, emissive: new THREE.Color('#1c8cff'), emissiveIntensity: 1.5 });
     this.gemMesh = new THREE.InstancedMesh(geo, mat, Math.max(1, this.gems.length));
     if (!this.gems.length) this.gemMesh.count = 0;
     this.group.add(this.gemMesh);
@@ -232,8 +232,8 @@ export class ItemSystem {
       if (!def) continue;
       const mesh = new THREE.Mesh(this.geo.obs[o.type], def.glow ? this.glowMat : this.mat);
       if (o.type === 'gumball' || o.type === 'balloon') {
-        mesh.material = mesh.material.clone();
-        mesh.material.color = new THREE.Color(['#ff5a8a', '#36a9ff', '#ffd23f', '#19e3b1'][this.obstacles.length % 4]);
+        // (cloning would drop pbrMat's shader hook, so make a fresh one)
+        mesh.material = pbrMat({ color: ['#ff5a8a', '#36a9ff', '#ffd23f', '#19e3b1'][this.obstacles.length % 4] });
       }
       mesh.castShadow = !!this.race.quality.shadows;
       this.group.add(mesh);

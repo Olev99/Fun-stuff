@@ -10,13 +10,14 @@ varying float vAlpha;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = min(size * uScale / max(-mv.z, 0.1), 96.0);
+  gl_PointSize = min(size * uScale / max(-mv.z, 0.1), 180.0);
   vColor = color;
   vAlpha = alpha;
 }`;
 
 const FRAG = /* glsl */ `
 uniform float uSoft;
+uniform float uGain;
 varying vec3 vColor;
 varying float vAlpha;
 void main() {
@@ -24,7 +25,7 @@ void main() {
   float d = length(c);
   float a = smoothstep(0.5, uSoft, d) * vAlpha;
   if (a < 0.01) discard;
-  gl_FragColor = vec4(vColor, a);
+  gl_FragColor = vec4(vColor * uGain, a);
   #include <colorspace_fragment>
 }`;
 
@@ -59,7 +60,8 @@ export class Particles {
     this.mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
       fragmentShader: FRAG,
-      uniforms: { uScale: { value: 400 }, uSoft: { value: additive ? 0.0 : 0.25 } },
+      // Additive sparks are pushed into HDR so they bloom.
+      uniforms: { uScale: { value: 400 }, uSoft: { value: additive ? 0.0 : 0.25 }, uGain: { value: additive ? 2.4 : 1 } },
       transparent: true,
       depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,

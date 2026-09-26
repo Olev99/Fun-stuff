@@ -25,6 +25,13 @@ export class Audio {
   }
 
   unlock() {
+    // iOS mutes Web Audio when the ringer is on silent unless the page asks
+    // for a "playback" audio session (Safari 17+).
+    try {
+      if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
+    } catch (e) {
+      /* not supported */
+    }
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -49,6 +56,26 @@ export class Audio {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     }
     if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+    this._primeSession();
+  }
+
+  // Older iOS: playing a (silent) media element switches the page to the
+  // playback audio session, which also un-mutes Web Audio on silent.
+  _primeSession() {
+    if (this._silent || navigator.audioSession || !/iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document)) return;
+    const rate = 8000, n = 800;
+    const buf = new ArrayBuffer(44 + n * 2);
+    const v = new DataView(buf);
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+    v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+    const el = document.createElement('audio');
+    el.setAttribute('playsinline', '');
+    el.loop = true;
+    el.src = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    el.play().catch(() => {});
+    this._silent = el;
   }
 
   get ready() {
@@ -134,8 +161,9 @@ export class Audio {
         this._tone('square', f, f * 1.5, 0.12, 0.09);
         break;
       }
-      case 'hop':
-        this._tone('triangle', 260, 420, 0.1, 0.12);
+      case 'driftStart':
+        this._noise(0.14, 0.1, 'bandpass', 2600, 1700, 0, this.sfx, 4);
+        this._tone('triangle', 220, 330, 0.08, 0.07);
         break;
       case 'land':
         this._tone('sine', 120, 60, 0.18, 0.3);

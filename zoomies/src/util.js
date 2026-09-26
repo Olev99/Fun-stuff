@@ -54,11 +54,14 @@ const _c = new THREE.Color();
 // Collects primitive parts, bakes a colour into each as a vertex attribute and
 // merges everything into one BufferGeometry. One mesh = one draw call.
 export class GeoBuilder {
-  constructor() {
+  // defaultMat: the MAT preset used by add() when no material is given.
+  constructor(defaultMat = null) {
     this.parts = [];
+    this.mat = defaultMat;
   }
 
-  add(geo, color, pos = [0, 0, 0], rot = [0, 0, 0], scale = 1) {
+  // mat: a MAT preset name or [roughness, metalness, emissive]; read by pbrMat().
+  add(geo, color, pos = [0, 0, 0], rot = [0, 0, 0], scale = 1, mat = null) {
     const g = geo.index ? geo.toNonIndexed() : geo;
     _e.set(rot[0], rot[1], rot[2]);
     _q.setFromEuler(_e);
@@ -76,6 +79,14 @@ export class GeoBuilder {
       cols[i * 3 + 2] = _c.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const pb = matOf(mat ?? this.mat);
+    const pbr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pbr[i * 3] = pb[0];
+      pbr[i * 3 + 1] = pb[1];
+      pbr[i * 3 + 2] = pb[2];
+    }
+    g.setAttribute('pbr', new THREE.BufferAttribute(pbr, 3));
     this.parts.push(g);
     return this;
   }
@@ -92,17 +103,24 @@ export class GeoBuilder {
     const pos = new Float32Array(n * 3);
     const nor = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
+    const pbr = new Float32Array(n * 3);
+    const def = matOf(this.mat);
     let o = 0;
     for (const g of this.parts) {
+      const c = g.attributes.position.count;
       pos.set(g.attributes.position.array, o);
       nor.set(g.attributes.normal.array, o);
-      col.set(g.attributes.color.array, o);
-      o += g.attributes.position.count * 3;
+      if (g.attributes.color) col.set(g.attributes.color.array, o);
+      else col.fill(1, o, o + c * 3);
+      if (g.attributes.pbr) pbr.set(g.attributes.pbr.array, o);
+      else for (let i = o; i < o + c * 3; i += 3) { pbr[i] = def[0]; pbr[i + 1] = def[1]; pbr[i + 2] = def[2]; }
+      o += c * 3;
     }
     const out = new THREE.BufferGeometry();
     out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    out.setAttribute('pbr', new THREE.BufferAttribute(pbr, 3));
     out.computeBoundingSphere();
     out.computeBoundingBox();
     this.parts.length = 0;
@@ -110,21 +128,57 @@ export class GeoBuilder {
   }
 }
 
-let _toonGradient = null;
-export function toonGradient() {
-  if (_toonGradient) return _toonGradient;
-  const data = new Uint8Array([90, 90, 90, 255, 175, 175, 175, 255, 255, 255, 255, 255]);
-  const t = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
-  t.minFilter = THREE.NearestFilter;
-  t.magFilter = THREE.NearestFilter;
-  t.generateMipmaps = false;
-  t.needsUpdate = true;
-  _toonGradient = t;
-  return t;
+// Surface presets: [roughness, metalness, emissive multiplier of the vertex colour].
+export const MAT = {
+  paint: [0.32, 0.05, 0],
+  metal: [0.3, 1, 0],
+  chrome: [0.12, 1, 0],
+  rubber: [0.88, 0, 0],
+  plastic: [0.45, 0, 0],
+  matte: [0.8, 0, 0],
+  fur: [0.78, 0, 0],
+  skin: [0.55, 0, 0],
+  gloss: [0.1, 0, 0],
+  eye: [0.05, 0, 0],
+  glow: [0.5, 0, 2.2],
+  glowHot: [0.4, 0, 5],
+  leaf: [0.72, 0, 0],
+  wood: [0.85, 0, 0],
+  stone: [0.9, 0, 0],
+  snow: [0.5, 0, 0],
+  ice: [0.1, 0, 0.12],
+  candy: [0.18, 0, 0],
+  frosting: [0.55, 0, 0],
+  fabric: [0.95, 0, 0],
+};
+const DEF_MAT = [0.8, 0, 0];
+function matOf(m) {
+  if (!m) return DEF_MAT;
+  if (Array.isArray(m)) return m;
+  return MAT[m] || DEF_MAT;
 }
 
-export function toonMat(opts = {}) {
-  return new THREE.MeshToonMaterial({ gradientMap: toonGradient(), ...opts });
+// Physically based material driven by the per-vertex "pbr" attribute that
+// GeoBuilder writes, so one draw call can mix paint, rubber, chrome and lights.
+export function pbrMat(opts = {}) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 1, ...opts });
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 pbr;\nvarying vec3 vPbr;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPbr = pbr;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPbr;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = roughness * vPbr.x;')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = metalness * vPbr.y;')
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance += diffuseColor.rgb * vPbr.z;');
+  };
+  m.customProgramCacheKey = () => 'pbr1';
+  return m;
+}
+
+// Plain physically based material for textured or single-colour surfaces.
+export function stdMat(opts = {}) {
+  return new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...opts });
 }
 
 export function disposeObject(root) {

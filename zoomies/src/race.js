@@ -6,7 +6,8 @@ import { AIDriver, DIFFICULTY } from './ai.js';
 import { ItemSystem } from './items.js';
 import { FX } from './particles.js';
 import { wheelGeometry, charById } from './characters.js';
-import { clamp, damp, dampAngle } from './util.js';
+import { clamp, damp, dampAngle, pbrMat } from './util.js';
+import { SkidMarks } from './skids.js';
 import * as TX from './textures.js';
 
 export const SPEED_CLASSES = {
@@ -73,6 +74,16 @@ export class Race {
     this.world = new World(this.track, this.quality);
     this.scene.add(this.world.group);
     this.scene.fog = this.world.fog;
+    this.world.applyEnvironment(app.renderer, this.scene);
+    this.grade = this.world.grade;
+    this.grade.boost = 0;
+    // Soft fill from the camera so the side of the karts we look at is never
+    // lost in shadow (the sun can be anywhere relative to the camera).
+    this.fill = new THREE.DirectionalLight(this.world.theme.hemi[0], this.world.fx.fill ?? 0.55);
+    this.scene.add(this.fill, this.fill.target);
+    this.skids = new SkidMarks(1200, this.world.theme.floating || this.world.theme.road === 'neon' ? '#241a3a' : '#1a1418');
+    this.scene.add(this.skids.mesh);
+    this.camRoll = 0;
     this.shadowTex = TX.blobShadowTexture();
     this.fx = new FX(this.scene);
     this.dust = this.world.theme.dust || '#cccccc';
@@ -123,7 +134,7 @@ export class Race {
     const tr = this.track;
     this.karts = [];
     const grid = this.mode === 'tt' ? [opts.player] : opts.grid;
-    this.wheelMesh = new THREE.InstancedMesh(wheelGeometry(), new THREE.MeshToonMaterial({ vertexColors: true }), grid.length * 4);
+    this.wheelMesh = new THREE.InstancedMesh(wheelGeometry(), pbrMat(), grid.length * 4);
     this.wheelMesh.castShadow = !!this.quality.shadows;
     this.wheelMesh.frustumCulled = false;
     this.scene.add(this.wheelMesh);
@@ -159,6 +170,7 @@ export class Race {
     this.camera.updateProjectionMatrix();
     this.viewH = h * pr;
     this.fx.setScale(this.viewH, this.camera.fov);
+    this.world.setViewH(this.viewH);
   }
 
   // ---------------- main update ----------------
@@ -217,6 +229,7 @@ export class Race {
       k.emitFX(dt, this.fx, this.dust);
     }
     this._updateWheels();
+    this._updateSkids(dt);
     this.fx.update(dt);
     this._updateCamera(dt);
     this.world.update(dt, this.camera, this.player ? this.player.pos : this.karts[this.demoTarget % this.karts.length].pos);
@@ -340,8 +353,8 @@ export class Race {
         case 'driftLevel':
           if (k.isPlayer) a.play('driftLevel', data);
           break;
-        case 'hop':
-          if (k.isPlayer) a.play('hop');
+        case 'driftStart':
+          if (k.isPlayer) a.play('driftStart');
           break;
         case 'land':
           if (k.isPlayer) a.play('land');
@@ -532,6 +545,22 @@ export class Race {
       for (let w = 0; w < 4; w++) m.setMatrixAt(k.wheelBase + w, k.wheels[w].spin.matrixWorld);
     }
     m.instanceMatrix.needsUpdate = true;
+  }
+
+  _updateSkids(dt) {
+    const sk = this.skids;
+    for (const k of this.karts) {
+      const spd = k.speed;
+      const on = k.grounded && !k.offroad && k.respawnT <= 0 && spd > 8 && (k.drifting || (k.ctl.brake && k.fwdSpeed > 12));
+      for (let w = 2; w < 4; w++) {
+        const key = k.index * 4 + w;
+        if (!on) { sk.lift(key); continue; }
+        const e = k.wheels[w].spin.matrixWorld.elements;
+        const sc = k.root.scale.x;
+        sk.add(key, e[12], e[13] - k.wheels[w].def.r * sc + 0.03, e[14], k.vel.x / spd, k.vel.z / spd, 0.34 * sc, k.drifting ? 0.5 : 0.32);
+      }
+    }
+    sk.update(dt);
   }
 
   // Thunder Cloud: zap everyone ahead of the user.
@@ -799,6 +828,10 @@ export class Race {
       this.camera.position.y += (Math.random() - 0.5) * s;
     }
     this.camera.lookAt(this.camLook);
+    // Lean the camera slightly into turns and drifts.
+    const rollT = k.drifting ? -k.driftDir * 0.035 : -(k.steerS || 0) * 0.015 * sf;
+    this.camRoll = snap ? rollT : damp(this.camRoll, rollT, 4, dt);
+    this.camera.rotateZ(this.camRoll);
     this.fov = 68 + sf * 7 + (k.boostTime > 0 ? 7 : 0) + (k.rocketTime > 0 ? 6 : 0);
   }
 
@@ -839,6 +872,14 @@ export class Race {
     else if (this.state === 'intro' || this.state === 'wait') this._introCam();
     else if (this.state === 'finished' || this.state === 'done') this._orbitCam(dt, this.player);
     else this._chase(dt, this.stateTime < 0.02 && this.state === 'countdown');
+    // Radial speed blur while boosting (post-processing).
+    const pk = this.mode === 'demo' ? null : this.player;
+    const bt = pk && this.state === 'race' && (pk.boostTime > 0 || pk.rocketTime > 0) ? (pk.rocketTime > 0 ? 1.3 : 1) : 0;
+    this.grade.boost = damp(this.grade.boost, bt, bt ? 8 : 3, dt);
+    if (this.grade.boost < 0.01) this.grade.boost = 0;
+    this.fill.position.copy(this.camera.position);
+    this.fill.position.y += 4;
+    this.fill.target.position.copy(this.camLook);
     if (Math.abs(this.camera.fov - this.fov) > 0.05) {
       this.camera.fov = damp(this.camera.fov, this.fov, 6, dt);
       this.camera.updateProjectionMatrix();
@@ -854,6 +895,7 @@ export class Race {
     this.wheelMesh.dispose();
     for (const k of this.karts) k.mat.dispose();
     this.shadowTex.dispose();
+    this.skids.dispose();
     this.scene.clear();
     if (this.session && this.session.race === this) this.session.race = null;
   }
