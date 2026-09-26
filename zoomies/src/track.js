@@ -110,6 +110,7 @@ export class Path {
 
     this.ramps = [];
     this.boosts = [];
+    this.patches = [];
     this.voids = [];
     this.speedMul = 1;
     this.bridge = new Uint8Array(count);
@@ -387,6 +388,11 @@ export class Track extends Path {
       return { s: start, len: l, h: r.h ?? 1.7, glide: !!r.glide, halfW: fr.hw };
     });
     this.boosts = (def.boosts || []).map((b) => ({ s: f(b.at), d: this.sd(b.d ?? 0), len: 7, w: 4.6 }));
+    // Surface patches on the road: black ice, mud, oil...
+    this.patches = (def.patches || []).map((p) => {
+      const l = p.len ?? 18;
+      return { s: reverse ? (f(p.at) - l + len) % len : f(p.at), len: l, d: this.sd(p.d ?? 0), w: p.w ?? 9, type: p.type || 'ice' };
+    });
     this.itemRows = (def.items || []).map((at) => f(at));
     this.gemLines = (def.gems || []).map((g) => ({ s: f(g.at), d: this.sd(g.d ?? 0), n: g.n ?? 5 }));
     this.obstacles = (def.obstacles || []).map((o) => ({ ...o, s: f(o.at) }));
@@ -663,11 +669,21 @@ export class Shortcut extends Path {
   }
 }
 
+// Patches on top of the road. grip scales sideways grip, traction scales
+// acceleration and braking, speed scales top speed.
+export const PATCHES = {
+  ice: { grip: 0.26, traction: 0.5, speed: 1.02 },
+  oil: { grip: 0.2, traction: 0.75, speed: 1 },
+  mud: { grip: 0.8, traction: 0.6, speed: 0.7 },
+  snow: { grip: 0.7, traction: 0.8, speed: 0.88 },
+  sand: { grip: 0.85, traction: 0.75, speed: 0.8 },
+};
+
 export const SURFACES = {
   road: { speed: 1, grip: 1 },
   dirt: { speed: 0.87, grip: 0.9 },
   offroad: { speed: 1, grip: 0.85, offroad: true },
-  ice: { speed: 1.03, grip: 0.32 },
+  ice: { speed: 1.03, grip: 0.24 },
 };
 
 const _fr = {};

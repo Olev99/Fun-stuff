@@ -79,7 +79,10 @@ export const TRACKS = [
     ramps: [{ at: 0.43, len: 8, h: 1.8 }],
     gems: [{ at: 0.05, d: 0, n: 5 }, { at: 0.22, d: -3, n: 5 }, { at: 0.56, d: 3, n: 6 }, { at: 0.88, d: 0, n: 5 }],
     obstacles: [{ at: 0.34, type: 'snowball', amp: 6, speed: 1 }, { at: 0.72, type: 'penguin', amp: 7, speed: 0.8 }],
-    grip: 0.72,
+    // Snow: much less grip and traction than tarmac, plus black ice.
+    grip: 0.5,
+    traction: 0.78,
+    patches: [{ at: 0.13, len: 22, d: 0, w: 12, type: 'ice' }, { at: 0.6, len: 26, d: -2, w: 11, type: 'ice' }, { at: 0.9, len: 16, d: 3, w: 8, type: 'ice' }],
     lakes: [{ x: -80, z: 22, rx: 40, rz: 44 }],
     shortcuts: [
       { name: 'Ice Shelf', from: 0.33, to: 0.52, side: -1, surface: 'ice', width: 10, deco: 'iceArch', crates: true,

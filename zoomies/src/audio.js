@@ -263,46 +263,236 @@ export class Audio {
     }
   }
 
-  // ---- engine (player only) ----
+  // ---- engines ----
+  // A small single-cylinder kart engine: a pulse-shaped waveform at the
+  // firing rate, a detuned copy for grit, a sub-octave for body, soft
+  // clipping that grows with load, an exhaust resonance, intake noise and a
+  // slow random wobble that makes idle sound like real combustion.
+  _engineWave() {
+    if (this._ew) return this._ew;
+    const N = 40;
+    const re = new Float32Array(N), im = new Float32Array(N);
+    for (let n = 1; n < N; n++) {
+      // decaying harmonics with a bump around the 2nd-4th (the "bark")
+      const a = (1 / Math.pow(n, 0.85)) * (n >= 2 && n <= 4 ? 1.5 : 1) * (n % 2 ? 1 : 0.8);
+      const ph = n * 0.9;
+      re[n] = a * Math.cos(ph);
+      im[n] = a * Math.sin(ph);
+    }
+    this._ew = this.ctx.createPeriodicWave(re, im);
+    return this._ew;
+  }
+
+  _shaper() {
+    if (this._sc) return this._sc;
+    const n = 1024, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * 2.2) / Math.tanh(2.2);
+    }
+    this._sc = curve;
+    return curve;
+  }
+
+  _engineVoice(out, level = 1) {
+    const c = this.ctx;
+    const v = { level };
+    const src = (node) => { node.start(); return node; };
+    v.o1 = src(c.createOscillator());
+    v.o1.setPeriodicWave(this._engineWave());
+    v.o2 = src(c.createOscillator());
+    v.o2.setPeriodicWave(this._engineWave());
+    v.sub = src(c.createOscillator());
+    v.sub.type = 'sine';
+    v.drive = c.createGain();
+    v.shaper = c.createWaveShaper();
+    v.shaper.curve = this._shaper();
+    v.shaper.oversample = '2x';
+    v.lp = c.createBiquadFilter();
+    v.lp.type = 'lowpass';
+    v.lp.Q.value = 0.9;
+    v.body = c.createBiquadFilter();
+    v.body.type = 'peaking';
+    v.body.frequency.value = 320;
+    v.body.Q.value = 1.2;
+    v.body.gain.value = 6;
+    v.amp = c.createGain();
+    v.amp.gain.value = 0;
+    const g2 = c.createGain();
+    g2.gain.value = 0.55;
+    const gs = c.createGain();
+    gs.gain.value = 0.5;
+    v.o1.connect(v.drive);
+    v.o2.connect(g2).connect(v.drive);
+    v.sub.connect(gs).connect(v.lp);
+    v.drive.connect(v.shaper).connect(v.lp);
+    v.lp.connect(v.body).connect(v.amp);
+    // intake / exhaust air
+    v.air = c.createBufferSource();
+    v.air.buffer = this.noise;
+    v.air.loop = true;
+    v.airBp = c.createBiquadFilter();
+    v.airBp.type = 'bandpass';
+    v.airBp.Q.value = 0.8;
+    v.airG = c.createGain();
+    v.airG.gain.value = 0;
+    v.air.connect(v.airBp).connect(v.airG).connect(v.amp);
+    v.air.start(0, Math.random());
+    // combustion wobble: very low-passed noise nudging the volume
+    v.jit = c.createBufferSource();
+    v.jit.buffer = this.noise;
+    v.jit.loop = true;
+    v.jit.playbackRate.value = 0.25;
+    const jl = c.createBiquadFilter();
+    jl.type = 'lowpass';
+    jl.frequency.value = 18;
+    v.jitG = c.createGain();
+    v.jitG.gain.value = 0;
+    v.jit.connect(jl).connect(v.jitG).connect(v.amp.gain);
+    v.jit.start(0, Math.random());
+    if (c.createStereoPanner) {
+      v.pan = c.createStereoPanner();
+      v.amp.connect(v.pan).connect(out);
+    } else v.amp.connect(out);
+    v.nodes = [v.o1, v.o2, v.sub, v.air, v.jit];
+    return v;
+  }
+
+  // rpm 1500-12500, load 0-1, vol 0-1
+  _setVoice(v, rpm, load, vol, t, pan = 0) {
+    const f = rpm / 60;
+    const k = 0.04;
+    v.o1.frequency.setTargetAtTime(f, t, k);
+    v.o2.frequency.setTargetAtTime(f * 1.007, t, k);
+    v.sub.frequency.setTargetAtTime(f * 0.5, t, k);
+    v.drive.gain.setTargetAtTime(0.35 + load * 0.9, t, 0.06);
+    v.lp.frequency.setTargetAtTime(380 + (rpm / 12500) * 2600 + load * 900, t, 0.06);
+    v.body.frequency.setTargetAtTime(220 + (rpm / 12500) * 380, t, 0.1);
+    v.airBp.frequency.setTargetAtTime(700 + (rpm / 12500) * 2200, t, 0.1);
+    v.airG.gain.setTargetAtTime((0.05 + load * 0.2) * (rpm / 12500), t, 0.08);
+    const base = vol * v.level * (0.55 + 0.45 * load);
+    v.amp.gain.setTargetAtTime(base, t, 0.05);
+    // (the filtered noise is small, hence the large factor)
+    v.jitG.gain.setTargetAtTime(base * 7 * Math.max(0, 1 - rpm / 6500), t, 0.1);
+    if (v.pan) v.pan.pan.setTargetAtTime(pan, t, 0.1);
+  }
+
+  _stopVoice(v, t) {
+    v.amp.gain.cancelScheduledValues(t);
+    v.amp.gain.setTargetAtTime(0, t, 0.05);
+    for (const n of v.nodes) n.stop(t + 0.4);
+  }
+
   startEngine() {
     if (!this.ctx || this.engine) return;
     const c = this.ctx;
-    const o1 = c.createOscillator();
-    const o2 = c.createOscillator();
-    const lp = c.createBiquadFilter();
-    const g = c.createGain();
-    o1.type = 'sawtooth';
-    o2.type = 'square';
-    lp.type = 'lowpass';
-    lp.frequency.value = 500;
-    lp.Q.value = 3;
-    g.gain.value = 0;
-    o1.connect(lp);
-    o2.connect(lp);
-    lp.connect(g).connect(this.sfx);
-    o1.start();
-    o2.start();
-    this.engine = { o1, o2, lp, g };
+    const e = (this.engine = { rpm: 1800, gear: 0, shift: 0, last: c.currentTime });
+    e.bus = c.createGain();
+    e.bus.gain.value = 0.16;
+    e.bus.connect(this.sfx);
+    e.voice = this._engineVoice(e.bus, 1);
+    e.rival = this._engineVoice(e.bus, 0.55);
+    e.rivalRpm = 3000;
+    // turbo whine while boosting
+    e.turbo = c.createOscillator();
+    e.turbo.type = 'triangle';
+    e.turboG = c.createGain();
+    e.turboG.gain.value = 0;
+    e.turbo.connect(e.turboG).connect(e.bus);
+    e.turbo.start();
+    // tyre squeal while drifting
+    e.sq = c.createBufferSource();
+    e.sq.buffer = this.noise;
+    e.sq.loop = true;
+    e.sqBp = c.createBiquadFilter();
+    e.sqBp.type = 'bandpass';
+    e.sqBp.Q.value = 7;
+    e.sqBp.frequency.value = 1900;
+    e.sqG = c.createGain();
+    e.sqG.gain.value = 0;
+    e.sq.connect(e.sqBp).connect(e.sqG).connect(e.bus);
+    e.sq.start();
+    e.sqTone = c.createOscillator();
+    e.sqTone.type = 'sine';
+    e.sqToneG = c.createGain();
+    e.sqToneG.gain.value = 0;
+    e.sqTone.connect(e.sqToneG).connect(e.bus);
+    e.sqTone.start();
   }
 
-  updateEngine(speedFrac, boosting, active) {
+  // s: { speed 0..1.3 (fraction of top speed), throttle, brake, boost, drift,
+  //      driftLevel, air, offroad, active, rival: { dist, speed, pan } }
+  updateEngine(s) {
     const e = this.engine;
-    if (!e) return;
-    const t = this.ctx.currentTime;
-    const f = 55 + speedFrac * 95 + (boosting ? 30 : 0);
-    e.o1.frequency.setTargetAtTime(f, t, 0.05);
-    e.o2.frequency.setTargetAtTime(f * 0.5 + 1.5, t, 0.05);
-    e.lp.frequency.setTargetAtTime(350 + speedFrac * 1400 + (boosting ? 800 : 0), t, 0.08);
-    e.g.gain.setTargetAtTime(active ? 0.045 + speedFrac * 0.04 : 0, t, 0.1);
+    if (!e || !this.ready) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const dt = Math.min(0.1, Math.max(0.001, t - e.last));
+    e.last = t;
+    const IDLE = 1900, RED = 12200;
+    // Gearbox: rpm climbs through each gear and drops on the shift.
+    const tops = [0.3, 0.52, 0.74, 0.96, 1.5];
+    const spd = Math.max(0, s.speed);
+    let g = e.gear;
+    if (g < tops.length - 1 && spd > tops[g] * 1.01) g++;
+    else if (g > 0 && spd < tops[g - 1] * 0.86) g--;
+    if (g > e.gear) {
+      e.shift = 0.14;
+      if (e.rpm > 9000 && s.active) this.pop();
+    }
+    e.gear = g;
+    const lo = g ? tops[g - 1] * 0.62 : 0;
+    const frac = Math.min(1, Math.max(0, (spd - lo) / (tops[g] - lo)));
+    const throttle = s.active ? Math.max(0, s.throttle ?? 1) : 0;
+    let target = IDLE + (RED - IDLE) * Math.pow(frac, 0.85);
+    if (s.air && throttle > 0) target = Math.max(target, RED * 0.92); // free-revving off a jump
+    if (!throttle || s.brake) target = Math.max(IDLE, target * 0.75);
+    if (s.boost) target = Math.min(RED * 1.04, target * 1.08 + 800);
+    const kUp = e.shift > 0 ? 3 : 9, kDn = 6;
+    e.rpm += (target - e.rpm) * (1 - Math.exp(-(target > e.rpm ? kUp : kDn) * dt));
+    e.shift = Math.max(0, e.shift - dt);
+    let load = s.active ? (throttle * (s.air ? 0.35 : 1) * (s.brake ? 0.2 : 1)) : 0;
+    if (s.boost) load = Math.min(1, load + 0.4);
+    if (s.offroad) load = Math.min(1, load + 0.15);
+    const dip = e.shift > 0.06 ? 0.55 : 1; // lift during the shift
+    this._setVoice(e.voice, e.rpm, load * dip, s.active ? 1 : 0, t);
+    // Nearest rival: fades in when close, panned to their side, with a
+    // little Doppler from the closing speed.
+    const r = s.rival;
+    if (r && s.active) {
+      const near = Math.max(0, 1 - r.dist / 26);
+      const rr = IDLE + (RED - IDLE) * Math.min(1, 0.35 + Math.max(0, r.speed) * 0.55) * (1 + (r.closing || 0) * 0.004);
+      e.rivalRpm += (rr - e.rivalRpm) * (1 - Math.exp(-4 * dt));
+      this._setVoice(e.rival, e.rivalRpm, 0.7, near * near, t, r.pan);
+    } else this._setVoice(e.rival, 3000, 0, 0, t);
+    // turbo
+    e.turbo.frequency.setTargetAtTime(1500 + (e.rpm / RED) * 1600, t, 0.1);
+    e.turboG.gain.setTargetAtTime(s.boost && s.active ? 0.05 : 0, t, s.boost ? 0.05 : 0.2);
+    // tyres
+    const squeal = s.active && !s.air && s.drift && spd > 0.3 ? 0.11 + 0.03 * (s.driftLevel || 0) : s.active && s.brake && spd > 0.45 && !s.air ? 0.07 : 0;
+    const wob = Math.sin(t * 7.3) * 120 + Math.sin(t * 3.1) * 80;
+    e.sqBp.frequency.setTargetAtTime(1700 + (s.driftLevel || 0) * 180 + wob, t, 0.05);
+    e.sqG.gain.setTargetAtTime(squeal * (s.offroad ? 0.3 : 1), t, 0.06);
+    e.sqTone.frequency.setTargetAtTime(1450 + wob * 0.6, t, 0.05);
+    e.sqToneG.gain.setTargetAtTime(squeal * 0.12 * (s.offroad ? 0 : 1), t, 0.06);
+  }
+
+  // A backfire pop (gear shifts at high rpm, lifting off the throttle).
+  pop() {
+    if (!this.ready || !this.engine) return;
+    this._noise(0.06, 0.18, 'bandpass', 900, 300, 0, this.engine.bus, 1.5);
   }
 
   stopEngine() {
     const e = this.engine;
     if (!e) return;
     const t = this.ctx.currentTime;
-    e.g.gain.setTargetAtTime(0, t, 0.05);
-    e.o1.stop(t + 0.3);
-    e.o2.stop(t + 0.3);
+    this._stopVoice(e.voice, t);
+    this._stopVoice(e.rival, t);
+    e.turboG.gain.setTargetAtTime(0, t, 0.05);
+    e.sqG.gain.setTargetAtTime(0, t, 0.05);
+    e.sqToneG.gain.setTargetAtTime(0, t, 0.05);
+    for (const n of [e.turbo, e.sq, e.sqTone]) n.stop(t + 0.4);
     this.engine = null;
   }
 

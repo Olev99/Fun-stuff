@@ -15,6 +15,21 @@ export function makeCode() {
 
 const params = new URLSearchParams(location.search);
 
+// Stable id for this browser tab, so a phone that connects twice (double tap,
+// flaky network, reload) replaces its old lobby entry instead of adding one.
+function clientId() {
+  let id = null;
+  try { id = sessionStorage.getItem('zoomies.cid'); } catch (e) { /* storage blocked */ }
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 10);
+    try { sessionStorage.setItem('zoomies.cid', id); } catch (e) { /* ignore */ }
+  }
+  return id;
+}
+
+const HEARTBEAT_MS = 1500;
+const PEER_TIMEOUT_MS = 9000;
+
 let peerLoad = null;
 function loadPeerJS() {
   if (window.Peer) return Promise.resolve(window.Peer);
@@ -115,6 +130,13 @@ class PeerTransport {
     for (const c of this.conns.values()) if (c.open) c.send(data);
   }
 
+  // Host: cut off one peer (stale or duplicate connection).
+  drop(id) {
+    const c = this.conns.get(id);
+    this.conns.delete(id);
+    if (c) try { c.close(); } catch (_) { /* ignore */ }
+  }
+
   close() {
     for (const c of this.conns.values()) try { c.close(); } catch (_) { /* ignore */ }
     this.conns.clear();
@@ -170,6 +192,10 @@ class LocalTransport {
     this.ch.postMessage({ from: this.id, to: null, kind: 'msg', data });
   }
 
+  drop(id) {
+    this.peers.delete(id);
+  }
+
   close() {
     if (this.ch) {
       this.ch.postMessage({ from: this.id, to: null, kind: 'bye' });
@@ -197,6 +223,36 @@ export class NetSession {
     this.transport = params.get('net') === 'local' ? new LocalTransport(cb) : new PeerTransport(cb);
     this.lobby = { track: 'sprout', reverse: false, speedClass: 'zoom', difficulty: 'normal', ai: true };
     this.inRace = false;
+    this.cid = clientId();
+    this.seen = new Map(); // peer id -> last time we heard from them
+    this.hb = setInterval(() => this._heartbeat(), HEARTBEAT_MS);
+  }
+
+  // Keep-alive both ways. The host drops players it hasn't heard from (their
+  // phone slept, lost signal or left without saying so); a guest gives up on
+  // a host that went quiet.
+  _heartbeat() {
+    if (this.closed || !this.role) return;
+    const now = performance.now();
+    if (this.isHost) {
+      this.transport.broadcast({ t: 'hb' });
+      for (const p of this.players.slice(1)) {
+        const t = this.seen.get(p.id);
+        if (t !== undefined && now - t > PEER_TIMEOUT_MS) this._drop(p.id);
+      }
+    } else if (this.seen.has('host')) {
+      this.transport.send('host', { t: 'hb' });
+      if (now - this.seen.get('host') > PEER_TIMEOUT_MS + 3000) {
+        this.closed = true;
+        if (this.onClosed) this.onClosed('Lost the connection to the host.');
+      }
+    }
+  }
+
+  _drop(id) {
+    this.seen.delete(id);
+    if (this.transport.drop) this.transport.drop(id);
+    this._leave(id);
   }
 
   get isHost() {
@@ -235,7 +291,8 @@ export class NetSession {
     this.code = code.toUpperCase();
     await this.transport.start('guest', this.code);
     this.meId = this.transport.peer ? this.transport.peer.id : this.transport.id;
-    this.transport.send('host', { t: 'hello', char });
+    this.seen.set('host', performance.now());
+    this.transport.send('host', { t: 'hello', char, cid: this.cid });
   }
 
   send(msg) {
@@ -278,6 +335,7 @@ export class NetSession {
 
   _leave(id) {
     if (this.isHost) {
+      if (!this.players.some((p) => p.id === id)) return;
       this.players = this.players.filter((p) => p.id !== id);
       if (this.race) this.race.onPeerLeft(id);
       this.broadcastLobby();
@@ -289,13 +347,23 @@ export class NetSession {
 
   _message(from, msg) {
     if (!msg || typeof msg !== 'object') return;
+    this.seen.set(from, performance.now());
+    if (msg.t === 'hb') return;
     if (this.isHost) {
       if (msg.t === 'hello') {
+        // Same phone connecting again: forget its old connection first.
+        const dup = msg.cid && this.players.find((p) => p.cid === msg.cid && p.id !== from);
+        if (dup) this._drop(dup.id);
         if (this.inRace || this.players.length >= MAX_PLAYERS) {
           this.sendTo(from, { t: 'full', reason: this.inRace ? 'A race is already running. Try again in a moment.' : 'This race is full.' });
           return;
         }
-        if (!this.players.find((p) => p.id === from)) this.players.push({ id: from, char: msg.char, name: `P${this.players.length + 1}` });
+        if (!this.players.find((p) => p.id === from)) {
+          const used = new Set(this.players.map((p) => p.name));
+          let n = 2;
+          while (used.has(`P${n}`)) n++;
+          this.players.push({ id: from, cid: msg.cid, char: msg.char, name: `P${n}` });
+        }
         this.broadcastLobby();
         return;
       }
@@ -327,6 +395,7 @@ export class NetSession {
 
   close() {
     this.closed = true;
+    clearInterval(this.hb);
     this.transport.close();
   }
 }

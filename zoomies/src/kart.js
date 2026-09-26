@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp } from './util.js';
 import { kartGeometry, WHEELS } from './characters.js';
+import { PATCHES } from './track.js';
 import { pbrMat, GeoBuilder } from './util.js';
 
 const GRAVITY = 34;
@@ -54,6 +55,9 @@ export class Kart {
     this.weight = 0.8 + st.weight * 0.1;
     this.grip = 9 * (race.trackDef.grip ?? 1);
     this.driftGrip = 2.6 * (race.trackDef.grip ?? 1);
+    // How well the tyres put power down (snow and ice tracks are below 1).
+    this.traction = race.trackDef.traction ?? 1;
+    this.patch = null;
     this.path = race.track;
     this.gliding = false;
     this.respawnT = 0;
@@ -176,6 +180,19 @@ export class Kart {
     if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) top *= 0.5;
     if (this.boostTime > 0) top *= 1.32;
     return top;
+  }
+
+  // The road patch (ice, mud, oil...) under the kart, if any.
+  _patchAt() {
+    const ps = this.path.patches;
+    if (!ps || !ps.length || !this.grounded || !this.trk) return null;
+    const L = this.path.length, s = this.trk.s, d = this.trk.d;
+    for (const p of ps) {
+      let u = s - p.s;
+      if (this.path.closed && u < 0) u += L;
+      if (u >= 0 && u <= p.len && Math.abs(d - p.d) < p.w / 2) return PATCHES[p.type];
+    }
+    return null;
   }
 
   placeAt(s, d) {
@@ -308,17 +325,19 @@ export class Kart {
     }
 
     // Longitudinal
+    const patch = (this.patch = this._patchAt());
+    const trac = this.traction * (patch ? patch.traction : 1);
     if (spinning) {
       this.spinTime -= dt;
       vf *= Math.exp(-2.4 * dt);
       vl *= Math.exp(-3 * dt);
     } else if (c.brake) {
-      if (vf > 1) vf -= 36 * dt;
-      else vf = Math.max(vf - 14 * dt, -9);
+      if (vf > 1) vf -= 36 * dt * trac;
+      else vf = Math.max(vf - 14 * dt * trac, -9);
     } else if (c.throttle > 0) {
-      const tgt = top * c.throttle;
+      const tgt = top * c.throttle * (patch ? patch.speed : 1);
       if (vf < tgt) {
-        vf += (tgt - vf) * (1 - Math.exp(-this.accelK * dt)) + 2.5 * dt;
+        vf += (tgt - vf) * (1 - Math.exp(-this.accelK * trac * dt)) + 2.5 * trac * dt;
         if (vf > tgt) vf = tgt;
       } else {
         vf = damp(vf, tgt, this.offroad ? 2.6 : 0.9, dt);
@@ -355,7 +374,7 @@ export class Kart {
     rxk = -fz; rzk = fx;
     vf = vx * fx + vz * fz;
     vl = vx * rxk + vz * rzk;
-    const gm = this.path.gripMul;
+    const gm = this.path.gripMul * (patch ? patch.grip : 1);
     const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm;
     vl *= Math.exp(-grip * dt);
     vx = fx * vf + rxk * vl;

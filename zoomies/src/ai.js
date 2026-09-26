@@ -128,7 +128,14 @@ export class AIDriver {
     path.frame(k.trk.s + 10 + spd * 0.5, this.fr2);
     const curvAhead = path.curvWide[this.fr2.i];
     const curvNow = path.curvWide[k.trk.idx ?? 0];
-    if (!k.drifting && !c.drift && this.driftCool <= 0 && spd > 19 && Math.abs(curvAhead) > 0.016 && Math.random() < this.diff.drift * this.skill) {
+    // On snow, ice and oil: lift off before corners instead of sliding wide.
+    const slick = (k.grip / 9) * path.gripMul * (k.patch ? k.patch.grip : 1);
+    if (slick < 0.85) {
+      const bend = Math.max(Math.abs(curvAhead), Math.abs(curvNow));
+      const safe = k.baseTop * (0.66 + 0.34 * slick) * (bend > 0.02 ? 0.88 : 1);
+      if (bend > 0.012 && spd > safe) c.throttle = spd > safe * 1.15 ? 0.2 : 0.6;
+    }
+    if (!k.drifting && !c.drift && this.driftCool <= 0 && spd > 19 && Math.abs(curvAhead) > 0.016 && Math.random() < this.diff.drift * this.skill * (slick < 0.7 ? 0.35 : 1)) {
       c.drift = true;
       this.driftT = 0;
     }

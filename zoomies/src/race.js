@@ -238,17 +238,54 @@ export class Race {
     const a = this.app.audio;
     if (this.player && this.mode !== 'demo') {
       const p = this.player;
-      a.updateEngine(clamp(p.speed / (p.baseTop * 1.3), 0, 1), p.boostTime > 0 || p.rocketTime > 0, this.state !== 'wait');
+      a.updateEngine(this._engineState(p));
     }
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 2.5);
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 3);
     if (this.mode !== 'demo') hud.update(this, dt);
   }
 
+  // What the engine sound needs to know about the player's kart, plus the
+  // nearest rival (heard panned to their side).
+  _engineState(p) {
+    let rival = null, best = 26 * 26;
+    for (const k of this.karts) {
+      if (k === p) continue;
+      const d2 = (k.pos.x - p.pos.x) ** 2 + (k.pos.z - p.pos.z) ** 2;
+      if (d2 < best) { best = d2; rival = k; }
+    }
+    const es = this._es || (this._es = {});
+    const r = this._esRival || (this._esRival = { dist: 0, speed: 0, pan: 0, closing: 0 });
+    const c = p.ctl;
+    es.speed = p.speed / p.baseTop;
+    es.throttle = this.state === 'finished' ? 0.6 : c.throttle;
+    es.brake = !!c.brake;
+    es.boost = p.boostTime > 0 || p.rocketTime > 0;
+    es.drift = p.drifting;
+    es.driftLevel = p.driftLevel;
+    // free-revving in the air, or revving on the grid for a rocket start
+    es.air = !p.grounded || (this.state === 'countdown' && !!c.drift);
+    es.offroad = p.offroad;
+    es.active = this.state !== 'wait';
+    es.rival = rival ? r : null;
+    if (rival) {
+      const d = Math.sqrt(best) || 1;
+      const dx = rival.pos.x - p.pos.x, dz = rival.pos.z - p.pos.z;
+      const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
+      r.dist = d;
+      r.speed = rival.speed / rival.baseTop;
+      r.pan = clamp((dx * -fz + dz * fx) / d, -1, 1) * 0.8;
+      r.closing = -((rival.vel.x - p.vel.x) * dx + (rival.vel.z - p.vel.z) * dz) / d;
+    }
+    return es;
+  }
+
   setState(s) {
     this.state = s;
     this.stateTime = 0;
     if (s === 'countdown') this.app.hud.showTrackName(null);
+    // Online races start in 'wait': show the thumb buttons once racing begins.
+    if (this.mode !== 'demo' && this.app.race === this) this.app.applyControls();
   }
 
   _rubberBand() {
@@ -474,16 +511,19 @@ export class Race {
     this.app.onRaceComplete(this, rows);
   }
 
-  // Host: end the race once every human has finished (or after a grace period).
+  // Host: end the race once every connected human has finished. Players who
+  // disconnect are dropped by the session heartbeat (their kart turns into a
+  // computer racer), and a long safety net covers anyone who is stuck.
   _checkNetEnd() {
-    const humans = this.karts.filter((k) => k.isPlayer || k.human);
-    const done = humans.filter((k) => k.finished).length;
+    const live = this.karts.filter((k) => k.isPlayer || (k.human && k.remote));
+    const done = live.filter((k) => k.finished).length;
     if (done && this.firstHumanFinish === undefined) this.firstHumanFinish = this.raceTime;
-    if (humans.length && done === humans.length) {
+    if (live.length && done === live.length) {
       if (this.allDoneAt === undefined) this.allDoneAt = this.raceTime;
       if (this.raceTime - this.allDoneAt > 3) this._finishResults();
-    } else if (this.firstHumanFinish !== undefined && this.raceTime - this.firstHumanFinish > 35) {
-      this._finishResults();
+    } else {
+      this.allDoneAt = undefined;
+      if (this.firstHumanFinish !== undefined && this.raceTime - this.firstHumanFinish > 150) this._finishResults();
     }
   }
 

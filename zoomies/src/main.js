@@ -493,7 +493,38 @@ class App {
     ses.onToLobby = () => this.returnToLobbyView();
   }
 
+  // Tear down any half-open session (a double tap on Host/Join used to leave
+  // an orphaned connection behind, which showed up as an extra idle player).
+  _resetSession() {
+    if (this.session) {
+      const old = this.session;
+      this.session = null;
+      old.close();
+    }
+  }
+
   async hostMP() {
+    if (this._netBusy) return;
+    this._netBusy = true;
+    try {
+      await this._hostMP();
+    } finally {
+      this._netBusy = false;
+    }
+  }
+
+  async joinMP(code) {
+    if (this._netBusy) return;
+    this._netBusy = true;
+    try {
+      await this._joinMP(code);
+    } finally {
+      this._netBusy = false;
+    }
+  }
+
+  async _hostMP() {
+    this._resetSession();
     this.ui.lobby('start', 'Creating a room…');
     const ses = new NetSession(this);
     this._wireSession(ses);
@@ -510,11 +541,12 @@ class App {
     this.previewTrack(ses.lobby.track, false);
   }
 
-  async joinMP(code) {
+  async _joinMP(code) {
     if (!/^[A-Za-z0-9]{4}$/.test(code)) {
       this.ui.lobby('start', 'Type the 4-letter code shown on the host\'s phone.');
       return;
     }
+    this._resetSession();
     this.ui.lobby('start', 'Connecting…');
     const ses = new NetSession(this);
     this._wireSession(ses);
@@ -566,7 +598,10 @@ class App {
     const ses = this.session;
     if (!ses || !ses.isHost || ses.players.length < 2) return;
     const L = ses.lobby;
-    const humans = ses.players.map((p) => ({ id: p.id, char: p.char }));
+    // Only players we've heard from recently get a kart.
+    const now = performance.now();
+    const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char }));
+    if (humans.length < 2) return;
     const taken = new Set(humans.map((h) => h.char));
     const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, 8 - humans.length)) : [];
     // Computer racers start in front, humans in shuffled slots at the back.

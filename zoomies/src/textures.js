@@ -393,3 +393,35 @@ export function glowTexture() {
   ctx.fillRect(0, 0, 64, 64);
   return toTex(c, { repeat: false, aniso: 1 });
 }
+
+// Soft-edged puddle shape for road patches (ice, oil, mud...). RGB carries a
+// little variation, alpha the irregular outline.
+export function patchTexture(seed = 3) {
+  const W = 128, H = 256;
+  const [c, ctx] = makeCanvas(W, H);
+  const r = rng(seed);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 26; i++) {
+    const x = W * (0.25 + r() * 0.5), y = H * (0.12 + r() * 0.76), rad = 22 + r() * 30;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = Math.min(1, d[i] / 255 * 1.6);
+    const edge = a > 0.55 ? 1 : a / 0.55;
+    const v = 200 + Math.floor(r() * 55);
+    d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = Math.floor(edge * edge * 255);
+  }
+  ctx.putImageData(img, 0, 0);
+  return toTex(c, { repeat: false });
+}

@@ -796,7 +796,38 @@ export class World {
     this.group.add(m);
   }
 
+  // Road patches: black ice, oil, mud... shaped by a soft alpha puddle.
+  _buildPatches() {
+    const LOOK = {
+      ice: { color: '#d4efff', roughness: 0.03, opacity: 0.8, emissive: '#6fb8ff', ei: 0.12 },
+      oil: { color: '#120c18', roughness: 0.04, metalness: 0.35, opacity: 0.92 },
+      mud: { color: '#5a3a22', roughness: 0.92, opacity: 0.95 },
+      snow: { color: '#ffffff', roughness: 0.55, opacity: 0.95 },
+      sand: { color: '#e6c68e', roughness: 0.95, opacity: 0.9 },
+    };
+    const mats = {};
+    for (const p of [this.track, ...this.track.shortcuts]) {
+      for (const pt of p.patches || []) {
+        const L = LOOK[pt.type] || LOOK.ice;
+        if (!mats[pt.type]) {
+          const tex = this._tex(TX.patchTexture(pt.type.length * 7));
+          mats[pt.type] = stdMat({
+            map: tex, color: L.color, roughness: L.roughness, metalness: L.metalness || 0, transparent: true, opacity: L.opacity,
+            depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3,
+            emissive: new THREE.Color(L.emissive || '#000000'), emissiveIntensity: L.ei || 0,
+          });
+        }
+        const geo = p.patch(pt.s, pt.s + pt.len, pt.d - pt.w / 2, pt.d + pt.w / 2, { lift: 0.035, segs: 10 });
+        const m = new THREE.Mesh(geo, mats[pt.type]);
+        m.receiveShadow = !!this.quality.shadows;
+        m.renderOrder = 1;
+        this.group.add(m);
+      }
+    }
+  }
+
   _buildRampsAndPads() {
+    this._buildPatches();
     const paths = [this.track, ...this.track.shortcuts];
     for (const b of this.track.boosts) this._padMesh(this.track.patch(b.s, b.s + b.len, b.d - b.w / 2, b.d + b.w / 2, { lift: 0.05 }));
     const rampTex = this._tex(TX.curbTexture('#ffd23f', '#1d1537'));
