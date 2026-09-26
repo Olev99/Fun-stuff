@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { kartGeometry, wheelGeometry, WHEELS, CHARACTERS } from './characters.js';
+import { CHARACTERS } from './characters.js';
+import { kartGeometry, wheelGeometry, WHEELS, bodyById } from './karts.js';
 import { GeoBuilder, pbrMat } from './util.js';
 import { studioEnvironment } from './env.js';
 
@@ -78,10 +79,19 @@ export class Showroom {
     this.setChar(CHARACTERS[0]);
   }
 
-  setChar(ch) {
-    const g = kartGeometry(ch);
+  // loadout: { body, paint } for career karts; defaults to the classic kart.
+  setChar(ch, loadout = null) {
+    const body = bodyById(loadout && loadout.body);
+    const g = kartGeometry(ch, { body: body.id, paint: loadout && loadout.paint });
     this.chassis.geometry = g.chassis;
     this.driver.geometry = g.driver;
+    this.driverBaseY = body.seat;
+    body.wheels.forEach((w, i) => {
+      const m = this.wheels[i];
+      m.position.set(w.x, w.y, w.z);
+      m.scale.set(w.w, w.r, w.r);
+    });
+    this.loadout = loadout;
     this.wheelMat.color.set(ch.accent === '#1d1537' ? '#ffd23f' : ch.accent);
     this.bgMat.uniforms.a.value.set(ch.color);
     this.bounce = 1;
@@ -112,7 +122,7 @@ export class Showroom {
     const b = Math.sin((1 - this.bounce) * Math.PI) * this.bounce;
     this.turn.position.y = b * 0.6;
     this.driver.rotation.z = Math.sin(this.time * 2.2) * 0.04;
-    this.driver.position.y = Math.abs(Math.sin(this.time * 3)) * 0.03;
+    this.driver.position.y = (this.driverBaseY || 0) + Math.abs(Math.sin(this.time * 3)) * 0.03;
   }
 
   // Render a square head-and-shoulders portrait for each character.
@@ -136,7 +146,7 @@ export class Showroom {
       const s = v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
       lut[i] = Math.round(Math.min(1, Math.max(0, s)) * 255);
     }
-    const saved = { angle: this.angle, ch: this.ch, pos: this.turn.position.y, ry: this.turn.rotation.y };
+    const saved = { angle: this.angle, ch: this.ch, lo: this.loadout, pos: this.turn.position.y, ry: this.turn.rotation.y };
     const bgWas = this.bgMat.uniforms.a.value.clone();
     const urls = {};
     this.turn.position.y = 0;
@@ -172,7 +182,7 @@ export class Showroom {
     }
     rt.dispose();
     this.podium.visible = true;
-    this.setChar(saved.ch);
+    this.setChar(saved.ch, saved.lo);
     this.bgMat.uniforms.a.value.copy(bgWas);
     this.angle = saved.angle;
     this.turn.position.y = saved.pos;

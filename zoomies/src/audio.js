@@ -161,6 +161,33 @@ export class Audio {
         this._tone('square', f, f * 1.5, 0.12, 0.09);
         break;
       }
+      case 'boom':
+        this._noise(0.9, 0.7, 'lowpass', 900, 60, 0, this.sfx, 0.8);
+        this._tone('sine', 110, 32, 0.6, 0.5);
+        this._noise(0.25, 0.35, 'bandpass', 2400, 600, 0, this.sfx, 1);
+        break;
+      case 'horn':
+        this._tone('square', 330, 320, 0.28, 0.14);
+        this._tone('square', 415, 405, 0.28, 0.12);
+        this._noise(0.35, 0.25, 'lowpass', 1600, 200, 0.05, this.sfx, 0.7);
+        break;
+      case 'firework':
+        this._tone('triangle', 900, 2600, 0.5, 0.08);
+        this._noise(0.4, 0.2, 'highpass', 3000, 6000, 0, this.sfx, 0.7);
+        break;
+      case 'twister':
+        this._noise(1.2, 0.3, 'bandpass', 300, 1400, 0, this.sfx, 2);
+        this._noise(1.0, 0.2, 'bandpass', 900, 2400, 0.2, this.sfx, 3);
+        break;
+      case 'ghost':
+        this._tone('sine', 520, 380, 0.6, 0.12);
+        this._tone('sine', 780, 560, 0.6, 0.08, 0.08);
+        this._tone('triangle', 260, 190, 0.7, 0.08, 0.15);
+        break;
+      case 'slip':
+        this._noise(0.5, 0.22, 'bandpass', 2200, 1500, 0, this.sfx, 6);
+        this._tone('triangle', 700, 350, 0.35, 0.06);
+        break;
       case 'driftStart':
         this._noise(0.14, 0.1, 'bandpass', 2600, 1700, 0, this.sfx, 4);
         this._tone('triangle', 220, 330, 0.08, 0.07);

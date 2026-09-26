@@ -5,7 +5,8 @@ import { Kart } from './kart.js';
 import { AIDriver, DIFFICULTY } from './ai.js';
 import { ItemSystem } from './items.js';
 import { FX } from './particles.js';
-import { wheelGeometry, charById } from './characters.js';
+import { charById } from './characters.js';
+import { wheelGeometry } from './karts.js';
 import { clamp, damp, dampAngle, pbrMat } from './util.js';
 import { SkidMarks } from './skids.js';
 import * as TX from './textures.js';
@@ -25,7 +26,7 @@ const STATE_HZ = 30;
 function kartState(k) {
   const r = (v) => Math.round(v * 100) / 100;
   const flags = (k.grounded ? 1 : 0) | (k.drifting ? 2 : 0) | (k.boostTime > 0 ? 4 : 0) | (k.offroad ? 8 : 0) |
-    (k.gliding ? 16 : 0) | (k.finished ? 32 : 0) | (k.trickAnim > 0 ? 64 : 0) | (k.respawnT > 0 ? 128 : 0);
+    (k.gliding ? 16 : 0) | (k.finished ? 32 : 0) | (k.trickAnim > 0 ? 64 : 0) | (k.respawnT > 0 ? 128 : 0) | (k.ghostTime > 0 ? 256 : 0);
   return [r(k.pos.x), r(k.pos.y), r(k.pos.z), r(k.yaw), r(k.vel.x), r(k.vel.z), r(k.vy), flags, k.driftDir, k.driftLevel,
     r(k.steerS), k.laps, r(k.total), k.place, k.gems, r(k.spinTime), r(k.starTime), r(k.shrinkTime), r(k.shield), r(k.rocketTime),
     k.path && k.path.id !== undefined ? k.path.id : -1, r(k.finishTime || 0)];
@@ -50,7 +51,11 @@ class RaceNet {
     this.s.send({ t: 'box', i, want });
   }
   claimGem(i) { this.s.send({ t: 'gem', i }); }
-  useItem(k, it) { this.s.send({ t: 'use', it, x: k.pos.x, z: k.pos.z, yaw: k.yaw, sp: Math.max(0, k.fwdSpeed) }); }
+  useItem(k, it, aim = 0) { this.s.send({ t: 'use', it, aim, x: k.pos.x, z: k.pos.z, yaw: k.yaw, sp: Math.max(0, k.fwdSpeed) }); }
+  sendBlast(x, y, z, r, kind, owner, spares) {
+    const q = (v) => Math.round(v * 10) / 10;
+    this.s.send({ t: 'blast', x: q(x), y: q(y), z: q(z), r, kind, o: owner ? owner.index : -1, sp: !!spares });
+  }
   hitObject(kind, id) { this.s.send({ t: 'hitobj', kind, id }); }
   sendHit(k, kind) {
     const id = this.race.slotPeer.get(k.index);
@@ -134,16 +139,23 @@ export class Race {
     const tr = this.track;
     this.karts = [];
     const grid = this.mode === 'tt' ? [opts.player] : opts.grid;
+    // All wheels are two instanced draws: full detail near the camera, a
+    // cheap version for distant karts (the unused slot gets a zero matrix).
     this.wheelMesh = new THREE.InstancedMesh(wheelGeometry(), pbrMat(), grid.length * 4);
-    this.wheelMesh.castShadow = !!this.quality.shadows;
-    this.wheelMesh.frustumCulled = false;
-    this.scene.add(this.wheelMesh);
+    this.wheelMeshLo = new THREE.InstancedMesh(wheelGeometry(true), this.wheelMesh.material, grid.length * 4);
+    this._zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (const m of [this.wheelMesh, this.wheelMeshLo]) {
+      m.castShadow = !!this.quality.shadows;
+      m.frustumCulled = false;
+      this.scene.add(m);
+    }
     const col = new THREE.Color();
     const guest = this.net && this.net.isGuest;
     grid.forEach((id, i) => {
       const ch = charById(id);
       const isPlayer = this.mode === 'mp' ? i === this.mySlot : this.mode !== 'demo' && id === opts.player;
-      const k = new Kart(this, ch, { isPlayer, index: i });
+      const lo = (opts.loadouts && opts.loadouts[i]) || (isPlayer && opts.playerLoadout) || {};
+      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body, upgrades: lo.upgrades, paint: lo.paint });
       const slot = tr.gridSlot(i);
       k.placeAt(slot.s, this.mode === 'tt' ? 0 : slot.d);
       if (isPlayer) this.player = k;
@@ -157,12 +169,18 @@ export class Race {
       }
       this.scene.add(k.root);
       this.scene.add(k.shadow);
-      for (let w = 0; w < 4; w++) this.wheelMesh.setColorAt(i * 4 + w, col.set(ch.accent === '#1d1537' ? '#ffd23f' : ch.accent));
+      col.set(ch.accent === '#1d1537' ? '#ffd23f' : ch.accent);
+      for (let w = 0; w < 4; w++) {
+        this.wheelMesh.setColorAt(i * 4 + w, col);
+        this.wheelMeshLo.setColorAt(i * 4 + w, col);
+      }
       k.wheelBase = i * 4;
       this.karts.push(k);
     });
-    if (this.wheelMesh.instanceColor) this.wheelMesh.instanceColor.needsUpdate = true;
-    this.wheelMesh.count = this.karts.length * 4;
+    for (const m of [this.wheelMesh, this.wheelMeshLo]) {
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      m.count = this.karts.length * 4;
+    }
   }
 
   setSize(w, h, pr) {
@@ -228,6 +246,7 @@ export class Race {
       k.updateVisual(dt, this.time);
       k.emitFX(dt, this.fx, this.dust);
     }
+    this._updateLOD();
     this._updateWheels();
     this._updateSkids(dt);
     this.fx.update(dt);
@@ -375,9 +394,12 @@ export class Race {
       const type = ev[i], data = ev[i + 1];
       switch (type) {
         case 'useItem': {
-          const used = this.items.use(k);
+          const used = this.items.use(k, null, null, k.ctl.aim || 0);
           if (used && near) {
-            const snd = { chili: 'boost', bubble: 'shield', rainbow: 'rainbow', honey: 'honey', ball: 'throw', bee: 'bee', boomerang: 'throw', rocket: 'boost', magnet: 'shield', warp: 'warp' }[used];
+            const snd = {
+              chili: 'boost', bubble: 'shield', rainbow: 'rainbow', honey: 'honey', ball: 'throw', bee: 'bee', boomerang: 'throw', rocket: 'boost',
+              magnet: 'shield', warp: 'warp', bomb: 'throw', oil: 'honey', firework: 'firework', twister: 'twister', ghost: 'ghost',
+            }[used];
             if (snd && (k.isPlayer || used !== 'chili')) a.play(snd);
             if (k.isPlayer && used === 'rocket') hud.toast('ROCKET RIDE!');
           }
@@ -392,6 +414,13 @@ export class Race {
           break;
         case 'driftStart':
           if (k.isPlayer) a.play('driftStart');
+          break;
+        case 'slip':
+          if (near) a.play('slip');
+          break;
+        case 'ghostEnd':
+          this.items.surprise(k);
+          if (k.isPlayer) hud.toast('SURPRISE!');
           break;
         case 'land':
           if (k.isPlayer) a.play('land');
@@ -534,6 +563,7 @@ export class Race {
       for (let j = i + 1; j < ks.length; j++) {
         const b = ks[j];
         if (a.remote && b.remote) continue;
+        if (a.ghostTime > 0 || b.ghostTime > 0) continue;
         const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
         const R = 1.2 * (a.root.scale.x + b.root.scale.x);
         const d2 = dx * dx + dz * dz;
@@ -578,13 +608,27 @@ export class Race {
     this.order = sorted;
   }
 
+  // Distant karts (not the player's) switch to their low-detail models.
+  _updateLOD() {
+    const cp = this.camera.position;
+    for (const k of this.karts) {
+      const d2 = k.pos.distanceToSquared(cp);
+      k.setLOD(k === this.player && this.mode !== 'demo' ? false : d2 > (k.lodFar ? 26 * 26 : 30 * 30));
+    }
+  }
+
   _updateWheels() {
-    const m = this.wheelMesh;
+    const hi = this.wheelMesh, lo = this.wheelMeshLo, Z = this._zeroM;
     for (const k of this.karts) {
       k.root.updateMatrixWorld(true);
-      for (let w = 0; w < 4; w++) m.setMatrixAt(k.wheelBase + w, k.wheels[w].spin.matrixWorld);
+      for (let w = 0; w < 4; w++) {
+        const m = k.wheels[w].spin.matrixWorld;
+        hi.setMatrixAt(k.wheelBase + w, k.lodFar ? Z : m);
+        lo.setMatrixAt(k.wheelBase + w, k.lodFar ? m : Z);
+      }
     }
-    m.instanceMatrix.needsUpdate = true;
+    hi.instanceMatrix.needsUpdate = true;
+    lo.instanceMatrix.needsUpdate = true;
   }
 
   _updateSkids(dt) {
@@ -648,6 +692,16 @@ export class Race {
   onGem(k) { if (k.isPlayer) this.app.audio.play('gem'); }
   onHazardHit() {}
   onProjectileHit() {}
+  onSlip(k) { if (k.isPlayer) this.app.hud.toast('SLIPPERY!'); }
+  onBlastHit(k) { if (k.isPlayer) this.shake = Math.max(this.shake, 0.7); }
+  onBlast(x, y, z, r, kind) {
+    const p = this.player;
+    const d2 = p ? (p.pos.x - x) ** 2 + (p.pos.z - z) ** 2 : 1e9;
+    if (d2 < 3600) {
+      this.app.audio.play(kind === 'bump' ? 'horn' : 'boom');
+      this.shake = Math.max(this.shake, kind === 'bump' ? 0.25 : Math.max(0.2, 0.9 - Math.sqrt(d2) / 60));
+    }
+  }
   onObstacleHit(k) { if (k.isPlayer) this.shake = Math.max(this.shake, 0.4); }
   onCrates(k) {
     if (this.player && k.pos.distanceToSquared(this.player.pos) < 900) this.app.audio.play('crate');
@@ -691,6 +745,7 @@ export class Race {
     k.gliding = !!(f & 16);
     if (f & 64 && !(k.trickAnim > 0)) k.trickAnim = 1;
     k.respawnT = f & 128 ? 0.5 : 0;
+    k.ghostTime = f & 256 ? 0.25 : 0;
     k.driftDir = a[8];
     k.driftLevel = a[9];
     k.steerS = a[10];
@@ -723,7 +778,7 @@ export class Race {
     }
     k.yaw = dampAngle(k.yaw, n.yaw, 14, dt);
     k.vel.set(n.vx, 0, n.vz);
-    for (const key of ['spinTime', 'starTime', 'shrinkTime', 'shield', 'rocketTime']) if (k[key] > 0) k[key] -= dt;
+    for (const key of ['spinTime', 'starTime', 'shrinkTime', 'shield', 'rocketTime', 'ghostTime']) if (k[key] > 0) k[key] -= dt;
     this.track.attach(k);
   }
 
@@ -760,7 +815,7 @@ export class Race {
           if (items.gems[msg.i]) items._popGem(msg.i);
           break;
         case 'use':
-          if (k) items.use(k, msg.it, { x: msg.x, z: msg.z, yaw: msg.yaw, speed: msg.sp });
+          if (k) items.use(k, msg.it, { x: msg.x, z: msg.z, yaw: msg.yaw, speed: msg.sp }, msg.aim || 0);
           break;
         case 'hitobj':
           if (msg.kind === 'h') {
@@ -796,6 +851,9 @@ export class Race {
         break;
       case 'grant':
         if (this.player) this.player.pendingItem = msg.item;
+        break;
+      case 'blast':
+        items.blast(msg.x, msg.y, msg.z, msg.r, msg.kind, this.karts[msg.o] || null, msg.sp, false);
         break;
       case 'hit':
         if (this.player) this.player.hit(msg.kind);
@@ -933,6 +991,7 @@ export class Race {
     this.fx.dispose();
     this.wheelMesh.material.dispose();
     this.wheelMesh.dispose();
+    this.wheelMeshLo.dispose();
     for (const k of this.karts) k.mat.dispose();
     this.shadowTex.dispose();
     this.skids.dispose();

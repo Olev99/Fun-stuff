@@ -14,15 +14,25 @@ export const ITEMS = {
   magnet: { icon: '🧲', name: 'Gem Magnet' },
   warp: { icon: '🌀', name: 'Warp Swirl' },
   rocket: { icon: '🚀', name: 'Rocket Ride' },
+  bomb: { icon: '💣', name: 'Gum Bomb' },
+  oil: { icon: '🛢️', name: 'Oil Slick' },
+  horn: { icon: '📯', name: 'Honk Blast' },
+  firework: { icon: '🎆', name: 'Firework' },
+  twister: { icon: '🌪️', name: 'Twister' },
+  ghost: { icon: '👻', name: 'Boo Mask' },
 };
 export const ITEM_ICONS = Object.values(ITEMS).map((i) => i.icon);
 
+// Which way each item goes when you just tap: +1 ahead, -1 behind. These are
+// the ones you can aim (swipe the ITEM button, or hold BRAKE to throw back).
+export const AIM_DEFAULT = { honey: -1, oil: -1, ball: 1, boomerang: 1, bomb: 1, firework: 1 };
+
 // Odds depend on race position: leaders get defence, stragglers get catch-up.
 const TABLES = [
-  { honey: 30, ball: 26, bubble: 22, chili: 10, boomerang: 12 },
-  { honey: 16, ball: 18, bee: 14, chili: 18, bubble: 8, chili3: 8, boomerang: 12, magnet: 6 },
-  { chili: 12, chili3: 18, bee: 18, rainbow: 10, ball: 8, storm: 5, bubble: 6, magnet: 10, warp: 8, boomerang: 5 },
-  { chili3: 24, rainbow: 20, rocket: 18, bee: 14, storm: 10, warp: 8, magnet: 6 },
+  { honey: 24, ball: 20, bubble: 18, chili: 8, boomerang: 10, oil: 12, horn: 8 },
+  { honey: 12, ball: 14, bee: 10, chili: 14, bubble: 6, chili3: 6, boomerang: 10, magnet: 5, oil: 8, bomb: 8, firework: 7, horn: 4 },
+  { chili: 10, chili3: 14, bee: 14, rainbow: 8, ball: 6, storm: 4, bubble: 4, magnet: 8, warp: 6, boomerang: 4, bomb: 8, firework: 6, twister: 6, ghost: 6 },
+  { chili3: 20, rainbow: 16, rocket: 16, bee: 12, storm: 8, warp: 8, magnet: 4, twister: 8, ghost: 8 },
 ];
 
 function weighted(table) {
@@ -79,6 +89,38 @@ function geos() {
     .add(new THREE.BoxGeometry(1.6, 0.16, 0.45), '#ff8a2b', [0.6, 0, 0], [0, 0.5, 0])
     .add(new THREE.BoxGeometry(1.6, 0.16, 0.45), '#ffd23f', [-0.6, 0, 0], [0, -0.5, 0])
     .build();
+  const bomb = B('candy')
+    .add(new THREE.SphereGeometry(0.62, 20, 14), '#ff5a9a')
+    .add(new THREE.TorusGeometry(0.62, 0.07, 6, 24), '#ffd6ea', [0, 0, 0], [Math.PI / 2, 0, 0], 1, 'plastic')
+    .add(new THREE.CylinderGeometry(0.16, 0.2, 0.22, 10), '#3a3448', [0, 0.66, 0], [0, 0, 0], 1, 'metal')
+    .add(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 5), '#c9b28a', [0.06, 0.9, 0], [0, 0, -0.35], 1, 'fabric')
+    .add(new THREE.SphereGeometry(0.1, 8, 6), '#ffd23f', [0.14, 1.07, 0], [0, 0, 0], 1, 'glowHot')
+    .build();
+  const firework = B('paint')
+    .add(new THREE.CylinderGeometry(0.22, 0.22, 1.3, 12), '#ff3d6a', [0, 0, 0], [Math.PI / 2, 0, 0])
+    .add(new THREE.CylinderGeometry(0.23, 0.23, 0.18, 12), '#ffffff', [0, 0, 0.25], [Math.PI / 2, 0, 0])
+    .add(new THREE.CylinderGeometry(0.23, 0.23, 0.18, 12), '#ffd23f', [0, 0, -0.25], [Math.PI / 2, 0, 0])
+    .add(new THREE.ConeGeometry(0.26, 0.5, 12), '#36a9ff', [0, 0, 0.9], [Math.PI / 2, 0, 0])
+    .add(new THREE.BoxGeometry(0.05, 0.5, 0.35), '#ffd23f', [0, 0.2, -0.55])
+    .add(new THREE.BoxGeometry(0.5, 0.05, 0.35), '#ffd23f', [0, 0, -0.55])
+    .add(new THREE.CylinderGeometry(0.16, 0.2, 0.1, 10), '#ffb13d', [0, 0, -0.7], [Math.PI / 2, 0, 0], 1, 'glowHot')
+    .build();
+  // A swirl of rings that widens towards the top; drawn see-through.
+  const tw = B([1, 0, 0.25]);
+  for (let k = 0; k < 9; k++) {
+    const r = 0.5 + k * 0.28;
+    tw.add(new THREE.TorusGeometry(r, 0.12 + k * 0.02, 5, 18), k % 2 ? '#e8ecf4' : '#b8c0d0', [Math.sin(k * 1.3) * 0.25, 0.3 + k * 0.55, Math.cos(k * 1.3) * 0.25], [Math.PI / 2 + Math.sin(k) * 0.2, 0, 0]);
+  }
+  const twister = tw.build();
+  const oilGeo = new THREE.CircleGeometry(1, 28);
+  const op = oilGeo.attributes.position;
+  for (let i = 1; i < op.count; i++) {
+    const a = Math.atan2(op.getY(i), op.getX(i));
+    const k = 1 + Math.sin(a * 3) * 0.12 + Math.sin(a * 7 + 1) * 0.06;
+    op.setXY(i, op.getX(i) * k, op.getY(i) * k);
+  }
+  oilGeo.rotateX(-Math.PI / 2);
+  const oil = oilGeo;
   const crate = B('wood')
     .add(new THREE.BoxGeometry(1.8, 1.8, 1.8), '#c9955d')
     .add(new THREE.BoxGeometry(1.86, 0.3, 1.86), '#8a5a36', [0, 0.75, 0])
@@ -136,8 +178,8 @@ function geos() {
     }
     obs[k] = b.build();
   }
-  _geo = { honey, ball, bee, boomerang, crate, obs };
-  for (const g of [honey, ball, bee, boomerang, crate, ...Object.values(obs)]) g.userData.shared = true;
+  _geo = { honey, ball, bee, boomerang, crate, obs, bomb, firework, twister, oil };
+  for (const g of [honey, ball, bee, boomerang, crate, bomb, firework, twister, oil, ...Object.values(obs)]) g.userData.shared = true;
   return _geo;
 }
 
@@ -157,6 +199,9 @@ export class ItemSystem {
     this.nextId = 1;
     this.mat = pbrMat();
     this.glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, color: new THREE.Color(2.6, 2.6, 2.6) });
+    this.twisterMat = pbrMat({ transparent: true, opacity: 0.55, depthWrite: false });
+    this.oilMat = stdMat({ color: '#140e1c', roughness: 0.04, metalness: 0.4, transparent: true, opacity: 0.93, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3, emissive: new THREE.Color('#2a1850'), emissiveIntensity: 0.4 });
+    this.effects = []; // short-lived visuals (shockwave rings)
     this.geo = geos();
     this._m = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
@@ -294,7 +339,8 @@ export class ItemSystem {
 
   // Apply an item's effect. Karts simulated elsewhere (multiplayer) only get
   // world-side effects here; their own effects run on their device.
-  use(kart, forcedItem = null, remoteSpawn = null) {
+  // aim: +1 throw ahead, -1 behind, 0 = the item's usual direction.
+  use(kart, forcedItem = null, remoteSpawn = null, aim = 0) {
     const it = forcedItem || kart.item;
     if (!it) return null;
     if (!forcedItem) {
@@ -305,26 +351,45 @@ export class ItemSystem {
     if (this.race.net && this.race.net.isGuest && !remoteSpawn) {
       // Guests apply self effects locally and ask the host to spawn the rest.
       this._selfEffect(kart, it);
-      this.race.net.useItem(kart, it);
+      this.race.net.useItem(kart, it, aim);
       return it;
     }
     this._selfEffect(kart, it);
     const src = remoteSpawn || { x: kart.pos.x, z: kart.pos.z, yaw: kart.yaw, speed: Math.max(0, kart.fwdSpeed) };
+    const dir = AIM_DEFAULT[it] ? (aim || AIM_DEFAULT[it]) : 1;
     const fx = Math.sin(src.yaw), fz = Math.cos(src.yaw);
     switch (it) {
       case 'honey':
-        this.addHoney(src.x - fx * 2.8, src.z - fz * 2.8, kart);
+      case 'oil':
+        if (dir < 0) this.addHazard(it, src.x - fx * 2.8, src.z - fz * 2.8, kart);
+        else this.addProjectile('lob', kart, src.x + fx * 2.4, src.z + fz * 2.4, fx * (src.speed + 16), fz * (src.speed + 16), null, undefined, { payload: it, vy: 8 });
         break;
       case 'ball': {
-        const sp = src.speed + 30;
-        this.addProjectile('ball', kart, src.x + fx * 2.4, src.z + fz * 2.4, fx * sp, fz * sp);
+        const sp = dir > 0 ? src.speed + 30 : -24;
+        this.addProjectile('ball', kart, src.x + fx * 2.4 * dir, src.z + fz * 2.4 * dir, fx * sp, fz * sp);
         break;
       }
       case 'boomerang': {
-        const sp = src.speed + 26;
-        this.addProjectile('boomerang', kart, src.x + fx * 2.4, src.z + fz * 2.4, fx * sp, fz * sp);
+        const sp = dir > 0 ? src.speed + 26 : -30;
+        this.addProjectile('boomerang', kart, src.x + fx * 2.4 * dir, src.z + fz * 2.4 * dir, fx * sp, fz * sp);
         break;
       }
+      case 'bomb': {
+        const sp = dir > 0 ? src.speed + 18 : Math.max(0, src.speed - 12);
+        this.addProjectile('bomb', kart, src.x + fx * 2.4 * dir, src.z + fz * 2.4 * dir, fx * sp, fz * sp, null, undefined, { vy: dir > 0 ? 9 : 3 });
+        break;
+      }
+      case 'firework': {
+        const sp = dir > 0 ? src.speed + 52 : -40;
+        this.addProjectile('firework', kart, src.x + fx * 2.6 * dir, src.z + fz * 2.6 * dir, fx * sp, fz * sp);
+        break;
+      }
+      case 'twister':
+        this.addProjectile('twister', kart, src.x + fx * 4, src.z + fz * 4, 0, 0);
+        break;
+      case 'horn':
+        this.blast(src.x, kart.pos.y, src.z, 9.5, 'bump', kart, true);
+        break;
       case 'bee': {
         const target = this.race.karts.find((o) => o.place === kart.place - 1 && !o.finished) || null;
         this.addProjectile('bee', kart, src.x + fx * 2, src.z + fz * 2, 0, 0, target);
@@ -346,33 +411,113 @@ export class ItemSystem {
       case 'magnet': kart.magnetTime = 6; break;
       case 'rocket': kart.rocketTime = 4.2; kart.startBoost(0.4, 12); break;
       case 'warp': this.race.warp(kart); break;
+      case 'ghost': kart.ghostTime = 5; kart.startBoost(0.4, 4); break;
     }
   }
 
-  addHoney(x, z, owner, id) {
+  // Boo Mask wears off: a surprise item appears.
+  surprise(kart) {
+    if (kart.item || kart.rolling > 0) return;
+    if (this.replica) { if (kart.isPlayer) this.race.net.claimBox(-1); return; }
+    this.give(kart, weighted(TABLES[2]));
+  }
+
+  // Explosion or shockwave. Hits the karts this device simulates and tells
+  // the other phones (a guest's own kart is checked on that phone). Clears
+  // traps and shots inside the radius.
+  blast(x, y, z, r, kind, owner, sparesOwner = false, relay = true) {
+    const race = this.race;
+    const fx = race.fx;
+    if (kind === 'bump') {
+      this._ring(x, y + 0.6, z, r, '#ffe7a8');
+      fx.burst(x, y + 1, z, ['#ffffff', '#ffe7a8', '#ffd23f'], 26, 14, 0.5, 0.5, 2);
+    } else {
+      this._ring(x, y + 0.8, z, r, '#ff9a4a');
+      fx.burst(x, y + 1, z, ['#ff5a9a', '#ffd23f', '#ffffff', '#ff6b35'], 60, 18, 0.9, 0.8, 6);
+      fx.burst(x, y + 1, z, ['#5a4a50', '#8a7a80'], 18, 6, 1.6, 1.4, -1, false);
+    }
+    for (const k of race.karts) {
+      if (k.remote || (sparesOwner && k === owner) || k.ghostTime > 0) continue;
+      if (this.replica && !k.isPlayer) continue;
+      const dx = k.pos.x - x, dz = k.pos.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > r * r || Math.abs(k.pos.y - y) > r) continue;
+      const l = Math.sqrt(d2) || 1;
+      const push = kind === 'bump' ? 16 : 10;
+      if (k.starTime <= 0 && k.rocketTime <= 0) {
+        k.vel.x += (dx / l) * push;
+        k.vel.z += (dz / l) * push;
+      }
+      if (k.hit(kind) && kind === 'spin') k.vy = Math.max(k.vy, 9);
+      race.onBlastHit(k, kind);
+    }
+    if (!this.replica) {
+      for (let i = this.hazards.length - 1; i >= 0; i--) {
+        const h = this.hazards[i];
+        if ((h.pos.x - x) ** 2 + (h.pos.z - z) ** 2 < r * r) this.removeHazard(h);
+      }
+      if (kind === 'bump') {
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+          const p = this.projectiles[i];
+          if (p.owner !== owner && (p.pos.x - x) ** 2 + (p.pos.z - z) ** 2 < r * r) this.removeProjectile(p);
+        }
+      }
+    }
+    race.onBlast(x, y, z, r, kind);
+    if (relay && race.net && race.net.isHost) race.net.sendBlast(x, y, z, r, kind, owner, sparesOwner);
+  }
+
+  // Expanding ring that fades out.
+  _ring(x, y, z, r, color) {
+    const m = new THREE.Mesh(this._ringGeo || (this._ringGeo = new THREE.TorusGeometry(1, 0.08, 6, 48)), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.5), transparent: true, depthWrite: false, fog: true }));
+    m.rotation.x = Math.PI / 2;
+    m.position.set(x, y, z);
+    this.group.add(m);
+    this.effects.push({ mesh: m, t: 0, dur: 0.45, r });
+  }
+
+  addHazard(type, x, z, owner, id) {
     const o = { pos: new THREE.Vector3(x, 0, z), vel: new THREE.Vector3(), path: owner ? owner.path : this.track, seg: owner ? owner.seg : -1, trk: {} };
     this.track.resolve(o, 1.5, 0);
     const trk = o.trk;
-    const mesh = new THREE.Mesh(this.geo.honey, this.mat);
-    mesh.position.set(o.pos.x, trk.y + 0.02, o.pos.z);
+    const oil = type === 'oil';
+    const mesh = new THREE.Mesh(oil ? this.geo.oil : this.geo.honey, oil ? this.oilMat : this.mat);
+    mesh.position.set(o.pos.x, trk.y + (oil ? 0.04 : 0.02), o.pos.z);
     mesh.rotation.y = Math.random() * 6;
+    if (oil) mesh.scale.setScalar(3.2);
+    mesh.renderOrder = oil ? 1 : 0;
     this.group.add(mesh);
-    const h = { id: id ?? this.nextId++, type: 'honey', mesh, pos: mesh.position, s: this.track.mainS(o), d: trk.d, path: o.path, owner, grace: 0.5, life: 45 };
+    const h = { id: id ?? this.nextId++, type, mesh, pos: mesh.position, s: this.track.mainS(o), d: trk.d, path: o.path, owner, grace: 0.5, life: oil ? 24 : 45, r: oil ? 3.2 : 1.6 };
     this.hazards.push(h);
     return h;
   }
 
-  addProjectile(type, owner, x, z, vx, vz, target = null, id) {
-    const mesh = new THREE.Mesh(type === 'ball' ? this.geo.ball : type === 'bee' ? this.geo.bee : this.geo.boomerang, this.mat);
+  // Legacy name used by older code paths.
+  addHoney(x, z, owner, id) {
+    return this.addHazard('honey', x, z, owner, id);
+  }
+
+  _projMesh(type, payload) {
+    const g = this.geo;
+    if (type === 'twister') return new THREE.Mesh(g.twister, this.twisterMat);
+    const geo = { ball: g.ball, bee: g.bee, boomerang: g.boomerang, bomb: g.bomb, firework: g.firework, lob: payload === 'oil' ? g.bomb : g.honey }[type] || g.ball;
+    const m = new THREE.Mesh(geo, this.mat);
+    if (type === 'lob' && payload === 'oil') m.scale.setScalar(0.8);
+    return m;
+  }
+
+  addProjectile(type, owner, x, z, vx, vz, target = null, id, extra = {}) {
+    const mesh = this._projMesh(type, extra.payload);
     const p = {
       id: id ?? this.nextId++, type, owner, mesh, pos: mesh.position, vel: new THREE.Vector3(vx, 0, vz),
       path: owner ? owner.path : this.track, seg: owner ? owner.seg : -1, trk: {},
-      life: type === 'ball' ? 7 : type === 'boomerang' ? 4.5 : 12, grace: 0.35, bounces: 0, target, age: 0,
-      prog: owner ? owner.total + 2 : 0, d: owner ? owner.trk.d : 0, hitSet: new Set(),
+      life: { ball: 7, boomerang: 4.5, bomb: 6, firework: 3, twister: 9, lob: 4 }[type] ?? 12, grace: 0.35, bounces: 0, target, age: 0,
+      prog: owner ? owner.total + 4 : 0, d: owner ? owner.trk.d : 0, hitSet: new Set(),
+      payload: extra.payload || null, vy: extra.vy || 0, landed: false, fuse: 1.1,
     };
     mesh.position.set(x, 0, z);
     this.track.resolve(p, 0.7, 1);
-    mesh.position.y = p.trk.y + 0.7;
+    mesh.position.y = p.trk.y + (type === 'twister' ? 0 : 0.7);
     this.group.add(mesh);
     this.projectiles.push(p);
     return p;
@@ -400,6 +545,7 @@ export class ItemSystem {
     const karts = race.karts;
     const fx = race.fx;
     const authority = !this.replica;
+    this._updEffects(dt);
 
     // Item boxes
     for (let i = 0; i < this.boxes.length; i++) {
@@ -498,7 +644,7 @@ export class ItemSystem {
         if (k.remote && authority) continue;
         if (!authority && !k.isPlayer) continue;
         const cool = o.hitCool.get(k) || 0;
-        if (time < cool) continue;
+        if (time < cool || k.ghostTime > 0) continue;
         const dx = k.pos.x - o.pos.x, dz = k.pos.z - o.pos.z, dy = k.pos.y + 0.8 - o.pos.y;
         const R = o.def.r + 1.1;
         if (dx * dx + dz * dz < R * R && Math.abs(dy) < o.def.r + 1.2) {
@@ -547,9 +693,15 @@ export class ItemSystem {
       for (const k of karts) {
         if (!this._local(k)) continue;
         if (!authority && !k.isPlayer) continue;
-        if (h.grace > 0 && k === h.owner) continue;
+        if ((h.grace > 0 && k === h.owner) || k.ghostTime > 0) continue;
         const dx = k.pos.x - h.pos.x, dz = k.pos.z - h.pos.z;
-        if (dx * dx + dz * dz < 3.6 && Math.abs(k.pos.y - h.pos.y) < 2) {
+        const R2 = h.type === 'oil' ? 8.5 : 3.6;
+        if (dx * dx + dz * dz < R2 && Math.abs(k.pos.y - h.pos.y) < 2) {
+          if (h.type === 'oil') {
+            // Oil stays put and sends everyone who crosses it sliding.
+            if (k.slip(1.5)) race.onSlip(k);
+            continue;
+          }
           k.hit('spin');
           fx.burst(h.pos.x, h.pos.y + 0.5, h.pos.z, ['#ffb21f', '#ffd76b'], 12, 6, 0.6, 0.6, 14, false);
           race.onHazardHit(k, h);
@@ -578,11 +730,16 @@ export class ItemSystem {
       }
       if (p.type === 'ball') this._updBall(p, dt, time);
       else if (p.type === 'boomerang') { if (this._updBoomerang(p, dt, time)) continue; }
-      else this._updBee(p, dt, time);
+      else if (p.type === 'bee') this._updBee(p, dt, time);
+      else {
+        // Bombs, fireworks, twisters and tossed traps handle their own hits.
+        this._updSpecial(p, dt, time);
+        continue;
+      }
 
       let removed = false;
       for (const k of karts) {
-        if (p.grace > 0 && k === p.owner) continue;
+        if ((p.grace > 0 && k === p.owner) || k.ghostTime > 0) continue;
         if (p.type === 'boomerang' && (k === p.owner || p.hitSet.has(k))) continue;
         const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
         if (dx * dx + dz * dz < 3.2 && Math.abs(k.pos.y + 0.6 - p.pos.y) < 2) {
@@ -611,8 +768,20 @@ export class ItemSystem {
 
   _replicaHit(p) {
     const k = this.race.player;
-    if (!k || (p.owner === k && p.age < 0.4)) return;
+    if (!k || (p.owner === k && p.age < 0.4) || k.ghostTime > 0) return;
     if (p.type === 'boomerang' && p.owner === k) return;
+    // Bombs and fireworks explode on the host (which tells us); tossed traps
+    // turn into hazards there too.
+    if (p.type === 'bomb' || p.type === 'firework' || p.type === 'lob') return;
+    if (p.type === 'twister') {
+      const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
+      if (dx * dx + dz * dz < 7 && !p._hitLocal) {
+        p._hitLocal = true;
+        if (k.hit('spin')) k.vy = Math.max(k.vy, 11);
+        this.race.onBlastHit(k, 'twister');
+      }
+      return;
+    }
     const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
     if (dx * dx + dz * dz < 3.2 && Math.abs(k.pos.y + 0.6 - p.pos.y) < 2) {
       if (p._hitLocal) return;
@@ -637,6 +806,110 @@ export class ItemSystem {
     g.active = false;
     g.t = 12;
     this.race.fx.burst(g.pos.x, g.pos.y, g.pos.z, ['#46f0ff', '#ffffff'], 8, 5, 0.4, 0.45, 6);
+  }
+
+  // Arcing throws land on the road; fireworks fly straight; twisters roam
+  // down the track. Any kart (even one simulated on another phone) sets off
+  // bombs and fireworks; the blast is relayed to the others.
+  _updSpecial(p, dt, time) {
+    const race = this.race;
+    const fx = race.fx;
+    const karts = race.karts;
+    const near = (r, skipOwner) => {
+      for (const k of karts) {
+        if ((skipOwner && k === p.owner) || k.ghostTime > 0) continue;
+        const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
+        if (dx * dx + dz * dz < r * r && Math.abs(k.pos.y + 0.6 - p.pos.y) < 2.4) return k;
+      }
+      return null;
+    };
+    if (p.type === 'bomb' || p.type === 'lob') {
+      if (!p.landed) {
+        p.pos.x += p.vel.x * dt;
+        p.pos.z += p.vel.z * dt;
+        this.track.resolve(p, 0.7, 0.6);
+        p.vy -= 22 * dt;
+        p.pos.y += p.vy * dt;
+        const ground = p.trk.y + 0.62;
+        p.mesh.rotation.x += dt * 8;
+        if (p.path.voids.length && p.path.isVoid(p.trk.s)) { if (p.pos.y < ground - 8) p.life = 0; }
+        else if (p.pos.y <= ground && p.vy < 0) {
+          p.pos.y = ground;
+          p.landed = true;
+          p.vel.set(0, 0, 0);
+          p.mesh.rotation.x = 0;
+          if (p.type === 'lob') {
+            this.addHazard(p.payload, p.pos.x, p.pos.z, p.owner);
+            this.removeProjectile(p);
+            return;
+          }
+        }
+        if (p.type === 'bomb' && p.age > 0.25 && near(1.9, p.grace > 0)) return this._boom(p);
+      } else {
+        p.fuse -= dt;
+        const blink = Math.floor(p.fuse * (p.fuse < 0.5 ? 16 : 7)) % 2 === 0;
+        p.mesh.scale.setScalar(blink ? 1.12 : 1);
+        if (Math.random() < 0.6) fx.glow.emit(p.pos.x + 0.14, p.pos.y + 1.1, p.pos.z, 0, 1.5, 0, '#ffd23f', 0.3, 0.05, 0.25);
+        if (p.fuse <= 0 || near(2.2, false)) return this._boom(p);
+      }
+      if (p.life <= 0.05 && p.type === 'bomb') return this._boom(p);
+      return;
+    }
+    if (p.type === 'firework') {
+      p.pos.x += p.vel.x * dt;
+      p.pos.z += p.vel.z * dt;
+      const wall = this.track.resolve(p, 0.6, 0);
+      p.pos.y = p.trk.y + 1.0 + Math.sin(p.age * 30) * 0.05;
+      p.mesh.rotation.y = Math.atan2(p.vel.x, p.vel.z);
+      p.mesh.rotation.z += dt * 12;
+      for (let n = 0; n < 2; n++) fx.glow.emit(p.pos.x, p.pos.y, p.pos.z, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, ['#ff3d6a', '#ffd23f', '#36a9ff', '#19e3b1'][Math.floor(Math.random() * 4)], 0.45, 0.05, 0.4);
+      if (wall > 0 || p.life < 0.1 || near(1.9, p.grace > 0)) return this._boom(p, 4.2);
+      return;
+    }
+    if (p.type === 'twister') {
+      // Tears down the track ahead, weaving across the road.
+      const tr = this.track;
+      p.prog += 44 * dt;
+      tr.frame(p.prog, this._fr);
+      const hw = this._fr.hw - 2;
+      const dd = Math.sin(p.age * 1.7 + p.id) * hw * 0.8;
+      p.pos.set(this._fr.x + this._fr.rx * dd, tr.heightAtFrame(this._fr, dd), this._fr.z + this._fr.rz * dd);
+      p.mesh.rotation.y += dt * 9;
+      const sc = Math.min(1, p.age * 3) * (p.life < 0.6 ? p.life / 0.6 : 1);
+      p.mesh.scale.set(sc, sc * (1 + Math.sin(time * 6) * 0.05), sc);
+      if (Math.random() < 0.8) fx.soft.emit(p.pos.x + (Math.random() - 0.5) * 3, p.pos.y + 0.3, p.pos.z + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 6, 3, (Math.random() - 0.5) * 6, race.dust, 0.9, 1.8, 0.7, -1, 1, 0.5);
+      for (const k of karts) {
+        if (k === p.owner || k.remote || p.hitSet.has(k) || k.ghostTime > 0) continue;
+        const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
+        if (dx * dx + dz * dz < 7) {
+          p.hitSet.add(k);
+          if (k.hit('spin')) k.vy = Math.max(k.vy, 11);
+          race.onBlastHit(k, 'twister');
+        }
+      }
+    }
+  }
+
+  _boom(p, r = 7) {
+    const owner = p.owner;
+    this.removeProjectile(p);
+    this.blast(p.pos.x, p.pos.y - 0.6, p.pos.z, r, 'spin', owner, false);
+  }
+
+  _updEffects(dt) {
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      const e = this.effects[i];
+      e.t += dt;
+      const f = e.t / e.dur;
+      if (f >= 1) {
+        this.group.remove(e.mesh);
+        e.mesh.material.dispose();
+        this.effects.splice(i, 1);
+        continue;
+      }
+      e.mesh.scale.setScalar(0.5 + e.r * f);
+      e.mesh.material.opacity = 1 - f;
+    }
   }
 
   _updBall(p, dt, time) {
@@ -716,8 +989,8 @@ export class ItemSystem {
     return {
       b: this.boxes.map((b) => (b.active ? 1 : 0)).join(''),
       g: this.gems.map((g) => (g.active ? 1 : 0)).join(''),
-      p: this.projectiles.map((p) => [p.id, p.type, r(p.pos.x), r(p.pos.y), r(p.pos.z), r(p.mesh.rotation.y), p.owner ? p.owner.index : -1]),
-      h: this.hazards.map((h) => [h.id, r(h.pos.x), r(h.pos.y), r(h.pos.z), h.owner ? h.owner.index : -1]),
+      p: this.projectiles.map((p) => [p.id, p.payload ? `lob-${p.payload}` : p.type, r(p.pos.x), r(p.pos.y), r(p.pos.z), r(p.mesh.rotation.y), p.owner ? p.owner.index : -1]),
+      h: this.hazards.map((h) => [h.id, r(h.pos.x), r(h.pos.y), r(h.pos.z), h.owner ? h.owner.index : -1, h.type]),
     };
   }
 
@@ -740,9 +1013,10 @@ export class ItemSystem {
       seen.add(id);
       let p = this.projectiles.find((q) => q.id === id);
       if (!p) {
-        const mesh = new THREE.Mesh(type === 'ball' ? this.geo.ball : type === 'bee' ? this.geo.bee : this.geo.boomerang, this.mat);
+        const lob = type.startsWith('lob-');
+        const mesh = this._projMesh(lob ? 'lob' : type, lob ? type.slice(4) : null);
         this.group.add(mesh);
-        p = { id, type, mesh, pos: mesh.position, owner: karts[oi] || null, age: 0, target: new THREE.Vector3(x, y, z) };
+        p = { id, type: lob ? 'lob' : type, mesh, pos: mesh.position, owner: karts[oi] || null, age: 0, target: new THREE.Vector3(x, y, z) };
         mesh.position.set(x, y, z);
         this.projectiles.push(p);
       }
@@ -754,13 +1028,15 @@ export class ItemSystem {
       this.removeProjectile(p);
     }
     const hseen = new Set();
-    for (const [id, x, y, z, oi] of s.h || []) {
+    for (const [id, x, y, z, oi, type = 'honey'] of s.h || []) {
       hseen.add(id);
       if (!this.hazards.find((h) => h.id === id)) {
-        const mesh = new THREE.Mesh(this.geo.honey, this.mat);
+        const oil = type === 'oil';
+        const mesh = new THREE.Mesh(oil ? this.geo.oil : this.geo.honey, oil ? this.oilMat : this.mat);
         mesh.position.set(x, y, z);
+        if (oil) mesh.scale.setScalar(3.2);
         this.group.add(mesh);
-        this.hazards.push({ id, type: 'honey', mesh, pos: mesh.position, s: 0, d: 0, path: this.track, owner: karts[oi] || null, grace: 0.6, life: 99 });
+        this.hazards.push({ id, type, mesh, pos: mesh.position, s: 0, d: 0, path: this.track, owner: karts[oi] || null, grace: 0.6, life: 99, r: oil ? 3.2 : 1.6 });
       }
     }
     for (const h of [...this.hazards]) if (!hseen.has(h.id)) this.removeHazard(h);
@@ -789,6 +1065,10 @@ export class ItemSystem {
     });
     this.mat.dispose();
     this.glowMat.dispose();
+    this.twisterMat.dispose();
+    this.oilMat.dispose();
+    for (const e of this.effects) e.mesh.material.dispose();
+    if (this._ringGeo) this._ringGeo.dispose();
     for (const o of this.obstacles) if (o.mesh.material !== this.mat && o.mesh.material !== this.glowMat) o.mesh.material.dispose();
     if (this.qTex) this.qTex.dispose();
   }

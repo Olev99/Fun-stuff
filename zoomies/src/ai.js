@@ -1,4 +1,5 @@
 import { clamp, wrapAngle } from './util.js';
+import { AIM_DEFAULT } from './items.js';
 
 // How the computer racers behave at each difficulty.
 export const DIFFICULTY = {
@@ -55,7 +56,7 @@ export class AIDriver {
         const lat = dx * -fz + dz * fx; // + = to our right
         if (Math.abs(lat) < r + 1.6) avoid = lat > 0 ? -4 : 4;
       };
-      for (const h of this.race.items.hazards) check(h.pos.x, h.pos.z, 1.6);
+      for (const h of this.race.items.hazards) check(h.pos.x, h.pos.z, h.r || 1.6);
       for (const o of this.race.items.obstacles) check(o.pos.x, o.pos.z, o.def.r);
     }
     this.dodge += (avoid - this.dodge) * Math.min(1, dt * 3);
@@ -135,7 +136,7 @@ export class AIDriver {
       const safe = k.baseTop * (0.66 + 0.34 * slick) * (bend > 0.02 ? 0.88 : 1);
       if (bend > 0.012 && spd > safe) c.throttle = spd > safe * 1.15 ? 0.2 : 0.6;
     }
-    if (!k.drifting && !c.drift && this.driftCool <= 0 && spd > 19 && Math.abs(curvAhead) > 0.016 && Math.random() < this.diff.drift * this.skill * (slick < 0.7 ? 0.35 : 1)) {
+    if (!k.drifting && !c.drift && this.driftCool <= 0 && spd > 19 && Math.abs(curvAhead) > 0.014 && Math.random() < this.diff.drift * this.skill * (slick < 0.7 ? 0.35 : 1)) {
       c.drift = true;
       this.driftT = 0;
     }
@@ -162,16 +163,47 @@ export class AIDriver {
     if (k.item && k.rolling <= 0 && this.itemDelay <= 0) {
       if (Math.random() < this.diff.items * 0.5 + 0.5 && this._shouldUse(k.item)) {
         c.item = true;
+        c.aim = this._aim(k.item);
         this.itemDelay = 0.4 + Math.random() * 1.5 / this.diff.items;
       }
     }
+  }
+
+  // Throw backwards at someone close behind when nobody is in range ahead.
+  _aim(item) {
+    if (!AIM_DEFAULT[item]) return 0;
+    const k = this.k;
+    const ks = this.race.karts;
+    const ahead = ks.some((o) => o !== k && o.total - k.total > 3 && o.total - k.total < 40);
+    const behind = ks.some((o) => o !== k && k.total - o.total > 2 && k.total - o.total < 18);
+    if (item === 'honey' || item === 'oil') return ahead && !behind && Math.random() < 0.4 ? 1 : -1;
+    return !ahead && behind && this.diff.items > 0.5 ? -1 : 1;
   }
 
   _shouldUse(item) {
     const k = this.k;
     const race = this.race;
     const smart = this.diff.items;
+    const behindClose = () => race.karts.some((o) => o !== k && k.total - o.total > 2 && k.total - o.total < 16);
+    const incoming = () => race.items.projectiles.some((p) => p.owner !== k && (p.pos.x - k.pos.x) ** 2 + (p.pos.z - k.pos.z) ** 2 < 400);
     switch (item) {
+      case 'oil': {
+        const behind = race.karts.some((o) => o !== k && k.total - o.total > 3 && k.total - o.total < 22);
+        return behind || Math.random() < 0.01;
+      }
+      case 'bomb':
+      case 'firework': {
+        const ahead = race.karts.some((o) => o !== k && o.total - k.total > 4 && o.total - k.total < 32 && Math.abs(o.trk.d - k.trk.d) < 5);
+        return ahead || (smart > 0.5 && behindClose()) || Math.random() < 0.006;
+      }
+      case 'horn': {
+        const crowd = race.karts.some((o) => o !== k && (o.pos.x - k.pos.x) ** 2 + (o.pos.z - k.pos.z) ** 2 < 70);
+        return crowd || incoming() || Math.random() < 0.004;
+      }
+      case 'twister':
+        return k.place > 1 || Math.random() < 0.01;
+      case 'ghost':
+        return incoming() || Math.random() < 0.012;
       case 'chili':
         if (this.boostAt >= 0) return false;
         return Math.abs(k.path.curvWide[k.trk.idx ?? 0]) < 0.015 || Math.random() < 0.02;
@@ -182,7 +214,7 @@ export class AIDriver {
       case 'ball':
       case 'boomerang': {
         const ahead = race.karts.some((o) => o !== k && o.total - k.total > 4 && o.total - k.total < 40 && Math.abs(o.trk.d - k.trk.d) < 3 && o.path === k.path);
-        return ahead || Math.random() < 0.006 * (2 - smart);
+        return ahead || (smart > 0.5 && behindClose()) || Math.random() < 0.006 * (2 - smart);
       }
       case 'rocket':
       case 'warp':

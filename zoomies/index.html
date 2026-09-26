@@ -324,6 +324,11 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #btn-item { width: 84px; height: 84px; }
 #btn-brake { width: 58px; height: 58px; font-size: 10.5px; }
 #btn-item.has { border-color: var(--sun); background: rgba(255,210,63,.25); }
+/* aimable items: swipe up to throw ahead, down to throw behind */
+#btn-item.aim::before, #btn-item.aim::after { position: absolute; left: 50%; transform: translateX(-50%); font-size: 11px; line-height: 1; opacity: .6; color: #fff; pointer-events: none; }
+#btn-item.aim::before { content: '▲'; top: 5px; }
+#btn-item.aim::after { content: '▼'; bottom: 5px; }
+#btn-item.fwd::before, #btn-item.back::after { opacity: 1; color: var(--sun); transform: translateX(-50%) scale(1.5); }
 #controls.tilt #btn-item { left: calc(22px + var(--sal)); bottom: calc(26px + var(--sab)); }
 #controls.tilt #btn-brake { left: calc(116px + var(--sal)); bottom: calc(22px + var(--sab)); }
 #controls.touch #btn-item { right: calc(138px + var(--sar)); bottom: calc(26px + var(--sab)); }
@@ -529,7 +534,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><b>Tricks</b>Tap DRIFT just after launching off a ramp. You get a boost when you land.</div>
         <div><b>Rocket start</b>Press and hold DRIFT right after the 2 disappears in the countdown.</div>
         <div><b>Gems</b>Each gem adds a little top speed, up to 10. Getting hit drops 3.</div>
-        <div><b>Items</b>Drive through the ? boxes, then tap ITEM to use what you got.</div>
+        <div><b>Items</b>Drive through the ? boxes, then tap ITEM to use what you got. For throwables (arrows on the button) swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it to throw behind.</div>
+        <div><b>Stuck?</b>If you're pinned against something for a few seconds, a drone lifts you back onto the road.</div>
         <div><b>Secret shortcuts</b>Every track hides one or two. Look for gaps in the wall, stacked crates and odd paths. Some need a boost to be worth it.</div>
         <div><b>Glide ramps</b>Blue ramps pop out a glider. Steer in the air and land far down the road.</div>
       </div>
@@ -545,6 +551,12 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><span>🧲</span>Gem Magnet: pulls in gems, small speed-up</div>
         <div><span>🌀</span>Warp Swirl: teleports you up the road</div>
         <div><span>🚀</span>Rocket Ride: autopilot at top speed</div>
+        <div><span>💣</span>Gum Bomb: lob it ahead, it blows up everyone nearby</div>
+        <div><span>🛢️</span>Oil Slick: a puddle that sends karts sliding</div>
+        <div><span>📯</span>Honk Blast: shoves nearby karts, wipes out incoming items</div>
+        <div><span>🎆</span>Firework: fast straight shot that explodes</div>
+        <div><span>🌪️</span>Twister: a tornado that tears down the track</div>
+        <div><span>👻</span>Boo Mask: pass through everything, then a surprise item</div>
       </div>
     </div>
     <div class="bottom-bar"><button class="btn" data-go="close">Got it</button></div>

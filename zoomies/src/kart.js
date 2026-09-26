@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp } from './util.js';
-import { kartGeometry, WHEELS } from './characters.js';
+import { kartGeometry, kartStats, bodyById } from './karts.js';
 import { PATCHES } from './track.js';
 import { pbrMat, GeoBuilder } from './util.js';
 
@@ -46,15 +46,17 @@ export class Kart {
     this.ch = ch;
     this.isPlayer = !!opts.isPlayer;
     this.index = opts.index ?? 0;
-    const st = ch.stats;
+    this.bodyDef = bodyById(opts.body || 'classic');
+    this.paint = opts.paint || null;
+    const st = (this.stats = opts.stats || kartStats(ch, this.bodyDef.id, opts.upgrades));
     const cls = race.speedClass;
     this.baseTop = cls.top * (0.93 + st.speed * 0.022);
     this.accelK = 0.55 + st.accel * 0.12;
     this.turnRate = 1.8 + st.handling * 0.12;
     this.driftTurn = 2.35 + st.handling * 0.1;
     this.weight = 0.8 + st.weight * 0.1;
-    this.grip = 9 * (race.trackDef.grip ?? 1);
-    this.driftGrip = 2.6 * (race.trackDef.grip ?? 1);
+    this.grip = 9 * (race.trackDef.grip ?? 1) * (st.grip ?? 1);
+    this.driftGrip = 2.6 * (race.trackDef.grip ?? 1) * (st.grip ?? 1);
     // How well the tyres put power down (snow and ice tracks are below 1).
     this.traction = race.trackDef.traction ?? 1;
     this.patch = null;
@@ -63,6 +65,10 @@ export class Kart {
     this.respawnT = 0;
     this.lastRamp = null;
     this.safeS = 0;
+    this.wallT = 0;
+    this.slipTime = 0; // oil: tyres lose grip
+    this.slipSpin = 0;
+    this.ghostTime = 0; // Boo Mask: pass through everything
     this.speedMul = 1; // AI rubber banding / difficulty
 
     this.ctl = { steer: 0, throttle: 0, brake: false, drift: false, item: false };
@@ -126,7 +132,10 @@ export class Kart {
   }
 
   _buildVisual() {
-    const geo = kartGeometry(this.ch);
+    const gopt = { body: this.bodyDef.id, paint: this.paint };
+    const geo = (this.geoHi = kartGeometry(this.ch, gopt));
+    this.geoLo = kartGeometry(this.ch, { ...gopt, lo: true });
+    this.lodFar = false;
     const sh = kartShared(this.race.shadowTex);
     this.mat = pbrMat();
     this.root = new THREE.Group();
@@ -137,13 +146,13 @@ export class Kart {
     this.chassis.castShadow = cast;
     this.body.add(this.chassis);
     this.driverPivot = new THREE.Group();
-    this.driverPivot.position.set(0, 0.8, -0.3);
+    this.driverPivot.position.set(0, 0.8 + this.bodyDef.seat, -0.3);
     this.body.add(this.driverPivot);
     this.driver = new THREE.Mesh(geo.driver, this.mat);
     this.driver.position.set(0, -0.8, 0.3);
     this.driver.castShadow = cast;
     this.driverPivot.add(this.driver);
-    this.wheels = WHEELS.map((w) => {
+    this.wheels = this.bodyDef.wheels.map((w) => {
       const pivot = new THREE.Object3D();
       pivot.position.set(w.x, w.y, w.z);
       const spin = new THREE.Object3D();
@@ -163,6 +172,16 @@ export class Kart {
     this.shadow.renderOrder = 1;
   }
 
+  // Swap to the cheaper model when far from the camera (also used for its
+  // shadow). Wheels are switched by the race's instanced wheel meshes.
+  setLOD(far) {
+    if (far === this.lodFar) return;
+    this.lodFar = far;
+    const g = far ? this.geoLo : this.geoHi;
+    this.chassis.geometry = g.chassis;
+    this.driver.geometry = g.driver;
+  }
+
   get speed() {
     return Math.hypot(this.vel.x, this.vel.z);
   }
@@ -177,9 +196,21 @@ export class Kart {
     if (this.starTime > 0) top *= 1.14;
     if (this.magnetTime > 0) top *= 1.08;
     if (this.rocketTime > 0) top *= 1.5;
-    if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) top *= 0.5;
+    if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) top *= this.stats.offroad ?? 0.5;
     if (this.boostTime > 0) top *= 1.32;
     return top;
+  }
+
+  // Ran over an oil slick: slide for a moment. Returns true if it took.
+  slip(t) {
+    if (this.starTime > 0 || this.rocketTime > 0 || this.ghostTime > 0 || this.slipTime > 0.3) return false;
+    this.slipTime = t;
+    this.slipSpin = (Math.random() < 0.5 ? -1 : 1) * (1.6 + Math.random());
+    this.drifting = false;
+    this.driftCharge = 0;
+    this.driftLevel = 0;
+    this.emit('slip');
+    return true;
   }
 
   // The road patch (ice, mud, oil...) under the kart, if any.
@@ -225,14 +256,14 @@ export class Kart {
   }
 
   hit(kind = 'spin') {
-    if (this.starTime > 0 || this.rocketTime > 0 || this.invuln > 0 || this.finishedLock) return false;
+    if (this.starTime > 0 || this.rocketTime > 0 || this.invuln > 0 || this.ghostTime > 0 || this.finishedLock) return false;
     if (this.shield > 0) {
       this.shield = 0;
       this.invuln = 0.6;
       this.emit('shieldPop');
       return false;
     }
-    this.spinDur = kind === 'zap' ? 0.9 : kind === 'bump' ? 0.6 : 1.3;
+    this.spinDur = (kind === 'zap' ? 0.9 : kind === 'bump' ? 0.6 : 1.3) * (this.stats.armor ?? 1);
     this.spinTime = this.spinDur;
     this.invuln = this.spinDur + 1.2;
     this.drifting = false;
@@ -268,6 +299,11 @@ export class Kart {
     if (this.shield > 0) this.shield -= dt;
     if (this.boostTime > 0) this.boostTime -= dt;
     if (this.trickWindow > 0) this.trickWindow -= dt;
+    if (this.slipTime > 0) this.slipTime -= dt;
+    if (this.ghostTime > 0) {
+      this.ghostTime -= dt;
+      if (this.ghostTime <= 0) this.emit('ghostEnd');
+    }
     if (this.hitFlash > 0) this.hitFlash -= dt * 2.5;
 
     const driftEdge = c.drift && !this.prevDrift;
@@ -303,15 +339,16 @@ export class Kart {
       if (spd > 7 || !this.grounded) this.driftPending = true;
     }
     if (driftRelease) {
-      if (this.drifting && this.driftLevel > 0) this.startBoost(DRIFT_BOOST[this.driftLevel], 4 + this.driftLevel * 2);
+      if (this.drifting && this.driftLevel > 0) this.startBoost(DRIFT_BOOST[this.driftLevel] * (this.stats.turbo ?? 1), 4 + this.driftLevel * 2);
       this.drifting = false;
       this.driftPending = false;
       this.driftCharge = 0;
       this.driftLevel = 0;
     }
-    if (c.drift && this.driftPending && !this.drifting && this.grounded && spd > 11 && Math.abs(this.steerS) > 0.22) {
+    const steerNow = Math.abs(c.steer) > Math.abs(this.steerS) ? c.steer : this.steerS;
+    if (c.drift && this.driftPending && !this.drifting && this.grounded && spd > 10 && Math.abs(steerNow) > 0.1) {
       this.drifting = true;
-      this.driftDir = Math.sign(this.steerS);
+      this.driftDir = Math.sign(steerNow);
       this.driftCharge = 0;
       this.driftLevel = 0;
       this.driftPending = false;
@@ -348,7 +385,11 @@ export class Kart {
     if ((this.boostTime > 0 || this.rocketTime > 0) && vf < top * 0.97) vf = damp(vf, top, 4, dt);
 
     // Steering
-    const sf = clamp(spd / 9, 0, 1) * (1 - 0.16 * clamp(spd / this.baseTop, 0, 1.3));
+    // Arcade karts can still pivot at a crawl (e.g. nose against a wall).
+    // Right after touching a wall it gets full lock so it can turn away.
+    const pivot = this.wallT > 0 ? 1 : c.throttle > 0 || c.brake ? 0.55 : 0;
+    if (this.wallT > 0) this.wallT -= dt;
+    const sf = Math.max(clamp(spd / 9, 0, 1), pivot) * (1 - 0.16 * clamp(spd / this.baseTop, 0, 1.3));
     let yawRate;
     if (this.drifting) {
       const rel = clamp(this.steerS * this.driftDir, -1, 1);
@@ -365,6 +406,7 @@ export class Kart {
       if (!this.grounded) yawRate *= 0.6;
     }
     if (spinning) yawRate = 0;
+    if (this.slipTime > 0) yawRate = yawRate * 0.4 + this.slipSpin * Math.min(1, this.slipTime);
     this.yaw += yawRate * dt;
 
     // Re-express velocity in the new heading and apply grip.
@@ -374,7 +416,7 @@ export class Kart {
     rxk = -fz; rzk = fx;
     vf = vx * fx + vz * fz;
     vl = vx * rxk + vz * rzk;
-    const gm = this.path.gripMul * (patch ? patch.grip : 1);
+    const gm = this.path.gripMul * (patch ? patch.grip : 1) * (this.slipTime > 0 ? 0.12 : 1);
     const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm;
     vl *= Math.exp(-grip * dt);
     vx = fx * vf + rxk * vl;
@@ -393,6 +435,7 @@ export class Kart {
       this.seg = trk.idx;
     }
     if (vn > 0) {
+      this.wallT = 0.6;
       if (vn > 4) {
         const k = clamp(1 - vn * 0.012, 0.72, 0.97);
         this.vel.x *= k;
@@ -404,13 +447,17 @@ export class Kart {
           this.driftLevel = 0;
         }
       }
-      // nudge heading to slide along the wall instead of grinding into it
-      const along = Math.atan2(trk.tx, trk.tz);
-      const fwdDot = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
-      const target = fwdDot >= 0 ? along : along + Math.PI;
-      let dy = target - this.yaw;
-      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      this.yaw += dy * Math.min(1, dt * 3);
+      // Nudge the heading to slide along the wall instead of grinding into
+      // it, unless the driver is already steering away from the wall.
+      const awayFromWall = this.steerS * Math.sign(trk.d) < -0.15;
+      if (!awayFromWall) {
+        const along = Math.atan2(trk.tx, trk.tz);
+        const fwdDot = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
+        const target = fwdDot >= 0 ? along : along + Math.PI;
+        let dy = target - this.yaw;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        this.yaw += dy * Math.min(1, dt * 3);
+      }
     }
     this.offroad = this.path.offroadAll || Math.abs(trk.d) > trk.ed - 0.3;
 
@@ -475,10 +522,24 @@ export class Kart {
     if (heading < -0.35 && spd > 4) this.wrongWay += dt;
     else this.wrongWay = Math.max(0, this.wrongWay - dt * 2);
 
+    // Stuck detection: trying to drive but barely moving for a few seconds.
+    const trying = (c.throttle > 0 || c.brake) && !spinning && this.respawnT <= 0 && this.grounded;
+    if (trying && this.speed < 2.5) this.stuck += dt;
+    else this.stuck = Math.max(0, this.stuck - dt * 2);
+    if (this.stuck > 2.8) this._rescue();
+
     // Item button edge
     const itemEdge = c.item && !this.prevItem;
     this.prevItem = c.item;
     if (itemEdge) this.emit('useItem');
+  }
+
+  // Pinned against something for a while: the drone lifts us back onto
+  // the middle of the road, facing the right way.
+  _rescue() {
+    this.stuck = 0;
+    this.safeS = this.path === this.track ? this.trk.s : this.safeS;
+    this._fall();
   }
 
   _fall() {
@@ -574,7 +635,19 @@ export class Kart {
 
     // Effects on materials
     const m = this.mat;
-    if (this.rocketTime > 0) {
+    const ghost = this.ghostTime > 0;
+    if (ghost !== !!this._ghostVis) {
+      this._ghostVis = ghost;
+      m.transparent = ghost;
+      m.depthWrite = !ghost;
+      m.opacity = 1;
+      m.needsUpdate = true;
+    }
+    if (ghost) {
+      m.opacity = 0.32 + 0.12 * Math.sin(time * 9);
+      m.emissive.set('#b8a8ff');
+      m.emissiveIntensity = 0.55;
+    } else if (this.rocketTime > 0) {
       m.emissive.set(Math.floor(time * 12) % 2 ? '#ff6a1a' : '#ffd23f');
       m.emissiveIntensity = 0.6;
     } else if (this.starTime > 0) {

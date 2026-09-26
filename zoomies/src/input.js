@@ -8,6 +8,7 @@ export class Input {
     this.settings = settings;
     this.keys = new Set();
     this.btn = { drift: false, item: false, brake: false };
+    this.itemPulse = null; // set when the ITEM button fires: +1 ahead, -1 behind, 0 default
     this.touchSteer = 0;
     this.tilt = { listening: false, angle: 0, smooth: 0, events: 0, lastT: 0, flip: 1, gsy: -1 };
     this.enabled = false;
@@ -94,6 +95,10 @@ export class Input {
     const btns = root.querySelectorAll('[data-btn]');
     btns.forEach((el) => {
       const name = el.dataset.btn;
+      if (name === 'item') {
+        this._bindItem(el);
+        return;
+      }
       const set = (v) => {
         this.btn[name] = v;
         el.classList.toggle('on', v);
@@ -141,7 +146,40 @@ export class Input {
     pad.addEventListener('pointercancel', end);
   }
 
+  // ITEM: swipe up to throw ahead, down to throw behind, tap for the item's
+  // usual direction. Fires the moment the swipe is clear, or on release.
+  _bindItem(el) {
+    let pid = null, y0 = 0, armed = false;
+    const clear = () => { pid = null; armed = false; el.classList.remove('on', 'fwd', 'back'); };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      pid = e.pointerId;
+      y0 = e.clientY;
+      armed = true;
+      el.classList.add('on');
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!armed || e.pointerId !== pid) return;
+      const dy = e.clientY - y0;
+      if (Math.abs(dy) > 24) {
+        armed = false;
+        this.itemPulse = dy < 0 ? 1 : -1;
+        el.classList.add(dy < 0 ? 'fwd' : 'back');
+      }
+    });
+    el.addEventListener('pointerup', (e) => {
+      if (e.pointerId !== pid) return;
+      if (armed) this.itemPulse = 0;
+      setTimeout(clear, 120);
+      pid = null;
+    });
+    el.addEventListener('pointercancel', clear);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
   resetButtons() {
+    this.itemPulse = null;
     for (const k in this.btn) this.btn[k] = false;
     this.touchSteer = 0;
     document.querySelectorAll('[data-btn].on').forEach((el) => el.classList.remove('on'));
@@ -172,12 +210,23 @@ export class Input {
         steer = this.touchSteer;
       }
     }
+    const brake = this.btn.brake || k.has('ArrowDown') || k.has('KeyS');
+    let item = this.btn.item || k.has('KeyE') || k.has('KeyX') || k.has('Enter') || k.has('KeyF');
+    let aim = 0;
+    if (this.itemPulse !== null) {
+      item = true;
+      aim = this.itemPulse;
+      this.itemPulse = null;
+    }
+    // Holding brake (or down) throws behind, holding up throws ahead.
+    if (item && !aim) aim = brake ? -1 : k.has('ArrowUp') || k.has('KeyW') ? 1 : 0;
     return {
       steer,
       throttle: 1,
-      brake: this.btn.brake || k.has('ArrowDown') || k.has('KeyS'),
+      brake,
       drift: this.btn.drift || k.has('Space') || k.has('ShiftLeft') || k.has('ShiftRight'),
-      item: this.btn.item || k.has('KeyE') || k.has('KeyX') || k.has('Enter') || k.has('KeyF'),
+      item,
+      aim,
     };
   }
 }

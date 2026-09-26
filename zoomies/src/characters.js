@@ -18,93 +18,12 @@ export function charById(id) {
 }
 
 const DARK = '#2a2438';
-const METAL = '#9aa3b5';
-const SEAT = '#3b2f5c';
 
-const sphere = (r, w = 18, h = 12) => new THREE.SphereGeometry(r, w, h);
-const capsule = (r, l, cs = 5, rs = 14) => new THREE.CapsuleGeometry(r, l, cs, rs);
-
-// Wheel geometry (unit radius and width, axis along X); instanced for all karts.
-let _wheelGeo = null;
-export function wheelGeometry() {
-  if (_wheelGeo) return _wheelGeo;
-  const B = new GeoBuilder('rubber');
-  B.add(new THREE.CylinderGeometry(1, 1, 1, 24), '#26212f', [0, 0, 0], [0, 0, Math.PI / 2]);
-  B.add(new THREE.TorusGeometry(0.86, 0.16, 8, 24), '#2e2838', [0.5, 0, 0], [0, Math.PI / 2, 0]);
-  B.add(new THREE.TorusGeometry(0.86, 0.16, 8, 24), '#2e2838', [-0.5, 0, 0], [0, Math.PI / 2, 0]);
-  B.add(new THREE.CylinderGeometry(0.58, 0.58, 1.06, 18), '#ffffff', [0, 0, 0], [0, 0, Math.PI / 2], 1, 'paint');
-  B.add(new THREE.CylinderGeometry(0.22, 0.22, 1.12, 10), '#c9ced8', [0, 0, 0], [0, 0, Math.PI / 2], 1, 'chrome');
-  // spokes and tread blocks so rolling is visible
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * Math.PI * 2;
-    B.add(new THREE.BoxGeometry(1.1, 0.1, 0.5), '#d8dce6', [0, Math.cos(a) * 0.3, Math.sin(a) * 0.3], [a, 0, 0], 1, 'chrome');
-  }
-  for (let k = 0; k < 10; k++) {
-    const a = (k / 10) * Math.PI * 2;
-    B.add(new THREE.BoxGeometry(1.02, 0.14, 0.26), '#3d3648', [0, Math.cos(a) * 0.95, Math.sin(a) * 0.95], [a, 0, 0]);
-  }
-  _wheelGeo = B.build();
-  _wheelGeo.userData.shared = true;
-  return _wheelGeo;
-}
-
-export const WHEELS = [
-  { x: 0.8, y: 0.34, z: 0.9, r: 0.34, w: 0.3, front: true },
-  { x: -0.8, y: 0.34, z: 0.9, r: 0.34, w: 0.3, front: true },
-  { x: 0.84, y: 0.41, z: -0.82, r: 0.41, w: 0.4, front: false },
-  { x: -0.84, y: 0.41, z: -0.82, r: 0.41, w: 0.4, front: false },
-];
-
-function chassis(ch) {
-  const B = new GeoBuilder('paint');
-  const body = ch.color;
-  const trim = ch.accent;
-  // floor pan
-  B.add(new THREE.BoxGeometry(1.25, 0.18, 2.3), DARK, [0, 0.32, 0], [0, 0, 0], 1, 'plastic');
-  // main tub
-  B.add(capsule(0.5, 1.5), body, [0, 0.6, -0.05], [Math.PI / 2, 0, 0], [1.3, 0.6, 1]);
-  // nose
-  B.add(capsule(0.34, 0.5), body, [0, 0.54, 1.02], [Math.PI / 2, 0, 0], [1.45, 0.72, 1]);
-  // front bumper
-  B.add(capsule(0.13, 1.3), DARK, [0, 0.36, 1.42], [0, 0, Math.PI / 2], 1, 'rubber');
-  // side pods
-  for (const s of [-1, 1]) {
-    B.add(capsule(0.22, 0.95), trim, [s * 0.68, 0.47, 0.02], [Math.PI / 2, 0, 0]);
-    // fenders over the front wheels
-    B.add(sphere(0.36, 18, 10), body, [s * 0.8, 0.62, 0.9], [0, 0, 0], [0.55, 0.35, 0.95]);
-    // racing stripe on the pod
-    B.add(capsule(0.05, 0.9, 3, 8), '#ffffff', [s * 0.86, 0.55, 0.02], [Math.PI / 2, 0, 0], 1, 'gloss');
-  }
-  // engine + exhausts
-  B.add(new THREE.BoxGeometry(0.9, 0.42, 0.55), METAL, [0, 0.72, -1.0], [0, 0, 0], 1, [0.35, 0.35, 0]);
-  B.add(new THREE.BoxGeometry(0.6, 0.2, 0.35), DARK, [0, 0.98, -1.0], [0, 0, 0], 1, 'plastic');
-  for (let k = 0; k < 3; k++) B.add(new THREE.BoxGeometry(0.94, 0.04, 0.5), '#6d7486', [0, 0.62 + k * 0.1, -1.0], [0, 0, 0], 1, [0.3, 0.5, 0]);
-  for (const s of [-1, 1]) {
-    B.add(new THREE.CylinderGeometry(0.11, 0.13, 0.5, 14), '#d0d6e2', [s * 0.3, 0.72, -1.36], [Math.PI / 2, 0, 0], 1, 'chrome');
-    B.add(new THREE.CylinderGeometry(0.07, 0.07, 0.52, 12), '#ff7a2a', [s * 0.3, 0.72, -1.37], [Math.PI / 2, 0, 0], 1, 'glow');
-  }
-  // spoiler
-  B.add(new THREE.BoxGeometry(1.6, 0.08, 0.4), trim, [0, 1.28, -1.22]);
-  B.add(new THREE.BoxGeometry(0.08, 0.3, 0.42), body, [0.8, 1.2, -1.22]);
-  B.add(new THREE.BoxGeometry(0.08, 0.3, 0.42), body, [-0.8, 1.2, -1.22]);
-  for (const s of [-1, 1]) B.add(new THREE.BoxGeometry(0.07, 0.42, 0.12), DARK, [s * 0.36, 1.04, -1.18], [0, 0, 0], 1, 'metal');
-  // tail lights
-  for (const s of [-1, 1]) B.add(new THREE.BoxGeometry(0.22, 0.09, 0.05), '#ff2a3a', [s * 0.62, 0.66, -1.16], [0, 0, 0], 1, 'glow');
-  // seat back
-  B.add(new THREE.BoxGeometry(0.78, 0.6, 0.16), SEAT, [0, 0.98, -0.62], [-0.18, 0, 0], 1, 'fabric');
-  // steering wheel + column
-  B.add(new THREE.TorusGeometry(0.2, 0.045, 8, 20), DARK, [0, 1.02, 0.42], [-0.9, 0, 0], 1, 'rubber');
-  B.add(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), DARK, [0, 0.86, 0.6], [0.9, 0, 0], 1, 'metal');
-  // windscreen
-  B.add(new THREE.BoxGeometry(0.62, 0.22, 0.03), '#bfe9ff', [0, 0.9, 0.62], [-0.5, 0, 0], 1, 'gloss');
-  // nose emblem + headlights
-  B.add(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 20), trim, [0, 0.8, 1.02], [-0.25, 0, 0], 1, 'chrome');
-  for (const s of [-1, 1]) {
-    B.add(sphere(0.1, 14, 10), '#c9ced8', [s * 0.36, 0.58, 1.31], [0, 0, 0], 1, 'chrome');
-    B.add(sphere(0.075, 12, 8), '#fff4c8', [s * 0.36, 0.58, 1.37], [0, 0, 0], 1, 'glowHot');
-  }
-  return B.build();
-}
+// Distant karts use a cheaper driver: sphere and capsule segment counts halve.
+let LOW = false;
+const seg = (n, min) => (LOW ? Math.max(min, Math.round(n / 2)) : n);
+const sphere = (r, w = 18, h = 12) => new THREE.SphereGeometry(r, seg(w, 6), seg(h, 4));
+const capsule = (r, l, cs = 5, rs = 14) => new THREE.CapsuleGeometry(r, l, LOW ? 2 : cs, seg(rs, 6));
 
 // Cute eyes: glossy dark ovals with a highlight.
 function eyes(B, hx, hy, hz, spread, r = 0.1) {
@@ -262,12 +181,11 @@ function driver(ch) {
   return B.build();
 }
 
-const _cache = new Map();
-export function kartGeometry(ch) {
-  if (_cache.has(ch.id)) return _cache.get(ch.id);
-  const g = { chassis: chassis(ch), driver: driver(ch) };
-  g.chassis.userData.shared = true;
-  g.driver.userData.shared = true;
-  _cache.set(ch.id, g);
-  return g;
+export function driverGeometry(ch, lo = false) {
+  LOW = lo;
+  try {
+    return driver(ch);
+  } finally {
+    LOW = false;
+  }
 }
