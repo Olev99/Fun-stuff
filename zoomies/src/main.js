@@ -10,6 +10,7 @@ import { CHARACTERS } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
 import { setMaxAniso } from './textures.js';
 import { fmtTime, ordinal } from './util.js';
+import { NetSession } from './net.js';
 
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -126,7 +127,7 @@ class App {
 
   applyControls() {
     const el = $('controls');
-    const racing = this.race && this.race.mode !== 'demo' && !this.paused && ['intro', 'countdown', 'race'].includes(this.race.state);
+    const racing = this.race && this.race.mode !== 'demo' && !this.paused && !this.menuOpen && ['intro', 'countdown', 'race'].includes(this.race.state);
     el.hidden = !(isTouch && racing);
     const tilt = this.settings.steering === 'tilt' && this.input.tilt.listening;
     el.className = tilt ? 'tilt' : 'touch';
@@ -219,7 +220,8 @@ class App {
     this.paused = false;
     const grid = this.makeGrid(cfg.player, cfg.order);
     this.race = new Race(this, {
-      mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass, laps: 3,
+      mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
+      difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
     });
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
@@ -242,7 +244,16 @@ class App {
 
   pause() {
     const r = this.race;
-    if (!r || r.mode === 'demo' || this.paused || !['intro', 'countdown', 'race'].includes(r.state)) return;
+    if (!r || r.mode === 'demo' || this.paused || !['intro', 'countdown', 'race', 'wait'].includes(r.state)) return;
+    document.querySelector('#scr-pause [data-go="restart"]').hidden = r.mode === 'mp';
+    if (r.mode === 'mp') {
+      // Online races cannot stop for one player: show the menu but keep racing.
+      this.menuOpen = true;
+      this.input.resetButtons();
+      this.ui.show('pause');
+      this.applyControls();
+      return;
+    }
     this.paused = true;
     this.audio.suspend();
     this.input.resetButtons();
@@ -251,6 +262,12 @@ class App {
   }
 
   resume() {
+    if (this.menuOpen) {
+      this.menuOpen = false;
+      this.ui.hideAll();
+      this.applyControls();
+      return;
+    }
     if (!this.paused) return;
     this.paused = false;
     this.audio.resume();
@@ -262,7 +279,7 @@ class App {
 
   onVisibility() {
     if (document.hidden) {
-      if (this.race && this.race.mode !== 'demo' && ['intro', 'countdown', 'race'].includes(this.race.state)) this.pause();
+      if (this.race && this.race.mode !== 'demo' && this.race.mode !== 'mp' && ['intro', 'countdown', 'race'].includes(this.race.state)) this.pause();
       this.audio.suspend();
     } else {
       if (!this.paused) this.audio.resume();
@@ -292,10 +309,22 @@ class App {
   // ---------------- results ----------------
   onRaceComplete(race, rows) {
     this.audio.stopEngine();
+    this.menuOpen = false;
     this.applyControls();
     this.hud.show(false);
     const ui = this.ui;
     const me = rows.find((r) => r.isPlayer);
+    if (race.mode === 'mp') {
+      const host = this.session && this.session.isHost;
+      ui.results({
+        title: me ? `${me.place}${ordinal(me.place).toLowerCase()} place` : 'Results',
+        sub: `Online · ${race.trackDef.name}`,
+        html: `<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`)).join('')}</div>`
+          + (host ? '' : '<p class="lobby-summary" style="margin:8px 0 0">Waiting for the host to pick the next race…</p>'),
+        buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Back to lobby', 'hot']] : [['leave', 'Leave', 'ghost small']],
+      });
+      return;
+    }
     const key = race.trackDef.id + (race.track.reverse ? '-r' : '');
     if (race.mode === 'tt') {
       const rec = this.records[key] || {};
@@ -366,6 +395,12 @@ class App {
 
   onResultsAction(action) {
     switch (action) {
+      case 'lobby':
+        this.backToLobby();
+        break;
+      case 'leave':
+        this.leaveMP();
+        break;
       case 'retry':
         this.restart();
         break;
@@ -390,6 +425,173 @@ class App {
         break;
       }
     }
+  }
+
+  // ---------------- multiplayer ----------------
+  openMultiplayer() {
+    if (!NetSession.supported()) {
+      this.ui.lobby('start', 'Online races need the full game page (open it in Safari, not inside another app).');
+      return;
+    }
+    this.ui.lobby(this.session ? 'room' : 'start');
+  }
+
+  onLobbyAction(action) {
+    if (action === 'host') this.hostMP();
+    else if (action === 'join') this.joinMP(document.getElementById('join-code').value.trim());
+    else if (action === 'leave') this.leaveMP();
+    else if (action === 'char') { this.ui.mode = 'mp'; this.ui.charSelect(); }
+    else if (action === 'start') this.startMP();
+  }
+
+  _wireSession(ses) {
+    ses.onLobby = () => {
+      if (this.ui.current === 'lobby') this.ui.renderLobby();
+      if (ses.isGuest && this.ui.current === 'lobby') this.previewTrack(ses.lobby.track, ses.lobby.reverse);
+    };
+    ses.onClosed = (reason) => {
+      const inRace = this.race && this.race.mode === 'mp';
+      this.session = null;
+      ses.close();
+      if (inRace) this.toTitle();
+      this.ui.lobby('start', reason || 'Disconnected.');
+    };
+    ses.onError = (e) => {
+      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', (e && e.message) || 'Connection problem.');
+    };
+    ses.onStart = (cfg) => this.startNetRace(cfg);
+    ses.onToLobby = () => this.returnToLobbyView();
+  }
+
+  async hostMP() {
+    this.ui.lobby('start', 'Creating a room…');
+    const ses = new NetSession(this);
+    this._wireSession(ses);
+    try {
+      await ses.host(this.settings.char);
+    } catch (e) {
+      ses.close();
+      this.ui.lobby('start', `Could not create a room: ${(e && e.message) || e}. Check your internet connection.`);
+      return;
+    }
+    this.session = ses;
+    ses.lobby = { track: this.settings.track, reverse: false, speedClass: this.settings.speedClass, difficulty: this.settings.difficulty, ai: true };
+    this.ui.lobby('room');
+    this.previewTrack(ses.lobby.track, false);
+  }
+
+  async joinMP(code) {
+    if (!/^[A-Za-z0-9]{4}$/.test(code)) {
+      this.ui.lobby('start', 'Type the 4-letter code shown on the host\'s phone.');
+      return;
+    }
+    this.ui.lobby('start', 'Connecting…');
+    const ses = new NetSession(this);
+    this._wireSession(ses);
+    try {
+      await ses.join(code, this.settings.char);
+    } catch (e) {
+      ses.close();
+      this.ui.lobby('start', (e && e.message) || 'Could not connect.');
+      return;
+    }
+    this.session = ses;
+    this.ui.lobby('room');
+  }
+
+  mpCharDone() {
+    if (this.session) this.session.pickChar(this.settings.char);
+    this.returnToLobbyView();
+  }
+
+  returnToLobbyView() {
+    this.menuOpen = false;
+    this.hud.show(false);
+    this.audio.stopEngine();
+    this.audio.setTempo(1);
+    if (!this.session) { this.toTitle(); return; }
+    this.ui.lobby('room');
+    this.previewTrack(this.session.lobby.track, this.session.lobby.reverse);
+    this.applyControls();
+  }
+
+  backToLobby() {
+    const ses = this.session;
+    if (!ses) { this.toTitle(); return; }
+    ses.inRace = false;
+    if (ses.isHost) ses.send({ t: 'toLobby' });
+    ses.race = null;
+    this.returnToLobbyView();
+  }
+
+  leaveMP() {
+    const ses = this.session;
+    this.session = null;
+    if (ses) ses.close();
+    this.menuOpen = false;
+    this.toTitle();
+  }
+
+  startMP() {
+    const ses = this.session;
+    if (!ses || !ses.isHost || ses.players.length < 2) return;
+    const L = ses.lobby;
+    const humans = ses.players.map((p) => ({ id: p.id, char: p.char }));
+    const taken = new Set(humans.map((h) => h.char));
+    const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, 8 - humans.length)) : [];
+    // Computer racers start in front, humans in shuffled slots at the back.
+    const grid = [...ai];
+    const hs = shuffle(humans.slice());
+    const slots = [];
+    for (const h of hs) { slots.push({ id: h.id, slot: grid.length }); grid.push(h.char); }
+    const cfg = { trackId: L.track, reverse: L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
+    ses.inRace = true;
+    ses.send({ t: 'start', cfg });
+    this.startNetRace(cfg);
+    const waiting = new Set(humans.filter((h) => h.id !== 'host').map((h) => h.id));
+    let went = false;
+    const go = () => {
+      if (went || !this.race || this.race.mode !== 'mp') return;
+      went = true;
+      ses.send({ t: 'go' });
+      this.race.netGo();
+    };
+    ses.onReady = (id) => { waiting.delete(id); if (!waiting.size) go(); };
+    setTimeout(go, 8000);
+  }
+
+  startNetRace(cfg) {
+    const ses = this.session;
+    if (!ses) return;
+    const me = ses.isHost ? 'host' : ses.meId;
+    const mine = cfg.humans.find((h) => h.id === me);
+    if (!mine) return;
+    this.disposeRace();
+    this.paused = false;
+    this.menuOpen = false;
+    this.gp = null;
+    const def = trackById(cfg.trackId);
+    this.race = new Race(this, {
+      mode: 'mp', trackDef: def, reverse: cfg.reverse, grid: cfg.grid, speedClass: cfg.speedClass, difficulty: cfg.difficulty,
+      laps: def.laps || 3, net: ses, playerSlot: mine.slot, humans: ses.isHost ? cfg.humans.filter((h) => h.id !== 'host') : [],
+      humanSlots: cfg.humans.map((h) => h.slot),
+    });
+    ses.race = this.race;
+    this.race.setSize(this.w, this.h, this.pr);
+    this.view = this.race;
+    this.ui.hideAll();
+    this.hud.reset(this.race);
+    this.hud.show(true);
+    this.hud.hint('Get ready…', 3);
+    this.input.resetButtons();
+    this.applyControls();
+    this.audio.unlock();
+    this.audio.startEngine();
+    this.audio.setTempo(1);
+    this.audio.playSong(def.music);
+    this._tiltChecked = false;
+    this.requestWake();
+    if (ses.isGuest) ses.send({ t: 'ready' });
   }
 
   // ---------------- loop ----------------

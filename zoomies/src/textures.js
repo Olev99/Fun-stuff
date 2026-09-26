@@ -55,6 +55,10 @@ const ROAD_STYLES = {
   dirt: { base: '#c98a55', spk: ['#d99b64', '#b8784a', '#e3ad78'], line: '#f7e2c0', groove: 'rgba(110,60,30,0.2)' },
   ice: { base: '#90a8c4', spk: ['#9ab1cc', '#8aa2bf', '#a9bfd8'], line: '#e8f6ff', groove: 'rgba(40,60,100,0.12)' },
   neon: { base: '#1b1637', spk: ['#231d45', '#15112b', '#2a2352'], line: '#39f5ff', groove: 'rgba(0,0,0,0.2)' },
+  chocolate: { base: '#6b3b24', spk: ['#7a4630', '#5a301c', '#8a5638'], line: '#ffd1e8', groove: 'rgba(40,15,5,0.2)' },
+  basalt: { base: '#2e2829', spk: ['#3b3335', '#221d1e', '#4a4042'], line: '#ff8a2b', groove: 'rgba(0,0,0,0.25)' },
+  pastel: { base: '#cbbcf0', spk: ['#c0b0ea', '#d8cbf6', '#b9c8f0'], line: '#ff7ab8', groove: 'rgba(150,120,220,0.12)' },
+  boardwalk: { base: '#b9854f', spk: ['#c9955d', '#a8743f', '#d4a46c'], line: '#fff1d6', groove: 'rgba(90,50,20,0.12)' },
 };
 
 export function roadTexture(style, seed = 1) {
@@ -77,6 +81,40 @@ export function roadTexture(style, seed = 1) {
   ctx.globalAlpha = style === 'neon' ? 0.9 : 0.55;
   ctx.fillRect(126, 0, 4, 110);
   ctx.globalAlpha = 1;
+  if (style === 'boardwalk') {
+    // planks across the road
+    for (let y = 0; y < 256; y += 16) {
+      ctx.fillStyle = 'rgba(80,45,15,0.35)';
+      ctx.fillRect(0, y, 256, 2);
+      ctx.fillStyle = 'rgba(255,230,190,0.12)';
+      ctx.fillRect(0, y + 2, 256, 3);
+    }
+  }
+  if (style === 'basalt') {
+    ctx.strokeStyle = 'rgba(255,110,30,0.9)';
+    ctx.lineWidth = 2;
+    const r2 = rng(seed + 9);
+    for (let n = 0; n < 7; n++) {
+      let x = 30 + r2() * 196, y = r2() * 256;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 5; k++) { x += (r2() - 0.5) * 30; y += 8 + r2() * 14; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+  }
+  if (style === 'pastel') {
+    const cols = ['rgba(255,158,203,0.25)', 'rgba(158,220,255,0.25)', 'rgba(255,236,150,0.3)', 'rgba(190,255,200,0.25)'];
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = cols[i]; ctx.fillRect(0, i * 64, 256, 64); }
+  }
+  if (style === 'chocolate') {
+    ctx.strokeStyle = 'rgba(255,209,232,0.5)';
+    ctx.lineWidth = 3;
+    for (let y = 20; y < 256; y += 64) {
+      ctx.beginPath();
+      for (let x = 20; x <= 236; x += 8) ctx.lineTo(x, y + Math.sin(x * 0.08) * 6);
+      ctx.stroke();
+    }
+  }
   if (style === 'neon') {
     ctx.strokeStyle = 'rgba(255,61,200,0.35)';
     ctx.lineWidth = 2;
@@ -108,6 +146,9 @@ const GROUND_STYLES = {
   sand: { base: '#e8b878', blot: ['#dca66a', '#f2c78c', '#d69a5d'], spk: ['#c98f55', '#f6d4a0', '#e0ac70'] },
   snow: { base: '#eef5fb', blot: ['#dde9f5', '#ffffff', '#d4e3f2'], spk: ['#c9dbee', '#ffffff', '#e2edf7'] },
   tiles: { base: '#221c44', blot: ['#2a2350', '#1a1536'], spk: ['#342b63', '#16122e'] },
+  frosting: { base: '#ffd3ea', blot: ['#ffc0df', '#fff0f7', '#ffe2f0'], spk: ['#ff5a8a', '#36a9ff', '#ffd23f', '#19e3b1', '#ffffff'] },
+  ash: { base: '#3d3537', blot: ['#4a4144', '#2e2729', '#574c4f'], spk: ['#ff7a1a', '#231e1f', '#6a5d60'] },
+  cloud: { base: '#ffffff', blot: ['#eef3ff', '#fff6fd', '#e6eeff'], spk: ['#ffffff', '#f2f6ff'] },
 };
 
 export function groundTexture(style, seed = 7) {
@@ -136,6 +177,19 @@ export function groundTexture(style, seed = 7) {
       ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
     }
+  } else if (style === 'frosting') {
+    // sprinkles
+    for (let i = 0; i < 500; i++) {
+      ctx.save();
+      ctx.translate(r() * 256, r() * 256);
+      ctx.rotate(r() * Math.PI);
+      ctx.fillStyle = st.spk[Math.floor(r() * st.spk.length)];
+      ctx.fillRect(-3, -1, 6, 2.2);
+      ctx.restore();
+    }
+  } else if (style === 'ash') {
+    speckle(ctx, 256, 256, r, ['#231e1f', '#6a5d60'], 1600, 1, 2.5, 0.6);
+    speckle(ctx, 256, 256, r, ['#ff7a1a', '#ffb04a'], 60, 1, 2, 0.9);
   } else {
     speckle(ctx, 256, 256, r, st.spk, 1800, 1, 2.5, 0.6);
   }
@@ -179,6 +233,40 @@ export function wallTexture(style) {
       ctx.fillStyle = i % 2 ? 'rgba(80,140,220,0.18)' : 'rgba(255,255,255,0)';
       ctx.fillRect(0, i * 32, 64, 32);
     }
+  } else if (style === 'wood') {
+    ctx.fillStyle = '#b07a44';
+    ctx.fillRect(0, 0, 64, 128);
+    for (let x = 0; x < 64; x += 13) { ctx.fillStyle = 'rgba(70,40,15,0.45)'; ctx.fillRect(x, 0, 2, 128); }
+    for (let y = 0; y < 128; y += 32) { ctx.fillStyle = '#6b4424'; ctx.fillRect(0, y, 64, 5); }
+    ctx.fillStyle = '#f3e3c0';
+    ctx.fillRect(50, 0, 6, 128);
+  } else if (style === 'candycane') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 64, 128);
+    ctx.fillStyle = '#ff3d6a';
+    for (let k = -4; k < 8; k++) {
+      ctx.beginPath();
+      ctx.moveTo(0, k * 32);
+      ctx.lineTo(64, k * 32 + 40);
+      ctx.lineTo(64, k * 32 + 56);
+      ctx.lineTo(0, k * 32 + 16);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (style === 'basalt') {
+    ctx.fillStyle = '#2b2527';
+    ctx.fillRect(0, 0, 64, 128);
+    speckle(ctx, 64, 128, rng(4), ['#3d3436', '#1c1718'], 400, 1, 4, 0.7);
+    const g = ctx.createLinearGradient(40, 0, 64, 0);
+    g.addColorStop(0, 'rgba(255,90,20,0)');
+    g.addColorStop(1, 'rgba(255,140,40,1)');
+    ctx.fillStyle = g;
+    ctx.fillRect(40, 0, 24, 128);
+  } else if (style === 'cloudrail') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 64, 128);
+    const cols = ['#ff9ecb', '#ffd98a', '#9ee7ff', '#c8a8ff'];
+    cols.forEach((c2, i) => { ctx.fillStyle = c2; ctx.fillRect(34 + i * 7, 0, 6, 128); });
   } else if (style === 'neon') {
     ctx.fillStyle = '#140f2c';
     ctx.fillRect(0, 0, 64, 128);

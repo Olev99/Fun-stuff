@@ -1,142 +1,174 @@
 import * as THREE from 'three';
 import { clamp, lerp } from './util.js';
 
-// A closed racing circuit defined by a Catmull-Rom spline. Everything about the
-// track (road surface, walls, banking, racing line) is derived from evenly
-// spaced samples, and karts are simulated in "track space" (distance along the
-// track + lateral offset), which is cheap and very robust.
-export class Track {
-  constructor(def, reverse = false) {
-    this.def = def;
-    this.reverse = reverse;
-    this.roadW = def.width ?? 17;
-    this.halfRoad = this.roadW / 2;
-    this.curbW = 1.3;
-    this.shoulder = def.shoulder ?? 6;
-    this.edgeD = this.halfRoad + this.curbW;
-    this.wallD = this.edgeD + this.shoulder;
-    this.wallH = def.wallH ?? 1.3;
+// A drivable corridor defined by a Catmull-Rom spline: either the closed main
+// loop or an open shortcut branch. Karts are simulated in "path space"
+// (distance along the path + lateral offset), which makes walls, banking,
+// ramps and AI cheap and robust.
+export class Path {
+  constructor(pts, opts = {}) {
+    const closed = (this.closed = opts.closed !== false);
+    this.width = opts.width ?? 17;
+    this.curbW = opts.curb ?? 1.3;
+    this.shoulder = opts.shoulder ?? 6;
+    this.wallH = opts.wallH ?? 1.3;
+    this.offroadAll = !!opts.offroad;
+    this.gripMul = opts.grip ?? 1;
 
-    let pts = def.points.map((p) => new THREE.Vector3(p[0], p[2] ?? 0, p[1]));
-    if (reverse) pts = [pts[0], ...pts.slice(1).reverse()];
-    const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
-    curve.arcLengthDivisions = 4000;
+    const curve = new THREE.CatmullRomCurve3(pts, closed, 'centripetal');
+    curve.arcLengthDivisions = Math.max(3000, pts.length * 300);
     const len = curve.getLength();
-    const N = Math.round(len / 2);
-    const sp = curve.getSpacedPoints(N);
-    this.N = N;
+    const segs = Math.max(6, Math.round(len / (opts.step ?? 2)));
+    const sp = curve.getSpacedPoints(segs);
+    const count = closed ? segs : segs + 1;
+    this.count = count;
+    this.N = count;
+    this.segs = segs;
     this.length = len;
-    this.ds = len / N;
+    this.ds = len / segs;
 
-    const px = (this.px = new Float32Array(N));
-    const py = (this.py = new Float32Array(N));
-    const pz = (this.pz = new Float32Array(N));
-    for (let i = 0; i < N; i++) {
+    const A = () => new Float32Array(count);
+    const px = (this.px = A()), py = (this.py = A()), pz = (this.pz = A());
+    for (let i = 0; i < count; i++) {
       px[i] = sp[i].x;
-      py[i] = Math.max(0, sp[i].y);
+      py[i] = sp[i].y;
       pz[i] = sp[i].z;
     }
-    // Smooth heights a little so hills never have kinks.
+    if (opts.minY !== undefined) for (let i = 0; i < count; i++) py[i] = Math.max(opts.minY, py[i]);
     this._smoothInPlace(py, 3);
 
-    const tx = (this.tx = new Float32Array(N));
-    const tz = (this.tz = new Float32Array(N));
-    const rx = (this.rx = new Float32Array(N));
-    const rz = (this.rz = new Float32Array(N));
-    const grade = (this.grade = new Float32Array(N));
-    for (let i = 0; i < N; i++) {
-      const a = (i - 1 + N) % N;
-      const b = (i + 1) % N;
-      let dx = px[b] - px[a];
-      let dz = pz[b] - pz[a];
+    const tx = (this.tx = A()), tz = (this.tz = A()), rx = (this.rx = A()), rz = (this.rz = A()), grade = (this.grade = A());
+    for (let i = 0; i < count; i++) {
+      const a = this.I(i - 1), b = this.I(i + 1);
+      let dx = px[b] - px[a], dz = pz[b] - pz[a];
       const l = Math.hypot(dx, dz) || 1;
       dx /= l;
       dz /= l;
-      tx[i] = dx;
-      tz[i] = dz;
-      rx[i] = -dz;
-      rz[i] = dx;
-      grade[i] = (py[b] - py[a]) / (2 * this.ds);
+      tx[i] = dx; tz[i] = dz;
+      rx[i] = -dz; rz[i] = dx;
+      const span = closed ? 2 : Math.max(1, b - a);
+      grade[i] = (py[b] - py[a]) / (span * this.ds);
     }
+
+    // Width multipliers per control point -> per sample.
+    const mult = new Float32Array(count).fill(1);
+    if (opts.widths && opts.widths.some((w) => w !== 1)) {
+      const cp = pts.map((p) => {
+        let best = 0, bd = Infinity;
+        for (let i = 0; i < count; i++) {
+          const d = (px[i] - p.x) ** 2 + (pz[i] - p.z) ** 2;
+          if (d < bd) { bd = d; best = i; }
+        }
+        return best;
+      });
+      const K = pts.length;
+      const last = closed ? K : K - 1;
+      for (let k = 0; k < last; k++) {
+        const a = cp[k];
+        let b = k + 1 < K ? cp[k + 1] : cp[0] + count;
+        if (b <= a) b += closed ? count : 0;
+        const w0 = opts.widths[k], w1 = opts.widths[(k + 1) % K];
+        for (let i = a; i <= b; i++) mult[this.I(i)] = lerp(w0, w1, b > a ? (i - a) / (b - a) : 0);
+      }
+      mult.set(this._smooth(mult, 10));
+    }
+    const hw = (this.hw = A()), ed = (this.ed = A()), wd = (this.wd = A());
+    for (let i = 0; i < count; i++) {
+      hw[i] = (this.width / 2) * mult[i];
+      ed[i] = hw[i] + this.curbW;
+      wd[i] = ed[i] + this.shoulder;
+    }
+    this.halfRoad = this.width / 2;
+    this.maxWallD = Math.max(...wd);
+    this.wallD = this.maxWallD;
+    this.edgeD = this.halfRoad + this.curbW;
 
     // Signed curvature (negative = right-hand turn).
-    const curv = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      const a = (i - 1 + N) % N;
-      const b = (i + 1) % N;
+    const curv = A();
+    for (let i = 0; i < count; i++) {
+      const a = this.I(i - 1), b = this.I(i + 1);
       const cross = tz[a] * tx[b] - tx[a] * tz[b];
       const dot = tx[a] * tx[b] + tz[a] * tz[b];
-      curv[i] = Math.atan2(cross, dot) / (2 * this.ds);
+      const span = closed ? 2 : Math.max(1, b - a);
+      curv[i] = Math.atan2(cross, dot) / (span * this.ds);
     }
     this.curv = this._smooth(curv, 3);
-    const curvWide = this._smooth(curv, 16);
-    this.curvWide = curvWide;
+    this.curvWide = this._smooth(curv, 16);
 
-    const bankK = def.bank ?? 3.0;
-    const slope = new Float32Array(N);
-    for (let i = 0; i < N; i++) slope[i] = clamp(curvWide[i] * bankK, -0.09, 0.09);
+    const bankK = opts.bank ?? 3.0;
+    const slope = A();
+    for (let i = 0; i < count; i++) slope[i] = clamp(this.curvWide[i] * bankK, -0.09, 0.09);
     this.slope = this._smooth(slope, 6);
 
     // Racing line: hug the inside of corners.
-    const lim = this.halfRoad - 2.6;
-    const rl = new Float32Array(N);
-    for (let i = 0; i < N; i++) rl[i] = clamp(-curvWide[i] * 330, -lim, lim);
+    const rl = A();
+    for (let i = 0; i < count; i++) {
+      const lim = Math.max(0, hw[i] - 2.6);
+      rl[i] = clamp(-this.curvWide[i] * 330, -lim, lim);
+    }
     this.racingLine = this._smooth(rl, 10);
 
-    // Features (positions given as fractions of a lap in the definition).
-    const f = (at) => (reverse ? (1 - at + 1) % 1 : at) * len;
-    const sd = (d) => (reverse ? -d : d);
-    this.ramps = (def.ramps || []).map((r) => {
-      const l = r.len ?? 8;
-      // In reverse, keep the ramp at the same spot but make it rise the other way.
-      const start = reverse ? (f(r.at) - l + len) % len : f(r.at);
-      return { s: start, len: l, h: r.h ?? 1.7 };
-    });
-    this.boosts = (def.boosts || []).map((b) => ({ s: f(b.at), d: sd(b.d ?? 0), len: 7, w: 4.6 }));
-    this.itemRows = (def.items || []).map((at) => f(at));
-    this.gemLines = (def.gems || []).map((g) => ({ s: f(g.at), d: sd(g.d ?? 0), n: g.n ?? 5 }));
+    this.ramps = [];
+    this.boosts = [];
+    this.voids = [];
+    this.speedMul = 1;
+    this.bridge = new Uint8Array(count);
+    this.gap = [new Uint8Array(count), new Uint8Array(count)]; // [left(-1), right(+1)] -> shortcut id + 1
+    this.noWall = [new Uint8Array(count), new Uint8Array(count)];
+  }
 
-    // Bounds
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = 0;
-    for (let i = 0; i < N; i++) {
-      minX = Math.min(minX, px[i]);
-      maxX = Math.max(maxX, px[i]);
-      minZ = Math.min(minZ, pz[i]);
-      maxZ = Math.max(maxZ, pz[i]);
-      maxY = Math.max(maxY, py[i]);
-    }
-    this.bounds = { minX, maxX, minZ, maxZ, maxY };
-    this.center = new THREE.Vector3((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
-    this.radius = Math.max(maxX - minX, maxZ - minZ) / 2;
+  isVoid(s) {
+    for (const v of this.voids) if (s >= v.s0 && s <= v.s1) return true;
+    return false;
+  }
+
+  I(i) {
+    const c = this.count;
+    if (this.closed) return ((i % c) + c) % c;
+    return i < 0 ? 0 : i >= c ? c - 1 : i;
   }
 
   _smooth(arr, r) {
-    const N = arr.length;
-    const out = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
+    const n = arr.length;
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
       let s = 0;
-      for (let k = -r; k <= r; k++) s += arr[(i + k + N) % N];
+      for (let k = -r; k <= r; k++) s += arr[this.I(i + k)];
       out[i] = s / (2 * r + 1);
     }
     return out;
   }
 
   _smoothInPlace(arr, r) {
-    const s = this._smooth(arr, r);
-    arr.set(s);
+    arr.set(this._smooth(arr, r));
   }
 
-  // Ground height at sample i and lateral offset d (excluding ramps).
+  wrapS(s) {
+    return this.closed ? ((s % this.length) + this.length) % this.length : clamp(s, 0, this.length);
+  }
+
   yAt(i, d) {
     const sl = this.slope[i];
-    return this.py[i] + sl * d + Math.abs(sl) * this.wallD;
+    return this.py[i] + sl * d + Math.abs(sl) * this.wd[i];
+  }
+
+  rampAt(s, d) {
+    if (this.ramps.length === 0) return null;
+    for (const r of this.ramps) {
+      if (Math.abs(d) > (r.halfW ?? 999)) continue;
+      let u = s - r.s;
+      if (this.closed && u < 0) u += this.length;
+      if (u >= 0 && u <= r.len) return r;
+    }
+    return null;
   }
 
   rampHeight(s, d) {
-    if (this.ramps.length === 0 || Math.abs(d) > this.halfRoad) return 0;
+    if (this.ramps.length === 0) return 0;
     for (const r of this.ramps) {
+      if (Math.abs(d) > (r.halfW ?? 999)) continue;
       let u = s - r.s;
-      if (u < 0) u += this.length;
+      if (this.closed && u < 0) u += this.length;
       if (u >= 0 && u <= r.len) {
         const k = u / r.len;
         return r.h * k * k * 0.35 + r.h * k * 0.65;
@@ -145,22 +177,22 @@ export class Track {
     return 0;
   }
 
-  // Interpolated frame at distance s along the track.
+  // Interpolated frame at distance s along the path.
   frame(s, out) {
-    const N = this.N;
-    s = ((s % this.length) + this.length) % this.length;
+    s = this.wrapS(s);
     const fi = s / this.ds;
-    const i = Math.floor(fi) % N;
-    const j = (i + 1) % N;
-    const t = fi - Math.floor(fi);
+    let i = Math.floor(fi);
+    let t = fi - i;
+    if (!this.closed && i >= this.segs) { i = this.segs - 1; t = 1; }
+    i = this.I(i);
+    const j = this.I(i + 1);
     out.i = i;
     out.t = t;
     out.s = s;
     out.x = lerp(this.px[i], this.px[j], t);
     out.z = lerp(this.pz[i], this.pz[j], t);
     out.baseY = lerp(this.py[i], this.py[j], t);
-    let rxv = lerp(this.rx[i], this.rx[j], t);
-    let rzv = lerp(this.rz[i], this.rz[j], t);
+    const rxv = lerp(this.rx[i], this.rx[j], t), rzv = lerp(this.rz[i], this.rz[j], t);
     const l = Math.hypot(rxv, rzv) || 1;
     out.rx = rxv / l;
     out.rz = rzv / l;
@@ -168,112 +200,141 @@ export class Track {
     out.tz = -out.rx;
     out.slope = lerp(this.slope[i], this.slope[j], t);
     out.grade = lerp(this.grade[i], this.grade[j], t);
+    out.hw = lerp(this.hw[i], this.hw[j], t);
+    out.ed = lerp(this.ed[i], this.ed[j], t);
+    out.wd = lerp(this.wd[i], this.wd[j], t);
+    out.idx = t < 0.5 ? i : j;
+    out.over = 0;
     return out;
   }
 
   heightAtFrame(fr, d) {
-    return fr.baseY + fr.slope * d + Math.abs(fr.slope) * this.wallD + this.rampHeight(fr.s, d);
+    return fr.baseY + fr.slope * d + Math.abs(fr.slope) * fr.wd + this.rampHeight(fr.s, d);
   }
 
-  // World position of (s, d). Writes into a Vector3.
   pointAt(s, d, v, fr = _fr) {
     this.frame(s, fr);
     v.set(fr.x + fr.rx * d, this.heightAtFrame(fr, d), fr.z + fr.rz * d);
     return v;
   }
 
-  // Project a world point onto the track. `hint` is the last known sample
-  // index (or -1 for a full search). Results are written into `out`.
+  // Project a world point onto the path. `hint` is the last sample index or -1.
   project(x, z, hint, out) {
-    const N = this.N;
     const px = this.px, pz = this.pz;
-    let best = 0;
-    let bestD = Infinity;
-    if (hint < 0) {
-      for (let i = 0; i < N; i++) {
+    let best = 0, bestD = Infinity;
+    if (hint < 0 || hint === undefined) {
+      for (let i = 0; i < this.count; i++) {
         const dx = x - px[i], dz = z - pz[i];
         const d = dx * dx + dz * dz;
         if (d < bestD) { bestD = d; best = i; }
       }
     } else {
       for (let k = -14; k <= 14; k++) {
-        const i = (hint + k + N) % N;
+        const i = this.I(hint + k);
         const dx = x - px[i], dz = z - pz[i];
         const d = dx * dx + dz * dz;
         if (d < bestD) { bestD = d; best = i; }
       }
     }
-    // Refine on the two adjacent segments.
-    const a1 = best, b1 = (best + 1) % N;
-    const a2 = (best - 1 + N) % N, b2 = best;
-    const r1 = segProj(px[a1], pz[a1], px[b1], pz[b1], x, z);
-    const d1 = _segDist;
-    const r2 = segProj(px[a2], pz[a2], px[b2], pz[b2], x, z);
-    const d2 = _segDist;
-    let a, t;
-    if (d1 <= d2) { a = a1; t = r1; } else { a = a2; t = r2; }
-    const s = (a + t) * this.ds;
-    this.frame(s, out);
+    let a = best, t = 0, dd = Infinity;
+    const canNext = this.closed || best + 1 < this.count;
+    const canPrev = this.closed || best - 1 >= 0;
+    if (canNext) {
+      const b = this.I(best + 1);
+      const r = segProj(px[best], pz[best], px[b], pz[b], x, z);
+      if (_segDist < dd) { dd = _segDist; a = best; t = r; }
+    }
+    if (canPrev) {
+      const p = this.I(best - 1);
+      const r = segProj(px[p], pz[p], px[best], pz[best], x, z);
+      if (_segDist < dd) { dd = _segDist; a = p; t = r; }
+    }
+    this.frame((a + t) * this.ds, out);
     out.d = (x - out.x) * out.rx + (z - out.z) * out.rz;
+    out.over = 0;
+    if (!this.closed) {
+      if (a === 0 && t <= 0) out.over = Math.min(0, (x - px[0]) * this.tx[0] + (z - pz[0]) * this.tz[0]);
+      const e = this.count - 1;
+      if (a === e - 1 && t >= 1) out.over = Math.max(0, (x - px[e]) * this.tx[e] + (z - pz[e]) * this.tz[e]);
+    }
     out.y = this.heightAtFrame(out, out.d);
-    out.idx = t < 0.5 ? a : (a + 1) % N;
     return out;
   }
 
   // ---------- Geometry helpers ----------
-
-  // A strip of road surface between lateral offsets d0..d1 along the whole loop.
-  strip(d0, d1, { vScale = 1 / 12, lift = 0, uRepeat = 1, across = 1 } = {}) {
-    const N = this.N;
-    const rings = N + 1;
+  // Road surface strip between lateral offsets (numbers or (i) => d) over [i0, i1].
+  strip(d0, d1, { vScale = 1 / 12, lift = 0, uRepeat = 1, across = 1, i0 = 0, i1 = -1, uWorld = 0 } = {}) {
+    const f0 = typeof d0 === 'function' ? d0 : () => d0;
+    const f1 = typeof d1 === 'function' ? d1 : () => d1;
+    const end = i1 < 0 ? (this.closed ? this.count : this.count - 1) : i1;
+    const rings = end - i0 + 1;
     const cols = across + 1;
     const pos = new Float32Array(rings * cols * 3);
     const uv = new Float32Array(rings * cols * 2);
     for (let r = 0; r < rings; r++) {
-      const i = r % N;
+      const i = this.I(i0 + r);
+      const a0 = f0(i), a1 = f1(i);
       for (let a = 0; a < cols; a++) {
-        const d = d0 + ((d1 - d0) * a) / across;
+        const d = a0 + ((a1 - a0) * a) / across;
         const o = r * cols + a;
         pos[o * 3] = this.px[i] + this.rx[i] * d;
         pos[o * 3 + 1] = this.yAt(i, d) + lift;
         pos[o * 3 + 2] = this.pz[i] + this.rz[i] * d;
-        uv[o * 2] = (a / across) * uRepeat;
-        uv[o * 2 + 1] = r * this.ds * vScale;
+        uv[o * 2] = uWorld ? d / uWorld : (a / across) * uRepeat;
+        uv[o * 2 + 1] = (i0 + r) * this.ds * vScale;
       }
     }
     const idx = [];
-    for (let r = 0; r < N; r++) {
+    for (let r = 0; r < rings - 1; r++) {
       for (let a = 0; a < across; a++) {
-        const A = r * cols + a, B = A + 1, C = A + cols, D = C + 1;
-        idx.push(A, B, C, B, D, C);
+        const A0 = r * cols + a, B = A0 + 1, C = A0 + cols, D = C + 1;
+        idx.push(A0, B, C, B, D, C);
       }
     }
     return finishGeo(pos, uv, idx, [0, 1, 0]);
   }
 
-  // A generic ribbon along the loop. fn(i, out6) writes two points per ring.
-  ribbon(fn, expectedNormal, vScale = 1 / 8) {
-    const N = this.N;
-    const rings = N + 1;
+  // Generic ribbon over [i0, i1]; fn(i, out6) writes two points per ring.
+  ribbon(fn, expected, vScale = 1 / 8, i0 = 0, i1 = -1) {
+    const end = i1 < 0 ? (this.closed ? this.count : this.count - 1) : i1;
+    const rings = end - i0 + 1;
     const pos = new Float32Array(rings * 6);
     const uv = new Float32Array(rings * 4);
     const tmp = new Float32Array(6);
     for (let r = 0; r < rings; r++) {
-      fn(r % N, tmp);
+      const i = this.I(i0 + r);
+      fn(i, tmp);
       pos.set(tmp, r * 6);
-      const v = r * this.ds * vScale;
+      const v = (i0 + r) * this.ds * vScale;
       uv[r * 4] = 0; uv[r * 4 + 1] = v;
       uv[r * 4 + 2] = 1; uv[r * 4 + 3] = v;
     }
     const idx = [];
-    for (let r = 0; r < N; r++) {
-      const A = r * 2, B = A + 1, C = A + 2, D = A + 3;
-      idx.push(A, B, C, B, D, C);
+    for (let r = 0; r < rings - 1; r++) {
+      const A0 = r * 2, B = A0 + 1, C = A0 + 2, D = A0 + 3;
+      idx.push(A0, B, C, B, D, C);
     }
-    return finishGeo(pos, uv, idx, expectedNormal(0));
+    return finishGeo(pos, uv, idx, expected(this.I(i0)));
   }
 
-  // A patch covering s0..s1 and d0..d1 that follows the road surface.
+  // Split [0, end] into contiguous runs where pred(i) is true.
+  runs(pred) {
+    const end = this.closed ? this.count : this.count - 1;
+    const out = [];
+    let start = -1;
+    for (let r = 0; r <= end; r++) {
+      const ok = pred(this.I(r));
+      if (ok && start < 0) start = r;
+      if ((!ok || r === end) && start >= 0) {
+        const stop = ok ? r : r - 1;
+        if (stop > start) out.push([start, stop]);
+        start = -1;
+      }
+    }
+    return out;
+  }
+
+  // A patch covering s0..s1 and d0..d1 that follows the surface.
   patch(s0, s1, d0, d1, { lift = 0.04, segs = 0, heightFn = null } = {}) {
     const len = s1 - s0;
     const n = segs || Math.max(2, Math.ceil(len / 1.2));
@@ -296,16 +357,95 @@ export class Track {
     }
     const idx = [];
     for (let k = 0; k < n; k++) {
-      const A = k * 2, B = A + 1, C = A + 2, D = A + 3;
-      idx.push(A, B, C, B, D, C);
+      const A0 = k * 2, B = A0 + 1, C = A0 + 2, D = A0 + 3;
+      idx.push(A0, B, C, B, D, C);
     }
     return finishGeo(pos, uv, idx, [0, 1, 0]);
   }
+}
 
-  // Minimum distance from (x,z) to the centreline (coarse; for scenery placement).
+// The main closed circuit plus its features and shortcut branches.
+export class Track extends Path {
+  constructor(def, reverse = false) {
+    let raw = def.points.slice();
+    if (reverse) raw = [raw[0], ...raw.slice(1).reverse()];
+    const sc = def.scale ?? 1;
+    const pts = raw.map((p) => new THREE.Vector3(p[0] * sc, p[2] ?? 0, p[1] * sc));
+    const widths = raw.map((p) => p[3] ?? 1);
+    super(pts, { closed: true, width: def.width ?? 17, shoulder: def.shoulder ?? 6, wallH: def.wallH ?? 1.3, bank: def.bank, widths, minY: 0 });
+    this.def = def;
+    this.reverse = reverse;
+    const len = this.length;
+    const f = (at) => (reverse ? (1 - at + 1) % 1 : at) * len;
+    this.f = f;
+    this.sd = (d) => (reverse ? -d : d);
+    const fr = {};
+    this.ramps = (def.ramps || []).map((r) => {
+      const l = r.len ?? 8;
+      const start = reverse ? (f(r.at) - l + len) % len : f(r.at);
+      this.frame(start, fr);
+      return { s: start, len: l, h: r.h ?? 1.7, glide: !!r.glide, halfW: fr.hw };
+    });
+    this.boosts = (def.boosts || []).map((b) => ({ s: f(b.at), d: this.sd(b.d ?? 0), len: 7, w: 4.6 }));
+    this.itemRows = (def.items || []).map((at) => f(at));
+    this.gemLines = (def.gems || []).map((g) => ({ s: f(g.at), d: this.sd(g.d ?? 0), n: g.n ?? 5 }));
+    this.obstacles = (def.obstacles || []).map((o) => ({ ...o, s: f(o.at) }));
+
+    // Bounds
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = 0;
+    for (let i = 0; i < this.count; i++) {
+      minX = Math.min(minX, this.px[i]); maxX = Math.max(maxX, this.px[i]);
+      minZ = Math.min(minZ, this.pz[i]); maxZ = Math.max(maxZ, this.pz[i]);
+      maxY = Math.max(maxY, this.py[i]);
+    }
+    this.bounds = { minX, maxX, minZ, maxZ, maxY };
+    this.center = new THREE.Vector3((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
+    this.radius = Math.max(maxX - minX, maxZ - minZ) / 2;
+
+    this._findBridges();
+    this.shortcuts = (def.shortcuts || []).map((sc, n) => new Shortcut(this, sc, n));
+    this._grid = null;
+  }
+
+  // Mark samples where this road passes over another part of itself.
+  _findBridges() {
+    const skip = Math.ceil(40 / this.ds);
+    for (let i = 0; i < this.count; i++) {
+      for (let j = 0; j < this.count; j++) {
+        let di = Math.abs(i - j);
+        di = Math.min(di, this.count - di);
+        if (di < skip) continue;
+        const dx = this.px[i] - this.px[j], dz = this.pz[i] - this.pz[j];
+        const r = this.wd[i] + this.wd[j] + 3;
+        if (dx * dx + dz * dz < r * r && this.py[i] - this.py[j] > 3.5) {
+          for (let k = -4; k <= 4; k++) this.bridge[this.I(i + k)] = 1;
+          break;
+        }
+      }
+    }
+  }
+
+  // Minimum distance from (x,z) to any drivable centreline (for scenery placement).
+  clearance(x, z) {
+    let best = Infinity;
+    for (let i = 0; i < this.count; i += 2) {
+      const dx = x - this.px[i], dz = z - this.pz[i];
+      const d = Math.sqrt(dx * dx + dz * dz) - this.wd[i];
+      if (d < best) best = d;
+    }
+    for (const sc of this.shortcuts) {
+      for (let i = 0; i < sc.count; i += 2) {
+        const dx = x - sc.px[i], dz = z - sc.pz[i];
+        const d = Math.sqrt(dx * dx + dz * dz) - sc.wd[i];
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+
   distToCenter(x, z) {
     let best = Infinity;
-    for (let i = 0; i < this.N; i += 2) {
+    for (let i = 0; i < this.count; i += 2) {
       const dx = x - this.px[i], dz = z - this.pz[i];
       const d = dx * dx + dz * dz;
       if (d < best) best = d;
@@ -315,12 +455,223 @@ export class Track {
 
   gridSlot(k) {
     const s = this.length - 8 - k * 3.4;
-    const d = (k % 2 === 0 ? -1 : 1) * Math.min(4, this.halfRoad - 2.5);
+    const fr = this.frame(s, {});
+    const d = (k % 2 === 0 ? -1 : 1) * Math.min(4, fr.hw - 2.5);
     return { s, d };
+  }
+
+  // Keep an object (kart or projectile) inside the drivable space, switching
+  // between the main loop and shortcuts through wall gaps. Returns the speed
+  // of any wall impact. o: { pos, vel, path, seg, trk }.
+  resolve(o, radius, bounce = 0.45) {
+    const p = o.path || this;
+    const trk = p.project(o.pos.x, o.pos.z, o.seg, o.trk);
+    o.seg = trk.idx;
+    const lim = trk.wd - radius;
+    if (p === this) {
+      if (Math.abs(trk.d) <= lim) return 0;
+      const side = trk.d > 0 ? 1 : 0;
+      const owner = this.gap[side][trk.idx];
+      if (owner) {
+        const sc = this.shortcuts[owner - 1];
+        const t2 = sc.project(o.pos.x, o.pos.z, -1, _tmpTrk);
+        if (t2.over === 0 && Math.abs(t2.d) < t2.wd - radius * 0.5) {
+          o.path = sc;
+          o.seg = t2.idx;
+          Object.assign(o.trk, t2);
+          return 0;
+        }
+      }
+      return this._push(o, trk, lim, bounce);
+    }
+    // On a shortcut
+    if (trk.over === 0 && Math.abs(trk.d) <= lim) return 0;
+    const m = this.project(o.pos.x, o.pos.z, p.mainHint(trk.s), _tmpTrk);
+    if (Math.abs(m.d) < m.wd - radius * 0.3) {
+      o.path = this;
+      o.seg = m.idx;
+      Object.assign(o.trk, m);
+      return 0;
+    }
+    if (trk.over !== 0) {
+      // Past the end of a branch without reaching the main road: step back.
+      const sg = Math.sign(trk.over);
+      o.pos.x -= trk.tx * trk.over;
+      o.pos.z -= trk.tz * trk.over;
+      const vn = (o.vel.x * trk.tx + o.vel.z * trk.tz) * sg;
+      if (vn > 0) { o.vel.x -= trk.tx * sg * vn * (1 + bounce); o.vel.z -= trk.tz * sg * vn * (1 + bounce); }
+      p.project(o.pos.x, o.pos.z, o.seg, trk);
+      return vn;
+    }
+    return this._push(o, trk, lim, bounce, p);
+  }
+
+  _push(o, trk, lim, bounce, path = this) {
+    const sg = Math.sign(trk.d);
+    const push = Math.abs(trk.d) - lim;
+    o.pos.x -= trk.rx * sg * push;
+    o.pos.z -= trk.rz * sg * push;
+    trk.d -= sg * push;
+    trk.y = path.heightAtFrame(trk, trk.d);
+    const vn = (o.vel.x * trk.rx + o.vel.z * trk.rz) * sg;
+    if (vn > 0) {
+      o.vel.x -= trk.rx * sg * vn * (1 + bounce);
+      o.vel.z -= trk.rz * sg * vn * (1 + bounce);
+      return vn;
+    }
+    return 0;
+  }
+
+  // Attach without pushing (for remote karts whose position is authoritative elsewhere).
+  attach(o) {
+    const p = o.path || this;
+    const trk = p.project(o.pos.x, o.pos.z, o.seg, o.trk);
+    o.seg = trk.idx;
+    if (Math.abs(trk.d) <= trk.wd + 1 && trk.over === 0) return;
+    if (p === this) {
+      for (const sc of this.shortcuts) {
+        const t2 = sc.project(o.pos.x, o.pos.z, -1, _tmpTrk);
+        if (t2.over === 0 && Math.abs(t2.d) < t2.wd) { o.path = sc; o.seg = t2.idx; Object.assign(o.trk, t2); return; }
+      }
+    } else {
+      o.path = this;
+      o.seg = -1;
+      this.project(o.pos.x, o.pos.z, -1, o.trk);
+      o.seg = o.trk.idx;
+    }
+  }
+
+  // Progress along the main loop for an object that may be on a shortcut.
+  mainS(o) {
+    return o.path && o.path !== this ? o.path.toMain(o.trk.s) : o.trk.s;
   }
 }
 
+// An open branch leaving the main loop through a gap in its wall and
+// rejoining it further on.
+export class Shortcut extends Path {
+  constructor(main, def, id) {
+    const L = main.length;
+    const rev = main.reverse;
+    const mapAt = (at) => (rev ? (1 - at + 1) % 1 : at);
+    let from = mapAt(def.from), to = mapAt(def.to);
+    let inner = (def.pts || []).map((p) => [mapAt(p[0]), rev ? -p[1] : p[1], p[2]]);
+    const k = main.def.scale ?? 1;
+    // World-space waypoints [x, z, y?] in track units (scaled like the main points).
+    let world = (def.wpts || []).map((p) => new THREE.Vector3(p[0] * k, p[2] ?? NaN, p[1] * k));
+    if (rev) {
+      [from, to] = [to, from];
+      inner = inner.reverse();
+      world = world.reverse();
+    }
+    const fr = {};
+    // Work out which side of the main road the branch leaves from its first waypoint.
+    let side = rev ? -(def.side || 1) : def.side || 1;
+    if (world.length || inner.length) {
+      const probe = {};
+      if (world.length) main.project(world[0].x, world[0].z, -1, probe);
+      else probe.d = inner[0][1];
+      side = Math.sign(probe.d) || side;
+    }
+    const P = [];
+    const add = (at, d, y) => {
+      main.frame(at * L, fr);
+      const dd = clamp(d, -fr.wd, fr.wd);
+      const yy = y !== undefined && y !== null ? y : Math.abs(d) <= fr.wd ? main.heightAtFrame(fr, dd) : main.heightAtFrame(fr, Math.sign(d) * fr.wd);
+      P.push(new THREE.Vector3(fr.x + fr.rx * d, yy, fr.z + fr.rz * d));
+    };
+    main.frame(from * L, fr);
+    add(from, side * Math.max(1, fr.hw - 3));
+    for (const p of inner) add(p[0], p[1], p[2]);
+    const tmp = {};
+    for (const w of world) {
+      if (Number.isNaN(w.y)) {
+        main.project(w.x, w.z, -1, tmp);
+        w.y = tmp.baseY;
+      }
+      P.push(w);
+    }
+    main.frame(to * L, fr);
+    add(to, side * Math.max(1, fr.hw - 3));
+    const surf = SURFACES[def.surface] || SURFACES.road;
+    super(P, { closed: false, width: def.width ?? 10, curb: 0.6, shoulder: def.shoulder ?? 1.4, wallH: def.wallH ?? 1.1, bank: 0,
+      offroad: !!surf.offroad, grip: surf.grip });
+    this.main = main;
+    this.id = id;
+    this.def = def;
+    this.name = def.name || 'Shortcut';
+    this.side = side;
+    this.surface = def.surface || 'road';
+    this.speedMul = surf.speed;
+    const flip = (a) => (rev ? 1 - a : a);
+    this.voids = (def.voids || []).map((v) => {
+      const a = rev ? 1 - v.at - v.len : v.at;
+      return { s0: a * this.length, s1: (a + v.len) * this.length };
+    });
+    this.obstacles = (def.obstacles || []).map((o) => ({ ...o, s: flip(o.at) * this.length, path: this }));
+    this.fromS = from * L;
+    let toS = to * L;
+    if (toS < this.fromS) toS += L;
+    this.toS = toS;
+    this.gems = (def.gems || []).map((g) => ({ s: flip(g.at) * this.length, d: g.d ?? 0, n: g.n ?? 4 }));
+    this.boosts = (def.boosts || []).map((b) => ({ s: Math.max(0, flip(b.at) * this.length - (rev ? 6 : 0)), d: b.d ?? 0, len: 6, w: 4 }));
+    // Ramps must still rise in the driving direction when the track is reversed.
+    // Jumps over gaps always get their ramp right before the gap.
+    const r0 = (def.ramps || [])[0] || {};
+    if (this.voids.length) {
+      const l = r0.len ?? 8;
+      this.ramps = this.voids.map((v) => ({ s: Math.max(0, v.s0 - l), len: l, h: r0.h ?? 2.2, glide: !!r0.glide, halfW: 99 }));
+    } else {
+      this.ramps = (def.ramps || []).map((r) => {
+        const l = r.len ?? 7;
+        return { s: rev ? flip(r.at) * this.length - l : r.at * this.length, len: l, h: r.h ?? 1.8, glide: !!r.glide, halfW: 99 };
+      });
+    }
+    this.itemRows = (def.items || []).map((at) => flip(at) * this.length);
+    this._link();
+  }
+
+  toMain(s) {
+    const u = clamp(s / this.length, 0, 1);
+    return (this.fromS + (this.toS - this.fromS) * u) % this.main.length;
+  }
+
+  mainHint(s) {
+    return Math.round(this.toMain(s) / this.main.ds) % this.main.count;
+  }
+
+  // Cut matching gaps into the main wall and mark where our own walls merge.
+  _link() {
+    const m = this.main;
+    const t = {};
+    this.overlap = new Uint8Array(this.count);
+    for (let i = 0; i < this.count; i++) {
+      m.project(this.px[i], this.pz[i], -1, t);
+      const reach = Math.abs(t.d);
+      const w = this.wd[i];
+      if (reach - w < t.wd + 0.5) this.overlap[i] = 1;
+      if (reach - w * 1.2 < t.wd + 1 && reach + w * 1.2 > t.wd - 1) {
+        const span = Math.ceil((w * 2) / m.ds) + 1;
+        const sideIdx = t.d > 0 ? 1 : 0;
+        for (let k = -span; k <= span; k++) m.gap[sideIdx][m.I(t.idx + k)] = this.id + 1;
+      }
+    }
+    // Keep a little wall at the very end of the overlap so the branch is not wide open.
+    this.entryEnd = this.overlap.indexOf(0);
+    const lastOut = this.overlap.lastIndexOf(0);
+    this.exitStart = lastOut >= 0 ? lastOut + 1 : this.count;
+  }
+}
+
+export const SURFACES = {
+  road: { speed: 1, grip: 1 },
+  dirt: { speed: 0.87, grip: 0.9 },
+  offroad: { speed: 1, grip: 0.85, offroad: true },
+  ice: { speed: 1.03, grip: 0.32 },
+};
+
 const _fr = {};
+const _tmpTrk = {};
 let _segDist = 0;
 function segProj(ax, az, bx, bz, x, z) {
   const vx = bx - ax, vz = bz - az;
@@ -333,16 +684,17 @@ function segProj(ax, az, bx, bz, x, z) {
 }
 
 function finishGeo(pos, uv, idx, expected) {
-  // Make sure the first triangle faces the expected way; flip all if not.
-  const i0 = idx[0] * 3, i1 = idx[1] * 3, i2 = idx[2] * 3;
-  const ax = pos[i1] - pos[i0], ay = pos[i1 + 1] - pos[i0 + 1], az = pos[i1 + 2] - pos[i0 + 2];
-  const bx = pos[i2] - pos[i0], by = pos[i2 + 1] - pos[i0 + 1], bz = pos[i2 + 2] - pos[i0 + 2];
-  const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-  if (nx * expected[0] + ny * expected[1] + nz * expected[2] < 0) {
-    for (let k = 0; k < idx.length; k += 3) {
-      const t = idx[k + 1];
-      idx[k + 1] = idx[k + 2];
-      idx[k + 2] = t;
+  if (idx.length >= 3) {
+    const i0 = idx[0] * 3, i1 = idx[1] * 3, i2 = idx[2] * 3;
+    const ax = pos[i1] - pos[i0], ay = pos[i1 + 1] - pos[i0 + 1], az = pos[i1 + 2] - pos[i0 + 2];
+    const bx = pos[i2] - pos[i0], by = pos[i2 + 1] - pos[i0 + 1], bz = pos[i2 + 2] - pos[i0 + 2];
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    if (nx * expected[0] + ny * expected[1] + nz * expected[2] < 0) {
+      for (let k = 0; k < idx.length; k += 3) {
+        const tt = idx[k + 1];
+        idx[k + 1] = idx[k + 2];
+        idx[k + 2] = tt;
+      }
     }
   }
   const g = new THREE.BufferGeometry();

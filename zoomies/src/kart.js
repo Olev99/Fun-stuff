@@ -1,14 +1,25 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp } from './util.js';
 import { kartGeometry, WHEELS } from './characters.js';
-import { toonMat } from './util.js';
+import { toonMat, GeoBuilder } from './util.js';
 
 const GRAVITY = 34;
 const DRIFT_COLORS = [null, '#43c8ff', '#ff9a1f', '#d45cff'];
 const DRIFT_THRESH = [0, 0.85, 1.9, 3.1];
 const DRIFT_BOOST = [0, 0.75, 1.25, 1.8];
 
-let _shieldGeo, _shieldMat, _shadowGeo, _shadowMat;
+let _shieldGeo, _shieldMat, _shadowGeo, _shadowMat, _gliderGeo;
+function gliderGeometry() {
+  if (_gliderGeo) return _gliderGeo;
+  const B = new GeoBuilder();
+  B.add(new THREE.BoxGeometry(4.2, 0.08, 1.3), '#ffffff', [0, 2.7, -0.3], [0.12, 0, 0]);
+  B.add(new THREE.BoxGeometry(2.1, 0.1, 1.32), '#ff5a8a', [-1.05, 2.72, -0.3], [0.12, 0, 0]);
+  B.add(new THREE.BoxGeometry(0.5, 0.12, 1.34), '#ffd23f', [0, 2.74, -0.3], [0.12, 0, 0]);
+  for (const x of [-0.7, 0.7]) B.add(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 4), '#2a2438', [x, 1.95, -0.3], [0, 0, x * 0.4]);
+  _gliderGeo = B.build();
+  _gliderGeo.userData.shared = true;
+  return _gliderGeo;
+}
 export function kartShared(shadowTex) {
   if (!_shieldGeo) {
     _shieldGeo = new THREE.SphereGeometry(1.95, 20, 14);
@@ -43,6 +54,11 @@ export class Kart {
     this.weight = 0.8 + st.weight * 0.1;
     this.grip = 9 * (race.trackDef.grip ?? 1);
     this.driftGrip = 2.6 * (race.trackDef.grip ?? 1);
+    this.path = race.track;
+    this.gliding = false;
+    this.respawnT = 0;
+    this.lastRamp = null;
+    this.safeS = 0;
     this.speedMul = 1; // AI rubber banding / difficulty
 
     this.ctl = { steer: 0, throttle: 0, brake: false, drift: false, item: false };
@@ -66,6 +82,8 @@ export class Kart {
     this.spinDur = 1;
     this.invuln = 0;
     this.starTime = 0;
+    this.rocketTime = 0;
+    this.magnetTime = 0;
     this.shrinkTime = 0;
     this.shield = 0;
     this.airTime = 0;
@@ -130,6 +148,9 @@ export class Kart {
       this.body.add(pivot);
       return { pivot, spin, def: w };
     });
+    this.gliderMesh = new THREE.Mesh(gliderGeometry(), this.mat);
+    this.gliderMesh.visible = false;
+    this.body.add(this.gliderMesh);
     this.shieldMesh = new THREE.Mesh(sh._shieldGeo, sh._shieldMat);
     this.shieldMesh.position.y = 0.95;
     this.shieldMesh.visible = false;
@@ -147,15 +168,19 @@ export class Kart {
   }
 
   get topSpeed() {
-    let top = this.baseTop * this.speedMul * (1 + this.gems * 0.009);
+    let top = this.baseTop * this.speedMul * (1 + this.gems * 0.009) * this.path.speedMul;
     if (this.shrinkTime > 0) top *= 0.78;
     if (this.starTime > 0) top *= 1.14;
-    if (this.offroad && this.boostTime <= 0 && this.starTime <= 0) top *= 0.5;
+    if (this.magnetTime > 0) top *= 1.08;
+    if (this.rocketTime > 0) top *= 1.5;
+    if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) top *= 0.5;
     if (this.boostTime > 0) top *= 1.32;
     return top;
   }
 
   placeAt(s, d) {
+    this.path = this.track;
+    this.seg = -1;
     const fr = this.track.frame(s, {});
     this.pos.set(fr.x + fr.rx * d, 0, fr.z + fr.rz * d);
     this.yaw = Math.atan2(fr.tx, fr.tz);
@@ -183,7 +208,7 @@ export class Kart {
   }
 
   hit(kind = 'spin') {
-    if (this.starTime > 0 || this.invuln > 0 || this.finishedLock) return false;
+    if (this.starTime > 0 || this.rocketTime > 0 || this.invuln > 0 || this.finishedLock) return false;
     if (this.shield > 0) {
       this.shield = 0;
       this.invuln = 0.6;
@@ -217,6 +242,11 @@ export class Kart {
     this.events.length = 0;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.starTime > 0) this.starTime -= dt;
+    if (this.rocketTime > 0) {
+      this.rocketTime -= dt;
+      if (this.rocketTime <= 0) this.invuln = Math.max(this.invuln, 1);
+    }
+    if (this.magnetTime > 0) this.magnetTime -= dt;
     if (this.shrinkTime > 0) this.shrinkTime -= dt;
     if (this.shield > 0) this.shield -= dt;
     if (this.boostTime > 0) this.boostTime -= dt;
@@ -233,7 +263,8 @@ export class Kart {
       return;
     }
 
-    const spinning = this.spinTime > 0;
+    if (this.respawnT > 0) this.respawnT -= dt;
+    const spinning = this.spinTime > 0 || this.respawnT > 0.3;
     const steerIn = spinning ? 0 : clamp(c.steer, -1, 1);
     this.steerS = damp(this.steerS, steerIn, 14, dt);
 
@@ -296,7 +327,7 @@ export class Kart {
     } else {
       vf = damp(vf, 0, 0.8, dt);
     }
-    if (this.boostTime > 0 && vf < top * 0.97) vf = damp(vf, top, 4, dt);
+    if ((this.boostTime > 0 || this.rocketTime > 0) && vf < top * 0.97) vf = damp(vf, top, 4, dt);
 
     // Steering
     const sf = clamp(spd / 9, 0, 1) * (1 - 0.16 * clamp(spd / this.baseTop, 0, 1.3));
@@ -325,7 +356,8 @@ export class Kart {
     rxk = -fz; rzk = fx;
     vf = vx * fx + vz * fz;
     vl = vx * rxk + vz * rzk;
-    const grip = !this.grounded ? 0.8 : this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip;
+    const gm = this.path.gripMul;
+    const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm;
     vl *= Math.exp(-grip * dt);
     vx = fx * vf + rxk * vl;
     vz = fz * vf + rzk * vl;
@@ -334,48 +366,41 @@ export class Kart {
     this.pos.x += vx * dt;
     this.pos.z += vz * dt;
 
-    // Track projection
-    const trk = tr.project(this.pos.x, this.pos.z, this.seg, this.trk);
-    this.seg = trk.idx;
-
-    // Walls
-    const lim = tr.wallD - 1.15;
-    if (Math.abs(trk.d) > lim) {
-      const sg = Math.sign(trk.d);
-      const push = Math.abs(trk.d) - lim;
-      this.pos.x -= trk.rx * sg * push;
-      this.pos.z -= trk.rz * sg * push;
-      trk.d -= sg * push;
-      const vn = (this.vel.x * trk.rx + this.vel.z * trk.rz) * sg;
-      if (vn > 0) {
-        this.vel.x -= trk.rx * sg * vn * 1.45;
-        this.vel.z -= trk.rz * sg * vn * 1.45;
-        if (vn > 4) {
-          const k = clamp(1 - vn * 0.012, 0.72, 0.97);
-          this.vel.x *= k;
-          this.vel.z *= k;
-          this.emit('wall', vn);
-          if (vn > 13 && this.drifting) {
-            this.drifting = false;
-            this.driftCharge = 0;
-            this.driftLevel = 0;
-          }
-        }
-        // nudge heading to slide along the wall instead of grinding into it
-        const along = Math.atan2(trk.tx, trk.tz);
-        const fwdDot = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
-        const target = fwdDot >= 0 ? along : along + Math.PI;
-        let dy = target - this.yaw;
-        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        this.yaw += dy * Math.min(1, dt * 3);
-      }
-      trk.y = tr.heightAtFrame(trk, trk.d);
+    // Track projection and walls; may switch between main road and shortcuts.
+    const prevPath = this.path;
+    const vn = tr.resolve(this, 1.15, 0.45);
+    const trk = this.trk;
+    if (this.path !== prevPath) {
+      if (this.path !== tr) this.emit('shortcut', this.path);
+      this.seg = trk.idx;
     }
-    this.offroad = Math.abs(trk.d) > tr.edgeD - 0.3;
+    if (vn > 0) {
+      if (vn > 4) {
+        const k = clamp(1 - vn * 0.012, 0.72, 0.97);
+        this.vel.x *= k;
+        this.vel.z *= k;
+        this.emit('wall', vn);
+        if (vn > 13 && this.drifting) {
+          this.drifting = false;
+          this.driftCharge = 0;
+          this.driftLevel = 0;
+        }
+      }
+      // nudge heading to slide along the wall instead of grinding into it
+      const along = Math.atan2(trk.tx, trk.tz);
+      const fwdDot = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
+      const target = fwdDot >= 0 ? along : along + Math.PI;
+      let dy = target - this.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      this.yaw += dy * Math.min(1, dt * 3);
+    }
+    this.offroad = this.path.offroadAll || Math.abs(trk.d) > trk.ed - 0.3;
 
     // Vertical motion
-    const groundY = trk.y;
-    const rampH = tr.rampHeight(trk.s, trk.d);
+    const overVoid = this.path.voids.length > 0 && this.path.isVoid(trk.s);
+    const groundY = overVoid ? -80 : trk.y;
+    const rampH = this.path.rampHeight(trk.s, trk.d);
+    const ramp = rampH > 0 ? this.path.rampAt(trk.s, trk.d) : null;
     if (this.grounded) {
       if (groundY < this.pos.y - 0.5) {
         this.grounded = false;
@@ -384,6 +409,11 @@ export class Kart {
           this.rampAir = true;
           this.trickWindow = 0.55;
           this.trickDone = false;
+          if (this.lastRamp && this.lastRamp.glide) {
+            this.gliding = true;
+            this.vy += 3;
+            this.emit('glide');
+          }
           this.emit('ramp');
         }
       } else {
@@ -392,23 +422,35 @@ export class Kart {
       }
     }
     this.lastRampH = rampH;
+    this.lastRamp = ramp;
     if (!this.grounded) {
-      this.vy -= GRAVITY * dt;
+      if (this.gliding) {
+        this.vy -= GRAVITY * 0.28 * dt;
+        if (this.vy < -5) this.vy = -5;
+      } else this.vy -= GRAVITY * dt;
       this.pos.y += this.vy * dt;
       this.airTime += dt;
       if (this.pos.y <= groundY) {
-        this.pos.y = groundY;
-        this._land();
+        // Only land if we actually reach the surface; falling short of the
+        // far edge of a gap means we are in the pit.
+        if (groundY - this.pos.y < 2.5 || this.path.voids.length === 0) {
+          this.pos.y = groundY;
+          this._land();
+        }
       }
+      if (this.pos.y < trk.y - 14) this._fall();
     }
+    if (this.grounded && this.path === tr) this.safeS = trk.s;
 
-    // Progress & laps
+    // Progress & laps (shortcuts map onto the main loop)
     const L = tr.length;
-    const dS = trk.s - this.lastS;
+    const ms = tr.mainS(this);
+    const dS = ms - this.lastS;
     if (dS < -L / 2) this.laps++;
     else if (dS > L / 2) this.laps--;
-    this.lastS = trk.s;
-    this.total = this.laps * L + trk.s;
+    this.lastS = ms;
+    this.mainPos = ms;
+    this.total = this.laps * L + ms;
 
     // Wrong way detection
     const heading = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
@@ -421,9 +463,34 @@ export class Kart {
     if (itemEdge) this.emit('useItem');
   }
 
+  _fall() {
+    // Dropped into a gap: a drone plucks you back onto the main road.
+    const tr = this.track;
+    const s = this.path !== tr ? (this.path.fromS - 6 + tr.length) % tr.length : this.safeS;
+    const fr = tr.frame(s, {});
+    this.path = tr;
+    this.seg = -1;
+    this.pos.set(fr.x, 0, fr.z);
+    tr.project(this.pos.x, this.pos.z, -1, this.trk);
+    this.seg = this.trk.idx;
+    this.pos.y = this.trk.y + 5;
+    this.yaw = Math.atan2(fr.tx, fr.tz);
+    this.vel.set(0, 0, 0);
+    this.vy = 0;
+    this.grounded = false;
+    this.gliding = false;
+    this.drifting = false;
+    this.driftPending = false;
+    this.boostTime = 0;
+    this.respawnT = 1.1;
+    this.invuln = Math.max(this.invuln, 2);
+    this.emit('fall');
+  }
+
   _land() {
     const hard = this.airTime > 0.3;
     this.grounded = true;
+    this.gliding = false;
     if (hard) {
       this.squash = Math.min(1, this.airTime * 1.4);
       this.emit('land', this.airTime);
@@ -489,7 +556,10 @@ export class Kart {
 
     // Effects on materials
     const m = this.mat;
-    if (this.starTime > 0) {
+    if (this.rocketTime > 0) {
+      m.emissive.set(Math.floor(time * 12) % 2 ? '#ff6a1a' : '#ffd23f');
+      m.emissiveIntensity = 0.6;
+    } else if (this.starTime > 0) {
       m.emissive.setHSL((time * 1.8) % 1, 1, 0.5);
       m.emissiveIntensity = 0.65;
     } else if (this.hitFlash > 0) {
@@ -501,6 +571,8 @@ export class Kart {
     } else {
       m.emissiveIntensity = 0;
     }
+    this.gliderMesh.visible = this.gliding;
+    if (this.gliding) this.gliderMesh.rotation.z = -this.steerS * 0.25;
     this.shieldMesh.visible = this.shield > 0;
     if (this.shield > 0) this.shieldMesh.scale.setScalar(1 + Math.sin(time * 6) * 0.04);
 
@@ -510,7 +582,8 @@ export class Kart {
     this.shadow.rotation.y = this.yaw;
     const sc = root.scale.x * clamp(1 - h * 0.08, 0.4, 1);
     this.shadow.scale.set(sc, 1, sc);
-    this.shadow.material.opacity = 1;
+    this.shadow.visible = !(this.path.voids.length && this.path.isVoid(this.trk.s));
+    this.root.visible = !(this.respawnT > 0.3 && Math.floor(time * 20) % 2 === 0);
   }
 
   // Particle effects
@@ -539,12 +612,13 @@ export class Kart {
       }
     }
     // Boost flames
-    if (this.boostTime > 0 || this.starTime > 0) {
-      for (const sx of [-0.3, 0.3]) {
+    if (this.boostTime > 0 || this.starTime > 0 || this.rocketTime > 0) {
+      const big = this.rocketTime > 0 ? 2 : 1;
+      for (const sx of big > 1 ? [-0.3, 0.3, 0, -0.3, 0.3] : [-0.3, 0.3]) {
         local(sx, 0.72, -1.62, v);
         const cols = this.starTime > 0 ? ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'] : ['#fff3a0', '#ffb020', '#ff6a1f'];
         fx.glow.emit(v[0], v[1], v[2], -fxs * 8 + (Math.random() - 0.5) * 2, 0.5 + Math.random(), -fzs * 8 + (Math.random() - 0.5) * 2,
-          cols[Math.floor(Math.random() * cols.length)], 0.9, 0.2, 0.18 + Math.random() * 0.1, 0, 3);
+          cols[Math.floor(Math.random() * cols.length)], 0.9 * big, 0.2, (0.18 + Math.random() * 0.1) * big, 0, 3);
       }
     }
     // Dust when off-road
@@ -553,6 +627,11 @@ export class Kart {
       local(sx, 0.2, -0.9, v);
       fx.soft.emit(v[0], v[1], v[2], (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3,
         dustColor, 0.7, 2.2, 0.6, -1, 2, 0.6);
+    }
+    // Magnet sparkles
+    if (this.magnetTime > 0 && Math.random() < 0.5) {
+      local((Math.random() - 0.5) * 3, 0.5 + Math.random() * 2, (Math.random() - 0.5) * 3, v);
+      fx.glow.emit(v[0], v[1], v[2], 0, 0.5, 0, '#46f0ff', 0.4, 0.05, 0.4, 0, 1);
     }
     // Rainbow sparkle trail
     if (this.starTime > 0 && Math.random() < 0.8) {

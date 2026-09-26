@@ -46,11 +46,16 @@ export class UI {
     switch (screen) {
       case 'title':
         if (action === 'settings' || action === 'help') this.overlay(action, 'title');
+        else if (action === 'mp') app.openMultiplayer();
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
-        if (action === 'back') app.toTitle();
+        if (this.mode === 'mp') app.mpCharDone();
+        else if (action === 'back') app.toTitle();
         else this.trackSelect();
+        break;
+      case 'lobby':
+        app.onLobbyAction(action);
         break;
       case 'track':
         if (action === 'back') this.charSelect();
@@ -64,7 +69,7 @@ export class UI {
         if (action === 'resume') app.resume();
         else if (action === 'restart') app.restart();
         else if (action === 'settings') this.overlay('settings', 'pause');
-        else if (action === 'quit') app.toTitle();
+        else if (action === 'quit') (app.session ? app.leaveMP() : app.toTitle());
         break;
       case 'results':
         app.onResultsAction(action);
@@ -92,7 +97,9 @@ export class UI {
   // ---------------- Characters ----------------
   charSelect() {
     const app = this.app;
-    $('char-mode').textContent = { gp: 'Grand Prix', quick: 'Quick Race', tt: 'Time Trial' }[this.mode];
+    $('char-mode').textContent = { gp: 'Grand Prix', quick: 'Quick Race', tt: 'Time Trial', mp: 'Multiplayer' }[this.mode];
+    document.querySelector('#scr-char [data-go="next"]').textContent = this.mode === 'mp' ? 'Done' : 'Next';
+    document.querySelector('#scr-char [data-go="back"]').hidden = this.mode === 'mp';
     const grid = $('char-grid');
     if (!grid.children.length) {
       for (const ch of CHARACTERS) {
@@ -138,6 +145,14 @@ export class UI {
       saveSettings(this.app.settings);
       this._syncClass();
     });
+    $('diff-seg').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-diff]');
+      if (!b) return;
+      this.app.audio.play('select');
+      this.app.settings.difficulty = b.dataset.diff;
+      saveSettings(this.app.settings);
+      this._syncClass();
+    });
     $('reverse').addEventListener('change', (e) => {
       this.app.settings.reverse = e.target.checked;
       saveSettings(this.app.settings);
@@ -149,6 +164,11 @@ export class UI {
   _syncClass() {
     document.querySelectorAll('#class-seg [data-cls]').forEach((b) => {
       const on = b.dataset.cls === this.app.settings.speedClass;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on);
+    });
+    document.querySelectorAll('#diff-seg [data-diff]').forEach((b) => {
+      const on = b.dataset.diff === this.app.settings.difficulty;
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on);
     });
@@ -213,6 +233,7 @@ export class UI {
     $('track-title').textContent = gp ? 'Pick a cup' : 'Pick a track';
     $('reverse-wrap').hidden = gp;
     $('class-seg').hidden = this.mode === 'tt';
+    $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
     this._syncClass();
     this._renderTrackCards();
@@ -264,7 +285,7 @@ export class UI {
       const rec = app.records[def.id + (rev ? '-r' : '')];
       const tx = document.createElement('div');
       tx.className = 'tx';
-      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb">${rec && rec.tt ? `Best: ${fmtTime(rec.tt)}` : def.blurb}</span>`;
+      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.laps || 3} laps${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}` : ''}</span><span class="tb">${def.blurb}</span>`;
       b.appendChild(tx);
       b.addEventListener('click', () => {
         app.audio.play('select');
@@ -337,6 +358,73 @@ export class UI {
       const v = inp.tilt.listening ? inp.tiltSteer() : 0;
       $('tilt-dot').style.transform = `translateX(${v * 70}px)`;
       if (inp.tiltLive) $('tilt-status').textContent = `Working. Angle ${Math.round(inp.tilt.angle)}°`;
+    }
+  }
+
+  // ---------------- Multiplayer lobby ----------------
+  lobby(view, error = '') {
+    $('lobby-start').hidden = view !== 'start';
+    $('lobby-room').hidden = view !== 'room';
+    $('lobby-error').textContent = error;
+    if (view === 'start') {
+      $('lobby-status').textContent = '';
+      $('lobby-buttons').innerHTML = '<button class="btn ghost small" data-go="leave">Back</button>';
+    }
+    this.show('lobby');
+    if (view === 'room') this.renderLobby();
+  }
+
+  renderLobby() {
+    const app = this.app;
+    const ses = app.session;
+    if (!ses || this.current !== 'lobby') return;
+    $('room-code').textContent = ses.code || '----';
+    const meId = ses.isHost ? 'host' : ses.meId;
+    const rows = ses.players.map((p, i) => {
+      const ch = charById(p.char);
+      return `<div class="pl${p.id === meId ? ' me' : ''}"><img alt="" src="${app.portraits[ch.id] || ''}"><span>${ch.name}${p.id === meId ? ' (you)' : ''}</span><span class="tag">${i === 0 ? 'HOST' : `P${i + 1}`}</span></div>`;
+    });
+    for (let i = ses.players.length; i < 4; i++) rows.push(`<div class="pl empty"><span></span><span>Waiting for a friend…</span><span></span></div>`);
+    $('lobby-players').innerHTML = rows.join('');
+    const cfg = ses.lobby;
+    const def = trackById(cfg.track);
+    const cls = { chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[cfg.speedClass];
+    const dif = { easy: 'Easy', normal: 'Normal', hard: 'Hard' }[cfg.difficulty];
+    if (ses.isHost) {
+      $('lobby-status').textContent = `${ses.players.length} of 4 players`;
+      $('lobby-settings').innerHTML = `
+        <div class="row"><span class="lbl">Track</span><div class="picker"><button data-lb="track-prev" aria-label="Previous track">◀</button><span>${def.name}${cfg.reverse ? ' ⟲' : ''}</span><button data-lb="track-next" aria-label="Next track">▶</button></div></div>
+        <div class="row"><span class="lbl">Speed</span><div class="seg">${['chill', 'zoom', 'turbo'].map((c) => `<button data-lb="cls-${c}" class="${cfg.speedClass === c ? 'on' : ''}">${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
+        <div class="row"><span class="lbl">Computer racers</span><div class="seg">${['off', 'easy', 'normal', 'hard'].map((d) => `<button data-lb="ai-${d}" class="${(d === 'off' ? !cfg.ai : cfg.ai && cfg.difficulty === d) ? 'on' : ''}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div></div>
+        <div class="row"><span class="lbl">Reverse</span><label class="toggle"><input type="checkbox" data-lb="reverse" ${cfg.reverse ? 'checked' : ''} aria-label="Reverse"></label></div>`;
+      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>Start race</button>`;
+    } else {
+      $('lobby-status').textContent = 'Connected';
+      $('lobby-settings').innerHTML = `<div class="lobby-summary">Track: <b>${def.name}${cfg.reverse ? ' (reverse)' : ''}</b><br>Speed: <b>${cls}</b><br>Computer racers: <b>${cfg.ai ? dif : 'Off'}</b><br><br>The host picks the track and starts the race.</div>`;
+      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button>`;
+    }
+    if (!this._lobbyBound) {
+      this._lobbyBound = true;
+      $('lobby-settings').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-lb]');
+        if (!b || !app.session || !app.session.isHost || b.tagName === 'INPUT') return;
+        app.audio.play('select');
+        const v = b.dataset.lb;
+        const L = app.session.lobby;
+        const idx = TRACKS.findIndex((t) => t.id === L.track);
+        if (v === 'track-prev') app.session.setLobby({ track: TRACKS[(idx - 1 + TRACKS.length) % TRACKS.length].id });
+        else if (v === 'track-next') app.session.setLobby({ track: TRACKS[(idx + 1) % TRACKS.length].id });
+        else if (v.startsWith('cls-')) app.session.setLobby({ speedClass: v.slice(4) });
+        else if (v === 'ai-off') app.session.setLobby({ ai: false });
+        else if (v.startsWith('ai-')) app.session.setLobby({ ai: true, difficulty: v.slice(3) });
+        app.previewTrack(app.session.lobby.track, app.session.lobby.reverse);
+      });
+      $('lobby-settings').addEventListener('change', (e) => {
+        if (e.target.dataset.lb === 'reverse' && app.session && app.session.isHost) {
+          app.session.setLobby({ reverse: e.target.checked });
+          app.previewTrack(app.session.lobby.track, app.session.lobby.reverse);
+        }
+      });
     }
   }
 

@@ -215,6 +215,20 @@ export class Audio {
         this._tone('square', 660, 660, 0.06, 0.08);
         this._tone('square', 990, 990, 0.1, 0.08, 0.06);
         break;
+      case 'warp':
+        this._tone('sine', 300, 1600, 0.4, 0.15);
+        this._tone('triangle', 1600, 300, 0.4, 0.1, 0.35);
+        break;
+      case 'secret':
+        [0, 7, 12, 16, 19, 24].forEach((s, i) => this._tone('triangle', mtof(72 + s), 0, 0.12, 0.12, i * 0.06));
+        break;
+      case 'fall':
+        this._tone('sine', 700, 120, 0.7, 0.18);
+        break;
+      case 'crate':
+        this._noise(0.25, 0.4, 'bandpass', 900, 300, 0, this.sfx, 1.2);
+        this._tone('square', 160, 80, 0.15, 0.12);
+        break;
       case 'burnout':
         this._noise(0.5, 0.3, 'lowpass', 600, 100);
         break;

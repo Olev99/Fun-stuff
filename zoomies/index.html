@@ -59,6 +59,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .btn.alt { background: var(--cream); }
 .btn.hot { background: var(--tang); color: var(--cream); }
 .btn.mint { background: var(--mint); }
+.btn.sky { background: var(--sky); color: var(--ink); }
 .btn.ghost { background: transparent; color: var(--cream); border-color: var(--cream); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
 .btn.small { font-size: 13px; padding: 8px 12px 7px; border-radius: 11px; }
 .btn .sub { display: block; font-family: var(--font-body); font-weight: 700; text-transform: none; font-size: 12px; letter-spacing: 0; margin-top: 3px; opacity: .8; }
@@ -154,6 +155,47 @@ h2.title {
 .seg { display: inline-flex; border: 3px solid var(--ink); border-radius: 12px; overflow: hidden; background: var(--ink-2); box-shadow: 0 4px 0 var(--ink); }
 .seg button { border: 0; background: transparent; color: var(--cream); font-family: var(--font-display); font-size: 12.5px; padding: 8px 12px 7px; cursor: pointer; }
 .seg button.on { background: var(--sun); color: var(--ink); }
+.seg .seg-lbl { font-family: var(--font-display); font-size: 11px; padding: 0 4px 0 10px; align-self: center; color: var(--muted); }
+.tcard .tz { display: inline-block; font-family: var(--font-display); font-size: 9.5px; letter-spacing: .04em; padding: 2px 6px 1px; border-radius: 6px; background: var(--ink); color: var(--sun); margin-right: 4px; }
+.tcard .tz.Medium { color: var(--mint); } .tcard .tz.Long { color: var(--berry); }
+/* Lobby */
+.lobby { width: min(720px, 100%); }
+.lobby-start, .lobby-room { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+@media (max-height: 380px) {
+  .dialog { padding: 10px 12px; gap: 6px; }
+  .pl { padding: 2px 6px; font-size: 13px; }
+  .pl img { width: 28px; height: 28px; }
+  .lobby-settings .row { padding: 4px 8px; }
+  .room-code b { font-size: 28px; }
+}
+.lobby-note { margin: 0; font-weight: 600; font-size: 14px; line-height: 1.35; color: var(--cream); max-width: 60ch; }
+.lobby-choices { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.join-row { display: flex; gap: 8px; align-items: center; }
+#join-code {
+  width: 150px; font-family: var(--font-display); font-size: 24px; letter-spacing: .25em; text-transform: uppercase; text-align: center;
+  padding: 8px 6px 6px; border-radius: 12px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink);
+  -webkit-user-select: text; user-select: text; touch-action: manipulation;
+}
+#join-code:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.lobby-error { min-height: 1.2em; margin: 8px 0 0; font-weight: 800; font-size: 13px; color: var(--berry); }
+.room-code { display: flex; align-items: baseline; gap: 12px; }
+.room-code small { font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
+.room-code b { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 9vh, 46px); letter-spacing: .12em; color: var(--sun); text-shadow: 0 3px 0 var(--ink); }
+.lobby-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; margin-top: 6px; }
+.players { display: grid; gap: 6px; align-content: start; }
+.pl { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 12px; background: rgba(0,0,0,.2); font-weight: 800; font-size: 14px; }
+.pl img { width: 34px; height: 34px; border-radius: 9px; border: 2px solid var(--ink); }
+.pl.me { background: var(--sun); color: var(--ink); }
+.pl .tag { font-family: var(--font-display); font-size: 10px; letter-spacing: .05em; opacity: .75; }
+.pl.empty { opacity: .45; font-weight: 700; font-size: 13px; }
+.lobby-settings { display: grid; gap: 8px; align-content: start; }
+.lobby-settings .row { padding: 6px 8px; }
+.picker { display: flex; align-items: center; gap: 6px; }
+.picker button { width: 34px; height: 34px; border-radius: 10px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); font-family: var(--font-display); font-size: 14px; cursor: pointer; }
+.picker span { font-family: var(--font-display); font-size: 12.5px; min-width: 9em; text-align: center; }
+.lobby-summary { font-weight: 700; font-size: 13px; line-height: 1.5; color: var(--cream); }
+.lobby-summary b { color: var(--sun); font-weight: 800; }
+@media (max-width: 640px) { .lobby-cols { grid-template-columns: 1fr; } }
 .seg button:focus-visible { outline: 3px solid var(--sky); outline-offset: -3px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; cursor: pointer; }
 .toggle input { appearance: none; -webkit-appearance: none; width: 44px; height: 26px; border-radius: 99px; background: var(--ink-3); border: 3px solid var(--ink); position: relative; margin: 0; cursor: pointer; transition: background .15s; }
@@ -382,6 +424,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <button class="btn hot" data-go="gp">Grand Prix<span class="sub">4 races, most points wins</span></button>
     <button class="btn" data-go="quick">Quick Race</button>
     <button class="btn mint" data-go="tt">Time Trial</button>
+    <button class="btn sky" data-go="mp">Multiplayer<span class="sub">Race friends on their phones</span></button>
     <div class="menu-row">
       <button class="btn alt small" data-go="settings">Settings</button>
       <button class="btn alt small" data-go="help">How to play</button>
@@ -417,6 +460,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <div class="seg" id="class-seg" role="radiogroup" aria-label="Speed class">
         <button data-cls="chill">Chill</button><button data-cls="zoom">Zoom</button><button data-cls="turbo">Turbo</button>
       </div>
+      <div class="seg" id="diff-seg" role="radiogroup" aria-label="AI difficulty">
+        <span class="seg-lbl">AI</span><button data-diff="easy">Easy</button><button data-diff="normal">Normal</button><button data-diff="hard">Hard</button>
+      </div>
       <label class="toggle" id="reverse-wrap"><input type="checkbox" id="reverse"> Reverse</label>
     </div>
   </div>
@@ -424,6 +470,31 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   <div class="bottom-bar">
     <button class="btn ghost small" data-go="back">Back</button>
     <button class="btn hot" data-go="race">Race!</button>
+  </div>
+</section>
+
+<section id="scr-lobby" class="screen center shade-full" hidden>
+  <div class="dialog panel lobby">
+    <div class="top-bar"><h2 class="title">Race with friends</h2><span class="eyebrow" id="lobby-status"></span></div>
+    <div id="lobby-start" class="lobby-start">
+      <p class="lobby-note">Up to 4 phones. Everyone needs an internet connection. One phone hosts and gets a room code, and friends type it in to join.</p>
+      <div class="lobby-choices">
+        <button class="btn hot" data-go="host">Host a race</button>
+        <div class="join-row">
+          <input id="join-code" maxlength="4" placeholder="CODE" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Room code">
+          <button class="btn" data-go="join">Join</button>
+        </div>
+      </div>
+      <p class="lobby-error" id="lobby-error" role="alert"></p>
+    </div>
+    <div id="lobby-room" class="lobby-room" hidden>
+      <div class="room-code"><small>Room code</small><b id="room-code">----</b></div>
+      <div class="lobby-cols">
+        <div class="players" id="lobby-players"></div>
+        <div class="lobby-settings" id="lobby-settings"></div>
+      </div>
+    </div>
+    <div class="bottom-bar" id="lobby-buttons"></div>
   </div>
 </section>
 
@@ -459,6 +530,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><b>Rocket start</b>Press and hold DRIFT right after the 2 disappears in the countdown.</div>
         <div><b>Gems</b>Each gem adds a little top speed, up to 10. Getting hit drops 3.</div>
         <div><b>Items</b>Drive through the ? boxes, then tap ITEM to use what you got.</div>
+        <div><b>Secret shortcuts</b>Every track hides one or two. Look for gaps in the wall, stacked crates and odd paths. Some need a boost to be worth it.</div>
+        <div><b>Glide ramps</b>Blue ramps pop out a glider. Steer in the air and land far down the road.</div>
       </div>
       <div class="items-list">
         <div><span>🌶️</span>Chili Boost: instant speed</div>
@@ -468,6 +541,10 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><span>🫧</span>Bubble Shield: blocks one hit</div>
         <div><span>🌈</span>Rainbow Rush: invincible and fast</div>
         <div><span>⛈️</span>Thunder Cloud: zaps everyone ahead</div>
+        <div><span>🪃</span>Boomerang: hits on the way out and back</div>
+        <div><span>🧲</span>Gem Magnet: pulls in gems, small speed-up</div>
+        <div><span>🌀</span>Warp Swirl: teleports you up the road</div>
+        <div><span>🚀</span>Rocket Ride: autopilot at top speed</div>
       </div>
     </div>
     <div class="bottom-bar"><button class="btn" data-go="close">Got it</button></div>

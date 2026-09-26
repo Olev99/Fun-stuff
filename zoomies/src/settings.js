@@ -12,6 +12,7 @@ export const DEFAULTS = {
   sfx: true,
   showFps: false,
   speedClass: 'zoom',
+  difficulty: 'normal',
   char: 'mochi',
   track: 'sprout',
   reverse: false,
