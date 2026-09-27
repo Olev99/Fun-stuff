@@ -170,6 +170,25 @@ h2.title {
 }
 .lobby-note { margin: 0; font-weight: 600; font-size: 14px; line-height: 1.35; color: var(--cream); max-width: 60ch; }
 .lobby-choices { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.nick-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-weight: 800; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+#nick {
+  width: 210px; font-family: var(--font-body); font-weight: 800; font-size: 16px; letter-spacing: 0; text-transform: none; padding: 7px 10px 6px;
+  border-radius: 12px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); -webkit-user-select: text; user-select: text; touch-action: manipulation;
+}
+#nick:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.pl .nk { color: var(--sun); } .pl.me .nk { color: var(--ink); }
+.res .nk small { font-weight: 700; opacity: .7; margin-left: 5px; font-size: 11px; }
+/* Name tags over the karts */
+#hud-tags { position: absolute; inset: 0; overflow: hidden; }
+#hud-tags .tag {
+  position: absolute; left: 0; top: 0; transform-origin: 50% 100%; opacity: 0; will-change: transform, opacity; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px; padding: 2px 8px 1px 3px; border-radius: 10px; background: rgba(29,21,55,.7);
+  border: 2px solid rgba(255,247,232,.5); font-family: var(--font-display); font-size: 11px; color: var(--cream); margin-top: -4px;
+}
+#hud-tags .tag b { font-weight: 400; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px; background: var(--c); color: #1d1537; display: grid; place-items: center; font-size: 10.5px; }
+#hud-tags .tag.friend { font-size: 15px; padding: 3px 11px 2px 4px; border-radius: 12px; background: rgba(29,21,55,.86); border-color: var(--c); box-shadow: 0 3px 0 rgba(0,0,0,.35); margin-top: -10px; }
+#hud-tags .tag.friend b { min-width: 22px; height: 22px; font-size: 13px; border-radius: 11px; }
+#hud-tags .tag.friend::after { content: ""; position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--c); }
 .join-row { display: flex; gap: 8px; align-items: center; }
 #join-code {
   width: 150px; font-family: var(--font-display); font-size: 24px; letter-spacing: .25em; text-transform: uppercase; text-align: center;
@@ -498,6 +517,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 <canvas id="gl"></canvas>
 
 <div id="hud" hidden>
+  <div id="hud-tags"></div>
   <div class="hud-tl">
     <div id="hud-item" class="item-slot"><span id="hud-item-icon"></span><span id="hud-item-count" class="cnt" hidden></span></div>
     <div id="hud-gems" class="gems"><i></i><b>0</b></div>
@@ -650,6 +670,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="top-bar"><h2 class="title">Race with friends</h2><span class="eyebrow" id="lobby-status"></span></div>
     <div id="lobby-start" class="lobby-start">
       <p class="lobby-note">Up to 4 phones. Everyone needs an internet connection. One phone hosts and gets a room code, and friends type it in to join.</p>
+      <label class="nick-row"><span>Your name</span><input id="nick" maxlength="12" placeholder="Shown over your kart" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false"></label>
       <div class="lobby-choices">
         <button class="btn hot" data-go="host">Host a race</button>
         <div class="join-row">
@@ -683,6 +704,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <div class="row"><div class="lbl">Invert tilt</div><label class="toggle"><input type="checkbox" id="set-invert" aria-label="Invert tilt"></label></div>
       <div class="row"><div><div class="lbl">Graphics</div><div class="hint">Ultra is sharpest, Battery skips bloom and saves power. All keep 60 fps by adjusting resolution.</div></div>
         <div class="seg" id="set-quality"><button data-v="auto">Auto</button><button data-v="high">Ultra</button><button data-v="low">Battery</button></div></div>
+      <div class="row"><div><div class="lbl">Name tags</div><div class="hint">Names and places over the other karts. Friends stand out in online races.</div></div>
+        <div class="seg" id="set-tags"><button data-v="all">Everyone</button><button data-v="friends">Friends</button><button data-v="off">Off</button></div></div>
       <div class="row"><div class="lbl">Music</div><label class="toggle"><input type="checkbox" id="set-music" aria-label="Music"></label></div>
       <div class="row"><div><div class="lbl">Sound effects</div><div class="hint">Plays even when the phone is on silent.</div></div><label class="toggle"><input type="checkbox" id="set-sfx" aria-label="Sound effects"></label></div>
       <div class="row"><div class="lbl">Show FPS</div><label class="toggle"><input type="checkbox" id="set-fps" aria-label="Show FPS"></label></div>

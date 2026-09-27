@@ -5,6 +5,7 @@ import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { UI } from './ui.js';
 import { CareerUI } from './careerui.js';
+import { cleanNick } from './nametags.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
 import { CHARACTERS } from './characters.js';
@@ -646,7 +647,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.host(this.settings.char);
+      await ses.host(this.settings.char, this.settings.name);
     } catch (e) {
       ses.close();
       this.ui.lobby('start', `Could not create a room: ${(e && e.message) || e}. Check your internet connection.`);
@@ -668,7 +669,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.join(code, this.settings.char);
+      await ses.join(code, this.settings.char, this.settings.name);
     } catch (e) {
       ses.close();
       this.ui.lobby('start', (e && e.message) || 'Could not connect.');
@@ -717,7 +718,7 @@ class App {
     const L = ses.lobby;
     // Only players we've heard from recently get a kart.
     const now = performance.now();
-    const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char }));
+    const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char, nick: p.nick || p.name }));
     if (humans.length < 2) return;
     const taken = new Set(humans.map((h) => h.char));
     const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, 8 - humans.length)) : [];
@@ -725,7 +726,7 @@ class App {
     const grid = [...ai];
     const hs = shuffle(humans.slice());
     const slots = [];
-    for (const h of hs) { slots.push({ id: h.id, slot: grid.length }); grid.push(h.char); }
+    for (const h of hs) { slots.push({ id: h.id, slot: grid.length, nick: h.nick }); grid.push(h.char); }
     const cfg = { trackId: L.track, reverse: L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
     ses.inRace = true;
     ses.send({ t: 'start', cfg });
@@ -757,6 +758,7 @@ class App {
       mode: 'mp', trackDef: def, reverse: cfg.reverse, grid: cfg.grid, speedClass: cfg.speedClass, difficulty: cfg.difficulty,
       laps: def.laps || 3, net: ses, playerSlot: mine.slot, humans: ses.isHost ? cfg.humans.filter((h) => h.id !== 'host') : [],
       humanSlots: cfg.humans.map((h) => h.slot),
+      nicks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanNick(h.nick)])),
     });
     ses.race = this.race;
     this.race.setSize(this.w, this.h, this.pr);

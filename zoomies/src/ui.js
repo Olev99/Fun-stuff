@@ -4,8 +4,10 @@ import { Track } from './track.js';
 import { THEMES } from './world.js';
 import { fmtTime, ordinal } from './util.js';
 import { saveSettings } from './settings.js';
+import { cleanNick } from './nametags.js';
 
 const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const STAT_NAMES = [['speed', 'Speed'], ['accel', 'Accel'], ['handling', 'Handling'], ['weight', 'Weight']];
 
 export class UI {
@@ -344,6 +346,18 @@ export class UI {
       app.applyQuality();
       this._syncSettings();
     });
+    $('set-tags').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      s().tags = b.dataset.v;
+      saveSettings(s());
+      this._syncSettings();
+    });
+    $('nick').addEventListener('input', (e) => {
+      s().name = cleanNick(e.target.value);
+      saveSettings(s());
+    });
     $('set-sens').addEventListener('input', (e) => { s().tiltSens = +e.target.value; saveSettings(s()); });
     $('set-invert').addEventListener('change', (e) => { s().invertTilt = e.target.checked; saveSettings(s()); });
     $('set-music').addEventListener('change', (e) => { s().music = e.target.checked; app.audio.setMusic(s().music); saveSettings(s()); });
@@ -362,6 +376,7 @@ export class UI {
     const s = this.app.settings;
     document.querySelectorAll('#set-steer [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.steering));
     document.querySelectorAll('#set-quality [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.quality));
+    document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
     $('set-sens').value = s.tiltSens;
     $('set-invert').checked = s.invertTilt;
     $('set-music').checked = s.music;
@@ -385,6 +400,7 @@ export class UI {
     $('lobby-room').hidden = view !== 'room';
     $('lobby-error').textContent = error;
     if (view === 'start') {
+      $('nick').value = this.app.settings.name || '';
       $('lobby-status').textContent = '';
       $('lobby-buttons').innerHTML = '<button class="btn ghost small" data-go="leave">Back</button>';
     }
@@ -400,7 +416,8 @@ export class UI {
     const meId = ses.isHost ? 'host' : ses.meId;
     const rows = ses.players.map((p, i) => {
       const ch = charById(p.char);
-      return `<div class="pl${p.id === meId ? ' me' : ''}"><img alt="" src="${app.portraits[ch.id] || ''}"><span>${ch.name}${p.id === meId ? ' (you)' : ''}</span><span class="tag">${i === 0 ? 'HOST' : `P${i + 1}`}</span></div>`;
+      const who = p.nick ? `<span class="nk">${esc(p.nick)}</span> · ${ch.name}` : ch.name;
+      return `<div class="pl${p.id === meId ? ' me' : ''}"><img alt="" src="${app.portraits[ch.id] || ''}"><span>${who}${p.id === meId ? ' (you)' : ''}</span><span class="tag">${i === 0 ? 'HOST' : `P${i + 1}`}</span></div>`;
     });
     for (let i = ses.players.length; i < 4; i++) rows.push(`<div class="pl empty"><span></span><span>Waiting for a friend…</span><span></span></div>`);
     $('lobby-players').innerHTML = rows.join('');
@@ -457,6 +474,7 @@ export class UI {
 
   row(r, extra = '') {
     const img = this.app.portraits[r.ch.id] || '';
-    return `<div class="res${r.isPlayer ? ' me' : ''}"><span class="p">${r.place}${ordinal(r.place).toLowerCase()}</span><img alt="" src="${img}"><span>${r.ch.name}</span>${extra}</div>`;
+    const name = r.nick ? `<span class="nk">${esc(r.nick)}<small>${r.ch.name}</small></span>` : `<span>${r.ch.name}</span>`;
+    return `<div class="res${r.isPlayer ? ' me' : ''}"><span class="p">${r.place}${ordinal(r.place).toLowerCase()}</span><img alt="" src="${img}">${name}${extra}</div>`;
   }
 }

@@ -61,7 +61,7 @@ Hold the phone sideways like a steering wheel and turn it to steer. **Settings**
 
 ## Racing with friends
 
-1. Everyone opens the game (same link) and taps **Multiplayer**.
+1. Everyone opens the game (same link), taps **Multiplayer** and types a name. The name floats over your kart on your friends' screens.
 2. One player taps **Host a race** and gets a 4-letter room code.
 3. Friends type the code and tap **Join**. Up to 4 phones can play, and each player picks a racer.
 4. The host picks the track, speed and computer racers (Off, Easy, Normal or Hard), then taps **Start race**.
@@ -86,6 +86,7 @@ How it works:
 | Pause | **II** button | Esc / P |
 
 - **Rocket start:** press and hold DRIFT right after the "2" disappears.
+- **Name tags:** the other karts show their name and current place above them, so you can see when you pass someone. In online races, friends get big tags in their kart colour that show from far away; computer racers get small tags up close. Settings switches tags between Everyone, Friends and Off.
 - **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are slow unless you hit them with a boost.
 - **Gems:** each one adds a little top speed, up to 10. Getting hit drops 3.
 
@@ -119,6 +120,7 @@ zoomies/
   src/world.js        sky, terrain, lakes, walls, scenery and landmarks per theme
   src/characters.js   racers and their procedural models
   src/karts.js        kart bodies, upgrades and kart stats
+  src/nametags.js     name and place tags floating over the karts
   src/ai.js           computer drivers and difficulty levels
   src/items.js        items, item boxes, gems, obstacles, crates
   src/input.js        tilt, touch and keyboard input

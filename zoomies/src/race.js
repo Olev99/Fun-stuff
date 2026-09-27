@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Track } from './track.js';
 import { World } from './world.js';
 import { Kart } from './kart.js';
+import { NameTags } from './nametags.js';
 import { AIDriver, DIFFICULTY } from './ai.js';
 import { ItemSystem } from './items.js';
 import { FX } from './particles.js';
@@ -115,6 +116,7 @@ export class Race {
     this.found = new Set();
 
     this._makeKarts(opts);
+    this.tags = new NameTags(this, this.app.settings.tags || 'all');
     this.items = new ItemSystem(this, !!(this.net && this.net.isGuest));
     if (this.mode === 'tt' && this.player) {
       this.player.item = 'chili';
@@ -157,6 +159,7 @@ export class Race {
       const isPlayer = this.mode === 'mp' ? i === this.mySlot : this.mode !== 'demo' && id === opts.player;
       const lo = (opts.loadouts && opts.loadouts[i]) || (isPlayer && opts.playerLoadout) || {};
       const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body, upgrades: lo.upgrades, paint: lo.paint });
+      k.nick = (opts.nicks && opts.nicks[i]) || null;
       const slot = tr.gridSlot(i);
       k.placeAt(slot.s, this.mode === 'tt' ? 0 : slot.d);
       if (isPlayer) this.player = k;
@@ -252,6 +255,7 @@ export class Race {
     this._updateSkids(dt);
     this.fx.update(dt);
     this._updateCamera(dt);
+    this.tags.update(this.camera, this.app.w, this.app.h);
     this.world.update(dt, this.camera, this.player ? this.player.pos : this.karts[this.demoTarget % this.karts.length].pos);
     this._netSend(dt);
 
@@ -531,7 +535,7 @@ export class Race {
   }
 
   _finishResults() {
-    const rows = this.karts.map((k) => ({ ch: k.ch, time: this._estimate(k), isPlayer: k.isPlayer, finished: k.finished, lapTimes: k.lapTimes.slice(), slot: k.index }));
+    const rows = this.karts.map((k) => ({ ch: k.ch, nick: k.nick, time: this._estimate(k), isPlayer: k.isPlayer, finished: k.finished, lapTimes: k.lapTimes.slice(), slot: k.index }));
     rows.sort((a, b) => a.time - b.time);
     rows.forEach((r, i) => (r.place = i + 1));
     this.results = rows;
@@ -863,7 +867,7 @@ export class Race {
         if (this.player) this.player.hit(msg.kind);
         break;
       case 'results': {
-        const rows = msg.rows.map((r) => ({ ch: charById(r.id), time: r.time, finished: r.finished, place: r.place, isPlayer: r.slot === this.mySlot, slot: r.slot, lapTimes: [] }));
+        const rows = msg.rows.map((r) => ({ ch: charById(r.id), nick: this.karts[r.slot] && this.karts[r.slot].nick, time: r.time, finished: r.finished, place: r.place, isPlayer: r.slot === this.mySlot, slot: r.slot, lapTimes: [] }));
         this.results = rows;
         this.app.onRaceComplete(this, rows);
         break;
@@ -999,6 +1003,7 @@ export class Race {
   }
 
   dispose() {
+    this.tags.dispose();
     this.world.dispose();
     this.items.dispose();
     this.fx.dispose();

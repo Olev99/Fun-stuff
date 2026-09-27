@@ -16,6 +16,8 @@ export const DEFAULTS = {
   char: 'mochi',
   track: 'sprout',
   reverse: false,
+  name: '', // multiplayer nickname
+  tags: 'all', // name tags over karts: all | friends | off
 };
 
 export function loadSettings() {
