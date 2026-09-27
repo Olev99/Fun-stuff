@@ -295,9 +295,11 @@ export class UI {
       this._thumb(cv, [def], rev);
       b.appendChild(cv);
       const rec = app.records[def.id + (rev ? '-r' : '')];
+      const nSc = (def.shortcuts || []).length;
+      const nFound = ((app.records.found || {})[def.id] || []).length;
       const tx = document.createElement('div');
       tx.className = 'tx';
-      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.laps || 3} laps${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}` : ''}</span><span class="tb">${def.blurb}</span>`;
+      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.laps || 3} laps${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}` : ''}</span><span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span><span class="tb">${def.blurb}</span>`;
       b.appendChild(tx);
       b.addEventListener('click', () => {
         app.audio.play('select');
@@ -346,6 +348,14 @@ export class UI {
       app.applyQuality();
       this._syncSettings();
     });
+    $('set-assist').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      s().assist = b.dataset.v;
+      saveSettings(s());
+      this._syncSettings();
+    });
     $('set-tags').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;
@@ -377,6 +387,7 @@ export class UI {
     document.querySelectorAll('#set-steer [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.steering));
     document.querySelectorAll('#set-quality [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.quality));
     document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
+    document.querySelectorAll('#set-assist [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.assist || 'off')));
     $('set-sens').value = s.tiltSens;
     $('set-invert').checked = s.invertTilt;
     $('set-music').checked = s.music;

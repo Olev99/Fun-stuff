@@ -39,6 +39,7 @@ export class NameTags {
       const k = t.k;
       let a = 0;
       const dist = cam.distanceTo(k.pos);
+      let edge = false;
       if (show && dist < t.max) {
         _v.set(k.pos.x, k.pos.y + 2.3, k.pos.z).project(camera);
         if (_v.z < 1 && Math.abs(_v.x) < 1.15 && Math.abs(_v.y) < 1.15) {
@@ -47,7 +48,24 @@ export class NameTags {
           const x = (_v.x * 0.5 + 0.5) * w, y = (0.5 - _v.y * 0.5) * h;
           const s = t.friend ? clamp(22 / dist, 0.72, 1.12) : clamp(16 / dist, 0.62, 1);
           t.d.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%) scale(${s.toFixed(3)})`;
+        } else if (t.friend && race.state === 'race' && race.player) {
+          // A friend right behind you: a marker at the bottom of the screen.
+          const p = race.player;
+          const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
+          const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z;
+          const back = -(dx * fx + dz * fz), gap = Math.hypot(dx, dz);
+          if (back > 0 && gap < 70) {
+            edge = true;
+            a = clamp((70 - gap) / 25, 0, 1);
+            const lat = dx * fz - dz * fx;
+            const x = w / 2 - clamp(lat / 18, -1, 1) * w * 0.22, y = h - 60;
+            t.d.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-100%) scale(0.9)`;
+          }
         }
+      }
+      if (edge !== t.edge) {
+        t.edge = edge;
+        t.d.classList.toggle('edge', edge);
       }
       if (Math.abs(a - t.a) > 0.02 || (a === 0) !== (t.a === 0)) {
         t.a = a;

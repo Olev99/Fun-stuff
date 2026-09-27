@@ -5,28 +5,28 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 ## What's in it
 
 - **8 original racers:** Mochi the cat, Pip the penguin, Bruno the bear, Rexi the dino, Volt the robot, Ember the fox, Zorp the alien and Hopper the frog. Each has its own speed, acceleration, handling and weight.
-- **18 tracks in 3 sizes and 14 themes,** each also playable in reverse. Every track hides at least one secret shortcut.
+- **18 tracks in 3 sizes and 14 themes,** each also playable in reverse. Every track hides secret shortcuts: jumps, glides, tunnels and boost-only cuts. Medium and Long tracks have two each.
 
-  | Track | Size | Theme | Secret shortcut |
+  | Track | Size | Theme | Secret shortcuts |
   | --- | --- | --- | --- |
-  | Sprout Speedway | Short | Meadows, windmill, hill jump | **Barn Lane:** smash the crates and drive through the barn |
+  | Sprout Speedway | Short | Meadows, windmill, hill jump | **Barn Lane** (smash the crates, through the barn) and **Pond Hop** (jump the duck pond) |
   | Coral Cove | Short | Beach boardwalk, lighthouse, lagoon | **Sandbar:** slow sand across the lagoon; bring a boost |
-  | Dune Dash Canyon | Medium | Desert mesas, narrow canyon | **Mesa Cave:** a tunnel through the rock |
-  | Frostbite Pass | Medium | Snow, pines, icy grip | **Ice Shelf:** a slippery short cut over the ice |
-  | Sweet Tooth Valley | Medium | Candy land, chocolate road | **Gingerbread Lane:** through a gingerbread house |
-  | Neon Nebula | Long | Night city, figure-eight flyover | **Hyperlane Leap:** a ramp jump over a gap |
-  | Magma Mountain | Long | Volcano climb, lava | **Crater Leap:** jump the lava pit |
-  | Cloud Carnival | Long | Floating fairground, glide ramps | **Rainbow Leap** (glide over a gap) and **Cotton Candy Cut** |
-  | Windmill Downs | Medium | Farmland esses, windmill, pond | **Cart Track:** a dirt lane past the barn |
-  | Tidal Twist | Short | Seaside figure-eight with a bridge | **Lagoon Boardwalk:** across the lagoon |
-  | Glacier Gorge | Long | Sheer ice, black-ice sheets, frozen lake | **Crevasse** (ice) and **Snowdrift Cut** |
-  | Obsidian Rush | Long | Black-glass highway, lava lakes | **Magma Chute** and **Glass Bridge** (jump the gap) |
-  | Spooky Hollow | Medium | Haunted manor, ghosts, mud | **Crypt Passage:** through the crypt |
-  | Jungle Ruins | Medium | Vines, temple, rolling boulders | **Temple Tunnel:** through the ruins |
+  | Tidal Twist | Short | Seaside figure-eight with a bridge | **Lagoon Boardwalk** and **Sandbar** |
+  | Blossom Gardens | Short | Cherry trees, koi pond, torii gates, lanterns | **Bamboo Grove** and **Lantern Path** |
+  | Dune Dash Canyon | Medium | Desert mesas, narrow canyon | **Mesa Cave** (a tunnel through the rock) and **Dune Surf** |
+  | Frostbite Pass | Medium | Snow, pines, icy grip | **Ice Shelf** and **Snowmobile Trail** |
+  | Sweet Tooth Valley | Medium | Candy land, chocolate road | **Gingerbread Lane** and **Chocolate River Jump** |
+  | Windmill Downs | Medium | Rolling farmland, windmill, pond | **Cart Track** and **Sheep Meadow** |
+  | Spooky Hollow | Medium | Haunted hilltop manor, ghosts, mud | **Crypt Passage** and **Graveyard Gate** |
+  | Jungle Ruins | Medium | Vines, temple, rolling boulders | **Temple Tunnel** and **Vine Trail** |
   | Gearworks | Medium | Factory figure-eight, oil slicks, barrels | **Loading Bay** and **Scrap Alley** |
-  | Moonbase Loop | Long | Low gravity, craters, Earth overhead | **Crater Hop:** a floaty jump over a crater |
-  | Maple Ridge | Medium | Autumn ridge climb and descent | **Lumber Run:** down through the logging trail |
-  | Blossom Gardens | Short | Cherry trees, koi pond, torii gates | **Bamboo Grove:** through the bamboo |
+  | Maple Ridge | Medium | Autumn ridge climb and descent | **Lumber Run** and **Pumpkin Patch** |
+  | Neon Nebula | Long | Night city, figure-eight flyover | **Hyperlane Leap** (jump) and **Glide Lane** (glide over a gap) |
+  | Magma Mountain | Long | Volcano climb, lava | **Crater Leap** and **Lava Tube** |
+  | Cloud Carnival | Long | Floating fairground, glide ramps | **Rainbow Leap** (glide over a gap) and **Cotton Candy Cut** |
+  | Glacier Gorge | Long | Sheer ice, black-ice sheets, frozen lake | **Crevasse** and **Snowdrift Cut** |
+  | Obsidian Rush | Long | Black-glass highway, lava lakes | **Magma Chute** and **Glass Bridge** (jump the gap) |
+  | Moonbase Loop | Long | Low gravity, craters, hairpins, Earth overhead | **Crater Hop** (floaty jump) and **Rover Tracks** |
 
 - **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels and moon rovers. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
 - **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer.
@@ -86,6 +86,9 @@ How it works:
 | Pause | **II** button | Esc / P |
 
 - **Rocket start:** press and hold DRIFT right after the "2" disappears.
+- **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
+- **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
+- **Steering assist:** Off, Light or Strong in Settings. It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
 - **Name tags:** the other karts show their name and current place above them, so you can see when you pass someone. In online races, friends get big tags in their kart colour that show from far away; computer racers get small tags up close. Settings switches tags between Everyone, Friends and Off.
 - **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are slow unless you hit them with a boost.
 - **Gems:** each one adds a little top speed, up to 10. Getting hit drops 3.
@@ -121,6 +124,7 @@ zoomies/
   src/characters.js   racers and their procedural models
   src/karts.js        kart bodies, upgrades and kart stats
   src/nametags.js     name and place tags floating over the karts
+  src/ghost.js        time trial ghost recording and replay
   src/ai.js           computer drivers and difficulty levels
   src/items.js        items, item boxes, gems, obstacles, crates
   src/input.js        tilt, touch and keyboard input

@@ -158,6 +158,7 @@ h2.title {
 .seg .seg-lbl { font-family: var(--font-display); font-size: 11px; padding: 0 4px 0 10px; align-self: center; color: var(--muted); }
 .tcard .tz { display: inline-block; font-family: var(--font-display); font-size: 9.5px; letter-spacing: .04em; padding: 2px 6px 1px; border-radius: 6px; background: var(--ink); color: var(--sun); margin-right: 4px; }
 .tcard .tz.Medium { color: var(--mint); } .tcard .tz.Long { color: var(--berry); }
+.tcard .tb.sc { color: var(--cream); opacity: .8; } .tcard .tb.sc.all { color: var(--mint); opacity: 1; }
 /* Lobby */
 .lobby { width: min(720px, 100%); }
 .lobby-start, .lobby-room { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
@@ -188,6 +189,8 @@ h2.title {
 #hud-tags .tag b { font-weight: 400; min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px; background: var(--c); color: #1d1537; display: grid; place-items: center; font-size: 10.5px; }
 #hud-tags .tag.friend { font-size: 15px; padding: 3px 11px 2px 4px; border-radius: 12px; background: rgba(29,21,55,.86); border-color: var(--c); box-shadow: 0 3px 0 rgba(0,0,0,.35); margin-top: -10px; }
 #hud-tags .tag.friend b { min-width: 22px; height: 22px; font-size: 13px; border-radius: 11px; }
+#hud-tags .tag.edge::before { content: "▼ BEHIND"; font-size: 10px; color: var(--c); margin: 0 4px 0 6px; order: 3; }
+#hud-tags .tag.edge::after { display: none; }
 #hud-tags .tag.friend::after { content: ""; position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--c); }
 .join-row { display: flex; gap: 8px; align-items: center; }
 #join-code {
@@ -229,6 +232,8 @@ h2.title {
 .dialog .scroll { overflow-y: auto; min-height: 0; flex: 1; display: grid; gap: 10px; padding-right: 4px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; background: rgba(0,0,0,.18); border-radius: 12px; }
 .row .lbl { font-weight: 800; font-size: 14px; }
+.row > div:first-child { min-width: 0; flex: 1 1 auto; }
+.row > .seg, .row > .toggle, .row > .btn, .row > input, .row > .tiltmeter { flex: 0 0 auto; }
 .row .hint { font-weight: 600; font-size: 12px; color: var(--muted); line-height: 1.2; }
 input[type=range] { -webkit-appearance: none; appearance: none; width: 160px; height: 26px; background: transparent; }
 input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 8px; background: var(--ink-3); border: 2px solid var(--ink); }
@@ -364,6 +369,10 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .car-unlock { display: flex; align-items: center; gap: 10px; margin: 0; font-weight: 700; font-size: 13.5px; background: rgba(25,227,177,.16); border-radius: 12px; padding: 6px 10px; }
 .car-unlock img { width: 38px; height: 38px; border-radius: 10px; border: 2px solid var(--ink); }
 .car-tip { margin: 0; font-weight: 700; font-size: 13px; color: var(--muted); line-height: 1.3; }
+#hud-split { margin-top: 3px; font-family: var(--font-display); font-size: 22px; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); opacity: 0; font-variant-numeric: tabular-nums; }
+#hud-split.show { animation: splitIn 3s ease-out forwards; }
+#hud-split.ahead { color: var(--mint); } #hud-split.behind { color: var(--berry); }
+@keyframes splitIn { 0% { opacity: 0; transform: scale(1.4); } 8% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 #hud-goal { margin-top: 3px; padding: 3px 10px 2px; border-radius: 10px; background: rgba(29,21,55,.62); border: 2px solid rgba(255,210,63,.7); font-family: var(--font-display); font-size: 12.5px; color: var(--sun); white-space: nowrap; }
 
 /* ---------- HUD ---------- */
@@ -526,6 +535,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div id="hud-lap">LAP <b>1</b>/3</div>
     <div id="hud-time">0:00.00</div>
     <div id="hud-goal" hidden></div>
+    <div id="hud-split"></div>
   </div>
   <button id="btn-pause" aria-label="Pause">II</button>
   <div class="hud-tr">
@@ -697,6 +707,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="scroll">
       <div class="row"><div><div class="lbl">Steering</div><div class="hint">Tilt your phone like a wheel, or drag on the left side.</div></div>
         <div class="seg" id="set-steer"><button data-v="tilt">Tilt</button><button data-v="touch">Touch</button></div></div>
+      <div class="row"><div><div class="lbl">Steering assist</div><div class="hint">Gently keeps you on the road and off the walls. Great for younger drivers.</div></div>
+        <div class="seg" id="set-assist"><button data-v="off">Off</button><button data-v="light">Light</button><button data-v="strong">Strong</button></div></div>
       <div class="row"><div><div class="lbl">Tilt sensitivity</div><div class="hint">Higher means less tilt for a full turn.</div></div>
         <input type="range" id="set-sens" min="0" max="1" step="0.05" aria-label="Tilt sensitivity"></div>
       <div class="row"><div><div class="lbl">Tilt check</div><div class="hint" id="tilt-status">Tilt the phone: the dot should follow.</div></div>
@@ -729,7 +741,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><b>Gems</b>Each gem adds a little top speed, up to 10. Getting hit drops 3.</div>
         <div><b>Items</b>Drive through the ? boxes, then tap ITEM to use what you got. For throwables (arrows on the button) swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it to throw behind.</div>
         <div><b>Stuck?</b>If you're pinned against something for a few seconds, a drone lifts you back onto the road.</div>
-        <div><b>Secret shortcuts</b>Every track hides one or two. Look for gaps in the wall, stacked crates and odd paths. Some need a boost to be worth it.</div>
+        <div><b>Secret shortcuts</b>Every track hides one or two. Look for gaps in the wall, stacked crates and odd paths. Some need a boost to be worth it. Once found, they show on the minimap and the track card counts them.</div>
+        <div><b>Ghosts</b>In Time Trial your best run is saved as a see-through ghost kart. Race it next time and watch the lap splits: green means you're ahead.</div>
+        <div><b>Steering assist</b>Settings has a Light or Strong assist that keeps you off the walls. Handy for younger drivers or while getting used to tilt.</div>
         <div><b>Glide ramps</b>Blue ramps pop out a glider. Steer in the air and land far down the road.</div>
       </div>
       <div class="items-list">

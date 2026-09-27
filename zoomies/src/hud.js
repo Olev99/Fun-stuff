@@ -50,6 +50,8 @@ export class HUD {
     this.flash.style.opacity = 0;
     this._buildMap(race);
     this.goalEl.hidden = !race.careerEv || race.careerEv.type === 'cup';
+    const sp = document.getElementById('hud-split');
+    if (sp) sp.className = '';
     const tt = race.mode === 'tt';
     this.pos.style.visibility = tt ? 'hidden' : 'visible';
     $('hud-gems').style.visibility = tt ? 'hidden' : 'visible';
@@ -59,6 +61,7 @@ export class HUD {
         ? 'Tilt to steer. Hold DRIFT after the 2 for a rocket start!'
         : 'Drag on the left to steer. Hold DRIFT after the 2 for a rocket start!', 5.5);
     }
+    if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
   }
 
   showTrackName(race) {
@@ -99,6 +102,26 @@ export class HUD {
       }
       c.closePath();
     };
+    // Shortcuts the player has found before, as dotted side paths.
+    const found = ((this.app.records.found || {})[race.trackDef.id]) || [];
+    const scs = race.mode === 'demo' ? [] : tr.shortcuts.filter((sc) => found.includes(sc.name));
+    for (const sc of scs) {
+      c.beginPath();
+      for (let i = 0; i < sc.count; i += 2) {
+        const [x, y] = this.mapT(sc.px[i], sc.pz[i]);
+        if (i === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.strokeStyle = 'rgba(29,21,55,0.85)';
+      c.lineWidth = 10;
+      c.setLineDash([]);
+      c.stroke();
+      c.strokeStyle = '#19e3b1';
+      c.lineWidth = 4;
+      c.setLineDash([6, 5]);
+      c.stroke();
+      c.setLineDash([]);
+    }
     path();
     c.strokeStyle = 'rgba(29,21,55,0.85)';
     c.lineWidth = 16;
@@ -113,6 +136,10 @@ export class HUD {
     c.arc(sx0, sy0, 5, 0, Math.PI * 2);
     c.fill();
     this.mapBg = bg;
+  }
+
+  refreshMap(race) {
+    this._buildMap(race);
   }
 
   _drawMap(race) {
@@ -230,6 +257,15 @@ export class HUD {
     void el.offsetWidth;
     el.className = 'stay finish';
     this.speed.classList.remove('on');
+  }
+
+  // Time trial split against the ghost: green when ahead, red when behind.
+  split(d) {
+    const el = this.splitEl || (this.splitEl = document.getElementById('hud-split'));
+    el.textContent = `${d <= 0 ? '−' : '+'}${Math.abs(d).toFixed(2)}`;
+    el.className = '';
+    void el.offsetWidth;
+    el.className = `show ${d <= 0 ? 'ahead' : 'behind'}`;
   }
 
   toast(text) {

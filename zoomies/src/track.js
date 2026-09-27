@@ -603,6 +603,9 @@ export class Shortcut extends Path {
     }
     for (const p of inner) add(p[0], p[1], p[2]);
     const tmp = {};
+    // With a lead-in the outer waypoints sit too close to the lead points and
+    // make a kink; the lead points replace them.
+    if (lead && world.length > 3) world = world.slice(1, -1);
     for (const w of world) {
       if (Number.isNaN(w.y)) {
         main.project(w.x, w.z, -1, tmp);

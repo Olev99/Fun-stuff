@@ -67,7 +67,7 @@ export class AIDriver {
       // Following a shortcut branch.
       const p = k.path;
       const s = k.trk.s + look;
-      approach = k.trk.s < 40;
+      approach = k.trk.s < 40 || k.trk.s > p.length - 45;
       if (s < p.length) {
         p.frame(s, this.fr);
         lane = clamp(this.dodge * 0.6, -(this.fr.hw - 1.2), this.fr.hw - 1.2);

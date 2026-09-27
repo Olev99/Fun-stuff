@@ -18,6 +18,7 @@ export const DEFAULTS = {
   reverse: false,
   name: '', // multiplayer nickname
   tags: 'all', // name tags over karts: all | friends | off
+  assist: 'off', // steering assist: off | light | strong
 };
 
 export function loadSettings() {

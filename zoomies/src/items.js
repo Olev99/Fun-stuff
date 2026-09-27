@@ -61,6 +61,7 @@ const OBSTACLES = {
   ghost: { r: 1.4, hit: 'bump', col: '#f2f0ff', col2: '#9dff8a', y: 1.6, bounce: 0.6 },
   barrel: { r: 1.3, hit: 'spin', col: '#3a6ab0', col2: '#ffcf2a', y: 1.2 },
   rover: { r: 1.6, hit: 'bump', col: '#e8ecf4', col2: '#6fd8ff', y: 0.2 },
+  lantern: { r: 1.3, hit: 'bump', col: '#e8303a', col2: '#ffd23f', y: 2, bounce: 0.7 },
 };
 
 let _geo = null;
@@ -190,6 +191,15 @@ function geos() {
         for (const x of [-1.1, 1.1]) for (const z of [-0.9, 0.9]) b.add(new THREE.CylinderGeometry(0.45, 0.45, 0.35, 12), '#3a3448', [x, 0.45, z], [0, 0, Math.PI / 2], 1, 'rubber');
         b.add(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 5), '#c8ccd4', [0.6, 2.1, 0.8], [0, 0, 0], 1, 'metal');
         b.add(new THREE.SphereGeometry(0.14, 8, 6), o.col2, [0.6, 2.85, 0.8], [0, 0, 0], 1, 'glowHot');
+        break;
+      case 'lantern':
+        // a paper lantern: red ribbed body, gold caps, a glowing band and a tassel
+        b.add(new THREE.SphereGeometry(1.15, 20, 14), o.col, [0, 0, 0], [0, 0, 0], [1, 1.25, 1], 'fabric');
+        for (const y of [-0.7, 0, 0.7]) b.add(new THREE.TorusGeometry(y ? 0.96 : 1.16, 0.05, 4, 24), '#7a1420', [0, y, 0], [Math.PI / 2, 0, 0], 1, 'wood');
+        b.add(new THREE.CylinderGeometry(0.5, 0.55, 0.3, 14), o.col2, [0, 1.4, 0], [0, 0, 0], 1, 'metal');
+        b.add(new THREE.CylinderGeometry(0.55, 0.5, 0.3, 14), o.col2, [0, -1.4, 0], [0, 0, 0], 1, 'metal');
+        b.add(new THREE.TorusGeometry(1.17, 0.09, 4, 24), '#ffc86a', [0, 0.35, 0], [Math.PI / 2, 0, 0], 1, 'glow');
+        b.add(new THREE.CylinderGeometry(0.06, 0.12, 0.8, 6), o.col2, [0, -1.95, 0], [0, 0, 0], 1, 'fabric');
         break;
       case 'balloon':
         b.add(new THREE.SphereGeometry(1.3, 24, 16), '#ffffff', [0, 0.4, 0], [0, 0, 0], [1, 1.2, 1]);

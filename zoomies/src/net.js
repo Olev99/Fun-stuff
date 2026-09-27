@@ -236,6 +236,12 @@ export class NetSession {
   _heartbeat() {
     if (this.closed || !this.role) return;
     const now = performance.now();
+    // If this phone itself was frozen (building a track, app switched away),
+    // the silence was ours: give everyone a fresh grace period instead of
+    // dropping them.
+    const stalled = this._lastHb !== undefined && now - this._lastHb > HEARTBEAT_MS * 3;
+    this._lastHb = now;
+    if (stalled) for (const id of this.seen.keys()) this.seen.set(id, now);
     if (this.isHost) {
       this.transport.broadcast({ t: 'hb' });
       for (const p of this.players.slice(1)) {

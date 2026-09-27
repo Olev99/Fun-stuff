@@ -3,6 +3,7 @@ import { Track } from './track.js';
 import { World } from './world.js';
 import { Kart } from './kart.js';
 import { NameTags } from './nametags.js';
+import { GhostRecorder, GhostPlayer, loadGhost } from './ghost.js';
 import { AIDriver, DIFFICULTY } from './ai.js';
 import { ItemSystem } from './items.js';
 import { FX } from './particles.js';
@@ -117,6 +118,13 @@ export class Race {
 
     this._makeKarts(opts);
     this.tags = new NameTags(this, this.app.settings.tags || 'all');
+    // Time trials record the run and replay your best one as a ghost.
+    if (this.mode === 'tt') {
+      this.ghostKey = opts.trackDef.id + (opts.reverse ? '-r' : '');
+      this.ghostRec = new GhostRecorder();
+      const g = loadGhost(this.ghostKey);
+      if (g) this.ghost = new GhostPlayer(this.scene, g);
+    }
     this.items = new ItemSystem(this, !!(this.net && this.net.isGuest));
     if (this.mode === 'tt' && this.player) {
       this.player.item = 'chili';
@@ -225,6 +233,7 @@ export class Race {
     const inp = this.player && this.player.ai == null && this.state !== 'wait' ? this.app.input.read(dt) : null;
     if (inp && this.player) {
       Object.assign(this.player.ctl, inp);
+      this._assist(this.player, this.player.ctl);
       if (this.state === 'countdown') this._trackRocket(inp);
     }
 
@@ -241,6 +250,8 @@ export class Race {
     for (let s = 0; s < steps; s++) this._physics(h, locked);
 
     for (const k of this.karts) if (k.remote) this._updateRemote(k, dt);
+    if (this.ghostRec && this.state === 'race' && this.player) this.ghostRec.sample(this.raceTime, this.player);
+    if (this.ghost) this.ghost.update(locked ? 0 : this.raceTime);
 
     this.items.update(dt, this.session ? this.netClock : this.time);
     if (this.net && this.net.isGuest) this.items.tickReplica(dt);
@@ -460,8 +471,11 @@ export class Race {
           if (k.isPlayer) {
             const first = !this.found.has(data.id);
             this.found.add(data.id);
-            hud.toast(first ? `SECRET! ${data.name}` : data.name);
+            // Remember discoveries across races: they then show on the minimap.
+            const ever = this.mode !== 'demo' && this.app.markShortcut(this.trackDef.id, data.name);
+            hud.toast(ever ? `SECRET FOUND! ${data.name}` : first ? `SECRET! ${data.name}` : data.name);
             if (first) a.play('secret');
+            if (ever) hud.refreshMap(this);
           }
           break;
         case 'fall':
@@ -500,6 +514,7 @@ export class Race {
         k.finishTime = this.raceTime;
         this._onFinish(k);
       } else if (k.isPlayer && k.laps >= 1) {
+        this._ghostSplit(k);
         if (k.laps === this.laps - 1) {
           this.app.hud.banner('FINAL LAP!', 'final');
           this.app.audio.play('finalLap');
@@ -512,8 +527,53 @@ export class Race {
     }
   }
 
+  // Steering assist (Settings): nudges the player's steering along the road
+  // and away from the walls without taking over. It leaves you alone when
+  // you head for a shortcut gap, spin or face the wrong way.
+  _assist(k, c) {
+    const lvl = this.app.settings.assist;
+    const base = lvl === 'strong' ? 0.5 : lvl === 'light' ? 0.25 : 0;
+    if (!base || !k.grounded || k.spinTime > 0 || k.respawnT > 0 || this.state !== 'race') return;
+    const p = k.path, trk = k.trk;
+    const spd = Math.max(0, k.fwdSpeed);
+    if (spd < 6) return;
+    const s = trk.s + 8 + spd * 0.4;
+    if (!p.closed && s > p.length - 2) return;
+    const fr = this._afr || (this._afr = {});
+    p.frame(s, fr);
+    // Keep the current lane, pulled in from the walls unless a shortcut opens there.
+    const lim = fr.hw - 2.2;
+    let lane = trk.d;
+    const open = p === this.track && this.track.gap[lane > 0 ? 1 : 0][fr.idx];
+    if (!open) lane = clamp(lane, -lim, lim);
+    const tx = fr.x + fr.rx * lane, tz = fr.z + fr.rz * lane;
+    let diff = Math.atan2(tx - k.pos.x, tz - k.pos.z) - k.yaw;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    if (Math.abs(diff) > 1.2) return;
+    const want = clamp(-diff * 2.6, -1, 1);
+    const nearWall = open ? 0 : clamp((Math.abs(trk.d) - (trk.hw - 3.5)) / 3, 0, 1);
+    let w = base + (1 - base) * nearWall * (lvl === 'strong' ? 0.8 : 0.5);
+    if (k.drifting) w *= 0.5;
+    c.steer += (want - c.steer) * w;
+  }
+
+  // Time trial: how far ahead of or behind your ghost you are at each lap.
+  _ghostSplit(k) {
+    const sp = this.ghost && this.ghost.g.splits;
+    if (!sp || !sp[k.laps - 1]) return;
+    const d = this.raceTime - sp[k.laps - 1];
+    this.app.hud.split(d);
+  }
+
   _onFinish(k) {
     if (!k.isPlayer || this.mode === 'demo') return;
+    if (this.ghostRec) {
+      this._ghostSplit(k);
+      let acc = 0;
+      const splits = k.lapTimes.map((t) => +(acc += t).toFixed(3));
+      this.newGhost = this.ghostRec.save(this.ghostKey, k.finishTime, splits, k);
+    }
     this.setState('finished');
     k.ai = new AIDriver(k, this, 0.9, DIFFICULTY.normal);
     k.speedMul = 0.92;
@@ -1004,6 +1064,7 @@ export class Race {
 
   dispose() {
     this.tags.dispose();
+    if (this.ghost) this.ghost.dispose(this.scene);
     this.world.dispose();
     this.items.dispose();
     this.fx.dispose();

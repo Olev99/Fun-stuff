@@ -256,6 +256,8 @@ class App {
   }
 
   startRace(cfg) {
+    // A track preview still pending would replace this race with a demo.
+    clearTimeout(this._prevT);
     this.lastCfg = cfg;
     this.disposeRace();
     this.paused = false;
@@ -291,6 +293,7 @@ class App {
     const r = this.race;
     if (!r || r.mode === 'demo' || this.paused || !['intro', 'countdown', 'race', 'wait'].includes(r.state)) return;
     document.querySelector('#scr-pause [data-go="restart"]').hidden = r.mode === 'mp';
+    document.querySelector('#scr-pause [data-go="quit"]').textContent = this.careerRun ? 'Quit to career' : 'Quit to menu';
     if (r.mode === 'mp') {
       // Online races cannot stop for one player: show the menu but keep racing.
       this.menuOpen = true;
@@ -389,7 +392,8 @@ class App {
         sub: race.trackDef.name,
         html: `<div class="big-msg"><em>${fmtTime(total)}</em></div>
           <div class="tt-times">${me.lapTimes.map((t, i) => `<div><small>Lap ${i + 1}</small>${fmtTime(t)}</div>`).join('')}
-          <div><small>Best total</small>${fmtTime(rec.tt)}</div><div><small>Best lap</small>${fmtTime(rec.lap)}</div></div>`,
+          <div><small>Best total</small>${fmtTime(rec.tt)}</div><div><small>Best lap</small>${fmtTime(rec.lap)}</div></div>
+          ${race.newGhost ? '<p class="car-goal" style="text-align:center;margin:8px 0 0">👻 Ghost saved. Race against it next time!</p>' : ''}`,
         buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Retry', 'hot']],
       });
       return;
@@ -488,6 +492,16 @@ class App {
         break;
       }
     }
+  }
+
+  // A shortcut the player drove through; true the first time ever.
+  markShortcut(trackId, name) {
+    const f = (this.records.found = this.records.found || {});
+    const list = (f[trackId] = f[trackId] || []);
+    if (list.includes(name)) return false;
+    list.push(name);
+    saveRecords(this.records);
+    return true;
   }
 
   // ---------------- career ----------------
@@ -749,6 +763,7 @@ class App {
     const me = ses.isHost ? 'host' : ses.meId;
     const mine = cfg.humans.find((h) => h.id === me);
     if (!mine) return;
+    clearTimeout(this._prevT);
     this.disposeRace();
     this.paused = false;
     this.menuOpen = false;

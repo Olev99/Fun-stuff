@@ -923,11 +923,12 @@ export class World {
           this.animated.push((dt, t) => { m.rotation.z = t * (k % 2 ? 1 : -1) * 0.8; });
         }
       }
-    } else if (deco === 'lavaRocks' || deco === 'cotton' || deco === 'palms' || deco === 'bamboo') {
+    } else if (deco === 'lavaRocks' || deco === 'cotton' || deco === 'palms' || deco === 'bamboo' || SCATTER[deco]) {
       const B = new GeoBuilder();
       const fr = {};
       const r = this.r;
-      for (let s = 6; s < sc.length - 6; s += deco === 'palms' ? 26 : deco === 'bamboo' ? 8 : 9) {
+      const sp = SCATTER[deco];
+      for (let s = 6; s < sc.length - 6; s += sp ? sp[0] : deco === 'palms' ? 26 : deco === 'bamboo' ? 8 : 9) {
         if (sc.isVoid(s)) continue;
         sc.frame(s, fr);
         const base = sc.heightAtFrame(fr, 0);
@@ -937,6 +938,11 @@ export class World {
           if (deco === 'lavaRocks') B.add(new THREE.ConeGeometry(1.2 + r(), 3 + r() * 5, 5), r() < 0.5 ? '#2b2527' : '#3d3336', [x, base + 1, z], [r() * 0.3, r() * 6, r() * 0.3], 1, 'stone');
           else if (deco === 'cotton') B.add(new THREE.IcosahedronGeometry(1.6 + r(), 2), ['#ffc6e4', '#c8e8ff', '#fff0f8'][Math.floor(r() * 3)], [x, base + 0.6, z], [0, 0, 0], 1, 'fabric');
           else if (deco === 'bamboo') B.addRaw(translate(P.bamboo(), x, base - 0.2, z, 0.8 + r() * 0.4));
+          else if (sp) {
+            const g = sp[1]();
+            g.rotateY(r() * 6.28);
+            B.addRaw(translate(g, x, base - 0.15, z, sp[2] * (0.85 + r() * 0.3)));
+          }
           else {
             B.addRaw(P.palmAt(x, base - 0.2, z, 0.9 + r() * 0.3, r() * 6));
           }
@@ -1824,6 +1830,18 @@ function translate(geo, x, y, z, s = 1) {
   geo.translate(x, y, z);
   return geo;
 }
+
+// Props lining shortcut paths: [spacing along the path, builder, scale].
+const SCATTER = {
+  cacti: [15, () => P.cactus(), 0.8],
+  pines: [11, () => P.pine(), 0.7],
+  graves: [7, () => P.grave(), 1],
+  pumpkins: [7, () => P.pumpkin(), 0.9],
+  lanterns: [13, () => P.lantern(), 0.9],
+  hay: [16, () => P.hay(), 0.8],
+  flowers: [6, () => P.flowers(), 1],
+  ferns: [7, () => P.fern(), 1.2],
+};
 
 // ---------------- Prop prototypes (vertex coloured, per-part PBR presets) ----------------
 const P = {
