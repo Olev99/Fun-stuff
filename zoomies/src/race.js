@@ -69,6 +69,7 @@ export class Race {
     this.opts = opts;
     this.mode = opts.mode; // 'gp' | 'quick' | 'tt' | 'demo' | 'mp'
     this.trackDef = opts.trackDef;
+    this.careerEv = opts.careerEv || null;
     this.laps = opts.laps ?? 3;
     this.speedClass = SPEED_CLASSES[opts.speedClass] || SPEED_CLASSES.zoom;
     this.diff = DIFFICULTY[opts.difficulty] || DIFFICULTY.normal;
@@ -689,7 +690,10 @@ export class Race {
   }
 
   onBoxHit(k) { if (k.isPlayer) this.app.audio.play('item'); }
-  onGem(k) { if (k.isPlayer) this.app.audio.play('gem'); }
+  onGem(k) {
+    k.gemsGot = (k.gemsGot || 0) + 1;
+    if (k.isPlayer) this.app.audio.play('gem');
+  }
   onHazardHit() {}
   onProjectileHit() {}
   onSlip(k) { if (k.isPlayer) this.app.hud.toast('SLIPPERY!'); }

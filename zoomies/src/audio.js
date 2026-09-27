@@ -263,6 +263,10 @@ export class Audio {
       case 'ui':
         this._tone('triangle', 880, 1100, 0.07, 0.12);
         break;
+      case 'coin':
+        this._tone('square', 988, 988, 0.07, 0.1);
+        this._tone('square', 1319, 1319, 0.22, 0.1, 0.07);
+        break;
       case 'uiBack':
         this._tone('triangle', 660, 440, 0.08, 0.12);
         break;

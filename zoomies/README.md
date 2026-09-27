@@ -28,15 +28,22 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   | Maple Ridge | Medium | Autumn ridge climb and descent | **Lumber Run:** down through the logging trail |
   | Blossom Gardens | Short | Cherry trees, koi pond, torii gates | **Bamboo Grove:** through the bamboo |
 
-- **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders and balloons. There are also boost pads, jump ramps, glide ramps with a pop-out glider, and gems.
+- **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels and moon rovers. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
+- **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer.
+  - 7 chapters, 35 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel.
+  - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team.
+  - Events pay coins by finishing place and gems, plus a first-clear bonus. Each event also has 3 stars to earn.
+  - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt), 4 upgrades per kart with 5 levels each, paint jobs and new racers.
+  - Progress is saved on the phone. Settings has a reset.
 - **Modes:**
+  - Career.
   - Grand Prix: 9 cups of 4 races with points.
   - Quick Race.
   - Time Trial, with saved records.
   - Multiplayer.
 - **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter.
 - **Driving:** drift mini-turbos with blue, orange and purple sparks, rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
-- **11 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Thunder Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀 and Rocket Ride 🚀. The racers at the back get the catch-up items.
+- **17 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Thunder Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️ and Boo Mask 👻. The racers at the back get the catch-up items. Throwable items can be aimed: swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
 
 ## Playing on iPhone
@@ -97,7 +104,9 @@ How it works:
 ```
 zoomies/
   index.html          UI, HUD and styles
-  src/main.js         app shell, menus, Grand Prix, multiplayer flow, dynamic resolution
+  src/main.js         app shell, menus, Grand Prix, career and multiplayer flow, dynamic resolution
+  src/career.js       career chapters, events, story, prices, scoring and save data
+  src/careerui.js     career hub, garage, story dialogue and career results
   src/race.js         race loop, laps, positions, collisions, camera, network sync
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
   src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur
@@ -109,6 +118,7 @@ zoomies/
   src/tracks.js       track layouts, shortcuts and cups
   src/world.js        sky, terrain, lakes, walls, scenery and landmarks per theme
   src/characters.js   racers and their procedural models
+  src/karts.js        kart bodies, upgrades and kart stats
   src/ai.js           computer drivers and difficulty levels
   src/items.js        items, item boxes, gems, obstacles, crates
   src/input.js        tilt, touch and keyboard input

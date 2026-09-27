@@ -237,6 +237,116 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .tt-times div { background: rgba(0,0,0,.2); border-radius: 12px; padding: 8px 10px; font-weight: 800; }
 .tt-times small { display: block; font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
 
+/* Career hub */
+#scr-career { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); gap: 16px; }
+#scr-career::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; background: linear-gradient(90deg, rgba(20,14,40,.8), rgba(20,14,40,.55) 45%, rgba(20,14,40,.7)); }
+.car-left { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.car-right { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.wallet { display: inline-flex; gap: 8px; }
+.wallet > span { font-family: var(--font-display); font-size: 14px; padding: 5px 10px 4px; border-radius: 11px; background: rgba(29,21,55,.8); border: 2px solid var(--ink); color: var(--sun); white-space: nowrap; }
+.wallet b { font-weight: 400; color: var(--cream); }
+.chap { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+.chap-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chap-nav span { font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
+.chap-nav button { width: 32px; height: 32px; border-radius: 10px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); font-family: var(--font-display); font-size: 13px; cursor: pointer; }
+.chap-nav button:disabled { opacity: .3; }
+.chap-name { font-family: var(--font-display); font-size: clamp(20px, 6.2vh, 30px); line-height: 1; color: var(--sun); text-shadow: 0 3px 0 var(--ink); }
+.chap-blurb { font-weight: 600; font-size: 13px; line-height: 1.25; }
+.chap-rival { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: var(--muted); }
+.chap-rival img { width: 42px; height: 42px; border-radius: 11px; border: 3px solid var(--ink); background: var(--ink-3); }
+.chap-rival b { color: var(--cream); font-family: var(--font-display); font-weight: 400; font-size: 15px; }
+.chap-meta { font-weight: 700; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.chap-meta .champ { color: var(--sun); }
+#scr-career.locked .ev-list { opacity: .45; }
+.ev-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 6px; align-content: start; padding: 2px 4px 4px 2px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.ev {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; text-align: left; padding: 6px 10px; cursor: pointer;
+  border: 3px solid var(--ink); border-radius: 14px; background: rgba(44,35,82,.92); box-shadow: 0 4px 0 var(--ink); color: var(--cream);
+}
+.ev .ic { font-size: 22px; text-align: center; }
+.ev .mid { display: grid; gap: 1px; min-width: 0; }
+.ev .nm { font-family: var(--font-display); font-size: 13.5px; line-height: 1.1; }
+.ev .sub { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev .hints { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11.5px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+.ev .hints .got { color: var(--sun); }
+.ev .best { font-size: 11.5px; font-weight: 800; color: var(--mint); }
+.ev .rew { font-family: var(--font-display); font-size: 12px; color: var(--sun); white-space: nowrap; }
+.ev .lock { font-weight: 800; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.ev .stars i, .car-stars i { font-style: normal; color: rgba(255,255,255,.18); }
+.ev .stars i.on { color: var(--sun); }
+.ev.boss { background: linear-gradient(90deg, rgba(120,40,90,.95), rgba(44,35,82,.95)); }
+.ev.sel { border-color: var(--sun); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--ink); }
+.ev.off { opacity: .55; }
+.btn.dim { opacity: .45; }
+/* Garage */
+#scr-garage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
+.gar-info { max-width: 340px; }
+.gstats { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; margin-top: 4px; }
+.gstats span { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.gstats b { font-family: var(--font-display); font-weight: 400; font-size: 12px; min-width: 5.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.gstats em { font-style: normal; font-size: 11px; margin-left: 4px; } .gstats em.up { color: var(--mint); } .gstats em.down { color: var(--berry); }
+.sbar { height: 9px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; }
+.sbar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--sun), var(--tang)); transition: width .25s ease-out; }
+.gtabs { align-self: flex-start; }
+.garage-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 8px; align-content: start; padding: 2px 4px 6px 2px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.garage-list.karts, .garage-list.paint { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.garage-list.racers { grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: center; }
+.gcard {
+  position: relative; display: grid; gap: 2px; text-align: left; padding: 8px 10px; border: 3px solid var(--ink); border-radius: 14px;
+  background: rgba(44,35,82,.92); box-shadow: 0 4px 0 var(--ink); color: var(--cream); cursor: pointer;
+}
+.gcard .gn { font-family: var(--font-display); font-size: 12.5px; line-height: 1.1; }
+.gcard .gt, .urow .gt { font-family: var(--font-display); font-size: 11.5px; color: var(--sun); }
+.gcard.own .gt { color: var(--mint); }
+.gcard .gu { position: absolute; top: 6px; right: 8px; font-family: var(--font-display); font-size: 10.5px; color: var(--mint); }
+.gcard.sel, .rcard.sel { border-color: var(--sun); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--ink); }
+.pcard .sw { height: 18px; border-radius: 7px; border: 2px solid var(--ink); }
+.rcard .rt { position: absolute; top: 4px; right: 4px; font-family: var(--font-display); font-size: 9.5px; padding: 2px 5px 1px; border-radius: 6px; background: rgba(29,21,55,.85); color: var(--sun); }
+.rcard.off img { filter: grayscale(1) brightness(.6); }
+.urow {
+  display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 5px 12px; cursor: pointer;
+  border: 3px solid var(--ink); border-radius: 14px; background: rgba(44,35,82,.92); box-shadow: 0 4px 0 var(--ink); color: var(--cream);
+}
+.urow:active { transform: translateY(2px); }
+.urow .uic { font-size: 22px; text-align: center; }
+.urow .umid { display: grid; gap: 2px; min-width: 0; }
+.urow .gn { font-family: var(--font-display); font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.urow .ub { font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.urow .gt.poor { color: var(--berry); } .urow .gt.max { color: var(--mint); }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 16px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
+.pips i.on { background: var(--mint); }
+/* Story */
+#scr-story { align-items: flex-end; justify-content: center; cursor: pointer; }
+#scr-story::before { background: linear-gradient(0deg, rgba(20,14,40,.9), rgba(20,14,40,.25) 60%); }
+.story-box { width: min(760px, 100%); display: grid; grid-template-columns: 86px 1fr; gap: 14px; padding: 14px 16px; margin-bottom: 4px; }
+.story-av { width: 86px; height: 86px; border-radius: 18px; border: 3px solid var(--ink); display: grid; place-items: center; overflow: hidden; font-size: 46px; }
+.story-av img { width: 100%; height: 100%; object-fit: cover; }
+.story-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.story-head b { font-family: var(--font-display); font-weight: 400; font-size: 17px; color: var(--sun); }
+#story-text { margin: 4px 0 2px; font-weight: 700; font-size: clamp(15px, 4.4vh, 19px); line-height: 1.3; min-height: 2.6em; }
+#story-text.in { animation: storyIn .3s ease-out; }
+@keyframes storyIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.story-next { font-weight: 800; font-size: 12px; color: var(--muted); animation: blink 1.2s steps(2) infinite; }
+.story-skip { position: absolute; top: max(12px, var(--sat)); right: max(18px, var(--sar)); }
+/* Career results */
+.car-res { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: center; }
+.car-stars { grid-row: span 2; font-size: 40px; line-height: 1; letter-spacing: 2px; }
+.car-stars i { text-shadow: 0 3px 0 var(--ink); }
+.car-stars i.on { color: var(--sun); }
+.car-stars i.new { animation: pop .6s ease-out; }
+.car-goal { font-weight: 800; font-size: 13px; color: var(--muted); }
+.car-res .big-msg { grid-column: 2; text-align: left; }
+.car-coins { grid-column: 1 / -1; display: grid; gap: 2px; font-weight: 700; font-size: 13.5px; background: rgba(0,0,0,.2); border-radius: 12px; padding: 6px 10px; }
+.car-coins div { display: flex; justify-content: space-between; gap: 12px; }
+.car-coins b { font-family: var(--font-display); font-weight: 400; font-size: 13px; color: var(--sun); }
+.car-coins .tot { border-top: 2px solid rgba(255,255,255,.12); padding-top: 3px; margin-top: 2px; }
+.car-coins .tot span { font-weight: 800; }
+.car-unlock { display: flex; align-items: center; gap: 10px; margin: 0; font-weight: 700; font-size: 13.5px; background: rgba(25,227,177,.16); border-radius: 12px; padding: 6px 10px; }
+.car-unlock img { width: 38px; height: 38px; border-radius: 10px; border: 2px solid var(--ink); }
+.car-tip { margin: 0; font-weight: 700; font-size: 13px; color: var(--muted); line-height: 1.3; }
+#hud-goal { margin-top: 3px; padding: 3px 10px 2px; border-radius: 10px; background: rgba(29,21,55,.62); border: 2px solid rgba(255,210,63,.7); font-family: var(--font-display); font-size: 12.5px; color: var(--sun); white-space: nowrap; }
+
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
 .hud-tl { position: absolute; top: calc(8px + var(--sat)); left: calc(12px + var(--sal)); display: flex; gap: 10px; align-items: flex-start; }
@@ -395,6 +505,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   <div class="hud-tc">
     <div id="hud-lap">LAP <b>1</b>/3</div>
     <div id="hud-time">0:00.00</div>
+    <div id="hud-goal" hidden></div>
   </div>
   <button id="btn-pause" aria-label="Pause">II</button>
   <div class="hud-tr">
@@ -426,9 +537,12 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <p class="tagline">Tilt your phone to steer. Hold <b>DRIFT</b> through corners, let go for a turbo.</p>
   </div>
   <nav class="menu">
-    <button class="btn hot" data-go="gp">Grand Prix<span class="sub">4 races, most points wins</span></button>
-    <button class="btn" data-go="quick">Quick Race</button>
-    <button class="btn mint" data-go="tt">Time Trial</button>
+    <button class="btn hot" data-go="career">Career<span class="sub">From junk kart to champion</span></button>
+    <button class="btn" data-go="gp">Grand Prix<span class="sub">4 races, most points wins</span></button>
+    <div class="menu-row">
+      <button class="btn mint small" data-go="quick">Quick Race</button>
+      <button class="btn mint small" data-go="tt">Time Trial</button>
+    </div>
     <button class="btn sky" data-go="mp">Multiplayer<span class="sub">Race friends on their phones</span></button>
     <div class="menu-row">
       <button class="btn alt small" data-go="settings">Settings</button>
@@ -478,6 +592,59 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   </div>
 </section>
 
+<section id="scr-career" class="screen" hidden>
+  <div class="car-left">
+    <div class="top-bar"><h2 class="title">Career</h2><span class="wallet"><span>🪙 <b id="car-coins">0</b></span><span>★ <b id="car-stars">0</b></span></span></div>
+    <div class="chap panel">
+      <div class="chap-nav"><button id="chap-prev" data-go="prev" aria-label="Previous chapter">◀</button><span id="chap-num">Chapter 1</span><button id="chap-next" data-go="next" aria-label="Next chapter">▶</button></div>
+      <div class="chap-name" id="chap-name"></div>
+      <div class="chap-blurb" id="chap-blurb"></div>
+      <div class="chap-rival"><img id="chap-rival-img" alt=""><span id="chap-rival"></span></div>
+      <div class="chap-meta" id="chap-meta"></div>
+    </div>
+  </div>
+  <div class="car-right">
+    <div class="ev-list" id="ev-list"></div>
+    <div class="bottom-bar">
+      <button class="btn ghost small" data-go="back">Menu</button>
+      <button class="btn alt small" data-go="garage">Garage</button>
+      <button class="btn hot" data-go="race" id="car-go">Race!</button>
+    </div>
+  </div>
+</section>
+
+<section id="scr-garage" class="screen" hidden>
+  <div class="char-left">
+    <div class="top-bar"><h2 class="title">Garage</h2><span class="wallet"><span>🪙 <b id="gar-coins">0</b></span></span></div>
+    <div class="char-info gar-info">
+      <div class="char-species" id="gar-kind"></div>
+      <div class="char-name" id="gar-name"></div>
+      <div class="char-tag" id="gar-blurb"></div>
+      <div class="gstats" id="gar-stats"></div>
+    </div>
+  </div>
+  <div class="char-right">
+    <div class="seg gtabs" id="garage-tabs" role="tablist"><button data-tab="karts">Karts</button><button data-tab="upgrades">Upgrades</button><button data-tab="racers">Racers</button><button data-tab="paint">Paint</button></div>
+    <div class="garage-list" id="garage-list"></div>
+    <div class="bottom-bar">
+      <button class="btn ghost small" data-go="back">Back</button>
+      <button class="btn hot" data-go="act" id="gar-act">Buy</button>
+    </div>
+  </div>
+</section>
+
+<section id="scr-story" class="screen shade-full" hidden>
+  <button class="btn ghost small story-skip" data-go="skip">Skip</button>
+  <div class="story-box panel">
+    <div class="story-av" id="story-av"></div>
+    <div class="story-body">
+      <div class="story-head"><b id="story-name"></b><span class="eyebrow" id="story-title"></span></div>
+      <p id="story-text"></p>
+      <span class="story-next">Tap to continue ▸</span>
+    </div>
+  </div>
+</section>
+
 <section id="scr-lobby" class="screen center shade-full" hidden>
   <div class="dialog panel lobby">
     <div class="top-bar"><h2 class="title">Race with friends</h2><span class="eyebrow" id="lobby-status"></span></div>
@@ -519,6 +686,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <div class="row"><div class="lbl">Music</div><label class="toggle"><input type="checkbox" id="set-music" aria-label="Music"></label></div>
       <div class="row"><div><div class="lbl">Sound effects</div><div class="hint">Plays even when the phone is on silent.</div></div><label class="toggle"><input type="checkbox" id="set-sfx" aria-label="Sound effects"></label></div>
       <div class="row"><div class="lbl">Show FPS</div><label class="toggle"><input type="checkbox" id="set-fps" aria-label="Show FPS"></label></div>
+      <div class="row"><div><div class="lbl">Career progress</div><div class="hint">Start the career over from the scrapyard. Coins, karts and stars are lost.</div></div>
+        <button class="btn ghost small" id="set-reset-career">Reset</button></div>
     </div>
     <div class="bottom-bar"><button class="btn" data-go="close">Done</button></div>
   </div>
@@ -529,6 +698,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <h2 class="title">How to play</h2>
     <div class="scroll">
       <div class="help-grid">
+        <div><b>Career</b>Start with the Rust Bucket and win coins in story events. Spend them in the Garage on new karts, upgrades, paint and racers. Beat each chapter's rival to open the next one.</div>
         <div><b>Steer</b>Hold the phone sideways and turn it like a steering wheel. Gas is automatic.</div>
         <div><b>Drift + turbo</b>Hold DRIFT while turning. Sparks go blue, orange, then purple. Let go for a boost.</div>
         <div><b>Tricks</b>Tap DRIFT just after launching off a ramp. You get a boost when you land.</div>

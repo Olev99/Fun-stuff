@@ -4,6 +4,7 @@ import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { UI } from './ui.js';
+import { CareerUI } from './careerui.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
 import { CHARACTERS } from './characters.js';
@@ -13,6 +14,9 @@ import { fmtTime, ordinal } from './util.js';
 import { NetSession } from './net.js';
 import { PostFX } from './post.js';
 import { installHeightFog } from './env.js';
+import {
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, rivalFor, playerLoadout, aiLoadouts, applyResult,
+} from './career.js';
 
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
 
@@ -44,6 +48,8 @@ class App {
   constructor() {
     this.settings = loadSettings();
     this.records = loadRecords();
+    this.career = loadCareer();
+    this.careerRun = null;
     this.canvas = $('gl');
     installHeightFog();
     const r = (this.renderer = new THREE.WebGLRenderer({
@@ -68,6 +74,7 @@ class App {
     this.input.bindTouch($('controls'));
     this.hud = new HUD(this);
     this.ui = new UI(this);
+    this.careerUI = new CareerUI(this, this.ui);
     this.showroom = new Showroom(this);
     this.portraits = this.showroom.portraits(r, 112);
     $('fps').hidden = !this.settings.showFps;
@@ -176,6 +183,7 @@ class App {
   toTitle() {
     this.paused = false;
     this.gp = null;
+    this.careerRun = null;
     this.audio.stopEngine();
     this.audio.setTempo(1);
     this.hud.show(false);
@@ -243,17 +251,21 @@ class App {
       // Leader starts at the back.
       order = CHARACTERS.map((c) => c.id).sort((a, b) => gp.points[a] - gp.points[b] || (a === gp.player ? 1 : -1));
     }
-    this.startRace({ mode: 'gp', trackId: gp.tracks[gp.index], reverse: gp.reverse, player: gp.player, speedClass: gp.speedClass, order });
+    this.startRace({ mode: 'gp', trackId: gp.tracks[gp.index], reverse: gp.reverse, player: gp.player, speedClass: gp.speedClass, order, ...(gp.extra || {}) });
   }
 
   startRace(cfg) {
     this.lastCfg = cfg;
     this.disposeRace();
     this.paused = false;
-    const grid = this.makeGrid(cfg.player, cfg.order);
+    const grid = cfg.grid || this.makeGrid(cfg.player, cfg.order);
+    // Career races: per-racer karts (bodies and upgrades) for the computer racers.
+    const byId = cfg.loadoutsById;
+    const loadouts = byId && cfg.mode !== 'tt' ? grid.map((id) => (id === cfg.player ? cfg.playerLoadout : byId[id]) || null) : null;
     this.race = new Race(this, {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
+      loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null,
     });
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
@@ -346,6 +358,10 @@ class App {
     this.hud.show(false);
     const ui = this.ui;
     const me = rows.find((r) => r.isPlayer);
+    if (this.careerRun && !this.gp) {
+      this.onCareerComplete(race, rows);
+      return;
+    }
     if (race.mode === 'mp') {
       const host = this.session && this.session.isHost;
       ui.results({
@@ -384,11 +400,14 @@ class App {
         gp.points[r.ch.id] += r.plus;
       }
       const last = gp.index >= gp.tracks.length - 1;
+      if (me.place === 1) gp.wins = (gp.wins || 0) + 1;
+      gp.gems = (gp.gems || 0) + (race.player.gemsGot || 0);
+      const quit = gp.careerEv ? 'career' : 'menu';
       ui.results({
         title: `${me.place}${ordinal(me.place).toLowerCase()} place`,
         sub: `Race ${gp.index + 1} of ${gp.tracks.length} · ${race.trackDef.name}`,
         html: `<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">+${r.plus}</span><span class="pts">${gp.points[r.ch.id]}</span>`)).join('')}</div>`,
-        buttons: last ? [['menu', 'Quit', 'ghost small'], ['final', 'Final standings', 'hot']] : [['menu', 'Quit', 'ghost small'], ['next', 'Next race', 'hot']],
+        buttons: last ? [[quit, 'Quit', 'ghost small'], ['final', 'Final standings', 'hot']] : [[quit, 'Quit', 'ghost small'], ['next', 'Next race', 'hot']],
       });
       return;
     }
@@ -406,6 +425,10 @@ class App {
       .sort((a, b) => b.pts - a.pts || (a.isPlayer ? -1 : 1));
     table.forEach((r, i) => (r.place = i + 1));
     const me = table.find((r) => r.isPlayer);
+    if (gp.careerEv) {
+      this.onCareerCupFinal(table, me);
+      return;
+    }
     const trophy = me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁';
     const key = `cup:${gp.cup.id}`;
     const prevBest = this.records[key];
@@ -427,6 +450,12 @@ class App {
 
   onResultsAction(action) {
     switch (action) {
+      case 'career':
+        this.openCareer();
+        break;
+      case 'garage':
+        this.openCareer(true);
+        break;
       case 'lobby':
         this.backToLobby();
         break;
@@ -434,7 +463,8 @@ class App {
         this.leaveMP();
         break;
       case 'retry':
-        this.restart();
+        if (this.careerRun) this.startCareerEvent(this.careerRun.evId);
+        else this.restart();
         break;
       case 'tracks':
         this.ui.mode = this.lastCfg.mode;
@@ -457,6 +487,91 @@ class App {
         break;
       }
     }
+  }
+
+  // ---------------- career ----------------
+  // Leave a race from the pause menu: career players go back to the hub.
+  quitRace() {
+    if (this.careerRun) this.openCareer();
+    else this.toTitle();
+  }
+
+  openCareer(garage = false) {
+    this.paused = false;
+    this.menuOpen = false;
+    this.gp = null;
+    this.careerRun = null;
+    this.audio.stopEngine();
+    this.audio.setTempo(1);
+    this.hud.show(false);
+    this.releaseWake();
+    if (!this.career) {
+      this.career = newCareer();
+      saveCareer(this.career);
+    }
+    if (!this.race || this.race.mode !== 'demo') this.disposeRace();
+    this.applyControls();
+    if (garage) this.careerUI.openGarage();
+    else this.careerUI.open();
+  }
+
+  resetCareer() {
+    clearCareer();
+    this.career = null;
+    this.careerUI.ci = null;
+  }
+
+  startCareerEvent(evId) {
+    const c = this.career;
+    const { ev, chapter } = eventById(evId);
+    const player = c.racer;
+    const rival = rivalFor(c, chapter);
+    const lo = playerLoadout(c);
+    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev };
+    this.careerRun = { evId };
+    if (ev.type === 'cup') {
+      const others = CHARACTERS.map((ch) => ch.id).filter((id) => id !== player);
+      this.gp = {
+        cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: chapter.cls, player, careerEv: ev, wins: 0, gems: 0,
+        extra: { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev },
+      };
+      for (const ch of CHARACTERS) this.gp.points[ch.id] = 0;
+      this.startGPRace();
+    } else if (ev.type === 'time') {
+      this.startRace({ ...base, mode: 'tt' });
+    } else if (ev.type === 'duel') {
+      this.startRace({ ...base, mode: 'quick', grid: [rival, player], difficulty: chapter.bossDiff, loadoutsById: aiLoadouts(chapter, [rival], rival) });
+    } else {
+      const grid = this.makeGrid(player);
+      this.startRace({ ...base, mode: 'quick', grid, loadoutsById: aiLoadouts(chapter, grid.filter((id) => id !== player), rival) });
+    }
+  }
+
+  onCareerComplete(race, rows) {
+    const me = rows.find((r) => r.isPlayer);
+    const { ev } = eventById(this.careerRun.evId);
+    const res = { place: me.place, finished: me.finished, time: me.time, gems: (race.player && race.player.gemsGot) || 0 };
+    // Lead over the next racer (duels and "win by" stars).
+    const next = rows.find((r) => r.place === me.place + 1);
+    res.margin = me.place === 1 && next ? next.time - me.time : 0;
+    const out = applyResult(this.career, ev.id, res);
+    if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    let extra = '';
+    if (ev.type === 'time') extra = `<div class="big-msg"><em>${fmtTime(me.time)}</em></div><div class="car-goal">Target ${fmtTime(ev.target)}</div>`;
+    const rowsHtml = ev.type === 'time' ? '' : `<div class="results">${rows.map((r) => this.ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`;
+    this.careerUI.results(out, rowsHtml, extra);
+  }
+
+  onCareerCupFinal(table, me) {
+    const gp = this.gp;
+    const res = { place: me.place, wins: gp.wins || 0, gems: gp.gems || 0, finished: true };
+    const out = applyResult(this.career, gp.careerEv.id, res);
+    if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    this.audio.play(me.place === 1 ? 'finish' : 'lose');
+    const trophy = me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁';
+    const rowsHtml = `<div class="trophy">${trophy}</div><div class="results">${table.map((r) => this.ui.row(r, `<span></span><span class="pts">${r.pts}</span>`)).join('')}</div>`;
+    this.gp = null;
+    this.careerUI.results(out, rowsHtml);
   }
 
   // ---------------- multiplayer ----------------

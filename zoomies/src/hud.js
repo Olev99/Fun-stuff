@@ -1,5 +1,6 @@
 import { ITEMS, ITEM_ICONS, AIM_DEFAULT } from './items.js';
 import { fmtTime, ordinal } from './util.js';
+import { hudGoal } from './career.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,6 +28,7 @@ export class HUD {
     this.speed = $('speedlines');
     this.flash = $('flash');
     this.fpsEl = $('fps');
+    this.goalEl = $('hud-goal');
     this.cache = {};
     this.mapFrame = 0;
     this.rollTimer = 0;
@@ -47,6 +49,7 @@ export class HUD {
     this.speed.classList.remove('on');
     this.flash.style.opacity = 0;
     this._buildMap(race);
+    this.goalEl.hidden = !race.careerEv || race.careerEv.type === 'cup';
     const tt = race.mode === 'tt';
     this.pos.style.visibility = tt ? 'hidden' : 'visible';
     $('hud-gems').style.visibility = tt ? 'hidden' : 'visible';
@@ -63,7 +66,8 @@ export class HUD {
       this.trackName.hidden = true;
       return;
     }
-    const cls = race.mode === 'tt' ? 'Time Trial' : `${race.speedClass.name} class`;
+    const ev = race.careerEv;
+    const cls = ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : `${race.speedClass.name} class`;
     const extra = this.app.gp ? ` · Race ${this.app.gp.index + 1} of ${this.app.gp.tracks.length}` : '';
     this.trackName.innerHTML = `<small>${cls}${extra}</small>${race.trackDef.name}${race.track.reverse ? ' ⟲' : ''}`;
     this.trackName.hidden = false;
@@ -158,6 +162,7 @@ export class HUD {
       this.pos.className = (v === 1 ? 'p1' : v === 2 ? 'p2' : v === 3 ? 'p3' : 'pn') + ' bump';
     });
     this._set('gems', p.gems, (v) => { this.gems.textContent = v; });
+    if (race.careerEv) this._set('goal', hudGoal(race.careerEv, race), (v) => { this.goalEl.textContent = v; });
     const t = race.state === 'finished' ? p.finishTime : race.raceTime;
     this._set('time', Math.floor(t * 20), () => { this.timeEl.textContent = fmtTime(t); });
 

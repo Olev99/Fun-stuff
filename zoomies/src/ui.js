@@ -47,6 +47,7 @@ export class UI {
       case 'title':
         if (action === 'settings' || action === 'help') this.overlay(action, 'title');
         else if (action === 'mp') app.openMultiplayer();
+        else if (action === 'career') app.openCareer();
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
@@ -69,10 +70,19 @@ export class UI {
         if (action === 'resume') app.resume();
         else if (action === 'restart') app.restart();
         else if (action === 'settings') this.overlay('settings', 'pause');
-        else if (action === 'quit') (app.session ? app.leaveMP() : app.toTitle());
+        else if (action === 'quit') (app.session ? app.leaveMP() : app.quitRace());
         break;
       case 'results':
         app.onResultsAction(action);
+        break;
+      case 'career':
+        app.careerUI.action(action);
+        break;
+      case 'garage':
+        app.careerUI.garageAction(action);
+        break;
+      case 'story':
+        if (action === 'skip') app.careerUI.endStory();
         break;
     }
   }
@@ -339,6 +349,13 @@ export class UI {
     $('set-music').addEventListener('change', (e) => { s().music = e.target.checked; app.audio.setMusic(s().music); saveSettings(s()); });
     $('set-sfx').addEventListener('change', (e) => { s().sfx = e.target.checked; app.audio.setSfx(s().sfx); saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
+    $('set-reset-career').addEventListener('click', () => {
+      if (!app.career) { app.hud.toast('No career yet'); return; }
+      if (!confirm('Start the career over? Coins, karts, racers and stars will be lost.')) return;
+      app.resetCareer();
+      app.audio.play('uiBack');
+      $('set-reset-career').textContent = 'Done';
+    });
   }
 
   _syncSettings() {
@@ -350,6 +367,7 @@ export class UI {
     $('set-music').checked = s.music;
     $('set-sfx').checked = s.sfx;
     $('set-fps').checked = s.showFps;
+    $('set-reset-career').textContent = 'Reset';
   }
 
   tick() {
