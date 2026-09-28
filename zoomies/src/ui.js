@@ -71,7 +71,11 @@ export class UI {
         break;
       case 'settings':
         if (action === 'wheelpad') app.wheelPad.open();
+        else if (action === 'sync') app.sync.open('settings');
         else this.closeOverlay();
+        break;
+      case 'sync':
+        app.sync.close();
         break;
       case 'help':
         this.closeOverlay();
@@ -103,7 +107,8 @@ export class UI {
         else app.toTitle();
         break;
       case 'profile':
-        this.title();
+        if (action === 'sync') app.sync.open('title');
+        else this.title();
         break;
       case 'gumball':
         app.gumballUI.action(action);

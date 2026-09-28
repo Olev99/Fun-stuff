@@ -424,6 +424,18 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #wp-flash.hit { background: rgba(255,60,90,.45); animation: wpflash .5s ease-out; }
 #wp-flash.boost { background: rgba(255,210,63,.3); animation: wpflash .4s ease-out; }
 @keyframes wpflash { from { opacity: 1; } to { opacity: 0; } }
+/* Sync progress */
+.sync-dlg { width: min(620px, 100%); }
+.sync-intro { margin: 0 0 8px; font-weight: 700; color: var(--muted); font-size: 13px; }
+.sync-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sync-col { display: grid; gap: 8px; align-content: start; justify-items: start; }
+.sync-col > b { font-family: var(--font-display); font-weight: 400; font-size: 15px; color: var(--sun); }
+.sync-qr { display: flex; align-items: center; gap: 12px; }
+#sync-qr { width: 120px; height: 120px; border-radius: 10px; border: 3px solid var(--ink); image-rendering: pixelated; }
+#sync-code { font: 34px var(--font-display); letter-spacing: .14em; color: var(--sun); }
+#sync-code-in { width: 120px; font: 24px var(--font-display); text-align: center; letter-spacing: .2em; text-transform: uppercase; padding: 4px 8px; border-radius: 12px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); }
+.sync-status { margin: 10px 0 0; font-weight: 800; color: var(--sun); min-height: 18px; font-size: 13px; }
+.sync-done { margin: 6px 0 0; font-weight: 800; color: var(--mint); font-size: 14px; }
 /* Gumball machine */
 #scr-gumball { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
 .gum-wearing { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
@@ -920,6 +932,28 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   </div>
 </section>
 
+<section id="scr-sync" class="screen center shade-full" hidden>
+  <div class="dialog panel sync-dlg">
+    <div class="top-bar"><h2 class="title">Sync progress</h2><span class="eyebrow">Phone ⇄ Mac</span></div>
+    <p class="sync-intro">Play on your phone and your Mac with the same level, coins, karts, prizes and trophies. Nothing is lost: both devices' progress is combined.</p>
+    <div class="sync-body">
+      <div class="sync-col">
+        <b>Show a code here</b>
+        <button class="btn sky small" id="sync-show">Show code</button>
+        <div class="sync-qr" id="sync-qr-wrap" hidden><canvas id="sync-qr" width="170" height="170" aria-label="QR code for syncing"></canvas><span id="sync-code">····</span></div>
+      </div>
+      <div class="sync-col">
+        <b>…or type the other device's code</b>
+        <div class="wp-row"><input id="sync-code-in" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Code from the other device">
+          <button class="btn mint small" id="sync-join">Sync</button></div>
+      </div>
+    </div>
+    <p class="sync-status" id="sync-status"></p>
+    <p class="sync-done" id="sync-done" hidden></p>
+    <div class="bottom-bar"><button class="btn hot" data-go="close">Done</button></div>
+  </div>
+</section>
+
 <section id="scr-story" class="screen shade-full" hidden>
   <button class="btn ghost small story-skip" data-go="skip">Skip</button>
   <div class="story-box panel">
@@ -954,7 +988,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="top-bar"><h2 class="title">Trophies</h2><span class="eyebrow" id="prof-count"></span></div>
     <div class="prof-top" id="prof-top"></div>
     <div class="scroll"><div class="ach-grid" id="ach-grid"></div></div>
-    <div class="bottom-bar"><button class="btn" data-go="close">Done</button></div>
+    <div class="bottom-bar"><button class="btn sky small" data-go="sync">⇄ Sync with my other device</button><button class="btn" data-go="close">Done</button></div>
   </div>
 </section>
 
@@ -1008,6 +1042,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <div class="row"><div class="lbl">Music</div><label class="toggle"><input type="checkbox" id="set-music" aria-label="Music"></label></div>
       <div class="row"><div><div class="lbl">Sound effects</div><div class="hint">Plays even when the phone is on silent.</div></div><label class="toggle"><input type="checkbox" id="set-sfx" aria-label="Sound effects"></label></div>
       <div class="row"><div class="lbl">Show FPS</div><label class="toggle"><input type="checkbox" id="set-fps" aria-label="Show FPS"></label></div>
+      <div class="row"><div><div class="lbl">Sync progress</div><div class="hint">Same progress on your phone and your Mac. No account needed.</div></div>
+        <button class="btn sky small" data-go="sync">Sync</button></div>
       <div class="row"><div><div class="lbl">Start over</div><div class="hint">Wipes your level, coins, trophies, karts and career progress.</div></div>
         <button class="btn ghost small" id="set-reset-career">Reset</button></div>
     </div>

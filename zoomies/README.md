@@ -45,6 +45,10 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 - **Player level and coins everywhere:** every race in every mode pays coins and XP, and online races pay extra. Levelling up pays a coin bonus, and every 5th level also gives a free prize capsule. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
+- **Gumball machine (🍬 Prizes):**
+  - Spend coins, or the free turn you get every 5 levels, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary.
+  - Hats show on your racer everywhere, even to friends online. Trails colour your boost flames, and your horn honks when you overtake someone.
+  - Duplicates pay coins back.
 - **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.
 - **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter.
 - **Driving:** drift mini-turbos with blue, orange and purple sparks, rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
@@ -63,6 +67,29 @@ iOS only allows tilt controls on HTTPS pages opened directly in Safari, not insi
 4. Tap a menu button and allow **Motion & Orientation** access when iOS asks.
 
 Hold the phone sideways like a steering wheel and turn it to steer. **Settings** has a live tilt check, a sensitivity slider and an invert option.
+
+## Playing on a Mac
+
+It's the same game, and it notices when it's opened on a Mac or another computer:
+
+- **Keyboard:** ← → steer (a tap is a nudge, holding is full lock), SPACE drifts, E uses items (hold ↑ or ↓ to throw ahead or behind), ↓ brakes and reverses, Q looks back and ESC pauses. Gas is automatic. In menus, ENTER picks the highlighted button and ESC goes back.
+- **Game controllers:** PlayStation, Xbox and Switch Pro controllers work. The stick steers, R drifts, L uses items, B brakes, Y looks back and Start pauses. A and B work the menus.
+- **Your phone as a steering wheel:** tap **📱 Phone as a wheel** on the title screen and point the iPhone's camera at the QR code (or open the game on the phone and type the code in Settings). Hold the phone sideways and tilt it to steer. Its big buttons drift, use items, brake and look back, and **OK**, **Back** and **II** work the menus on the Mac. The phone shows your place, lap and item. If the phone disconnects mid-race, the game pauses.
+- **Max graphics:** Auto picks Max on a computer.
+  - Shadows at 4096 px over a wider area, and sun shafts through trees and scenery.
+  - Denser scenery, grass and weather, and more detailed far-away karts.
+  - Up to full Retina resolution. Dynamic resolution still holds 60 fps, and the Show FPS setting shows what it's doing.
+- Menus and the HUD scale up to fit the big screen.
+
+## Same progress on phone and Mac
+
+Your progress lives on each device, with no account needed. To bring two devices in step, open **Settings → Sync progress** (or the 🏆 screen) on both. Tap **Show code** on one and scan or type the code on the other. The two saves are combined, and nothing is lost:
+
+- Karts, racers, paint, prizes, trophies, stars and found shortcuts from both devices are kept.
+- Time trial records and ghosts: the faster one wins.
+- Coins, XP and stats: the first sync takes the higher value. After that, both devices remember the shared totals, so later syncs add up what each device earned or spent in between.
+
+Sync again whenever you switch devices. Pairing uses the same free WebRTC setup as multiplayer, so it needs the full page (not inside another page), as tilt does.
 
 ## Racing with friends
 
@@ -111,7 +138,8 @@ How it works:
 - **Tracks:** each track is a spline, and shortcuts are extra spline branches. Karts are simulated in "path space" (distance along the path + lateral offset) and switch between the main road and shortcuts through gaps in the walls. That keeps walls, banking, jumps, bridges and AI cheap. A full 8-kart physics step costs about 0.1–0.2 ms.
 - **Frame rate:** every graphics setting scales render resolution with frame time to hold 60 fps. Auto renders at 1.35–2.4× (starting at 2×), Ultra at 1.8–3× and Battery at 1.2–1.6× without bloom. If Low Power Mode caps Safari at 30 fps, the game notices and doesn't lower the resolution for nothing.
 - **Audio:** all sound is synthesised with WebAudio, including the engine, effects and a procedural chiptune per track. There are no audio files.
-- **Networking:** [PeerJS](https://peerjs.com) (vendored). To test locally without the internet, add `?net=local` to the URL and open two tabs.
+- **Networking:** [PeerJS](https://peerjs.com) (vendored), used for races, the phone wheel and progress sync. To test locally without the internet, add `?net=local` to the URL and open two tabs.
+- **QR codes:** [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) by Kazuhiko Arase (MIT, vendored).
 
 ```
 zoomies/
@@ -120,6 +148,11 @@ zoomies/
   src/career.js       career chapters, events, story, prices, scoring and save data
   src/careerui.js     career hub, garage, story dialogue and career results
   src/profile.js      player level, race rewards, achievements and the daily challenge
+  src/cosmetics.js    gumball machine prizes: hats, boost trails and horns
+  src/gumballui.js    the gumball machine and collection screens
+  src/platform.js     phone or computer (Mac) detection
+  src/wheel.js        a phone as the steering wheel for a computer
+  src/sync.js         syncing progress between devices
   src/race.js         race loop, laps, positions, collisions, camera, network sync
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
   src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur

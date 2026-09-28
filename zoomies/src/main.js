@@ -7,6 +7,7 @@ import { UI } from './ui.js';
 import { CareerUI } from './careerui.js';
 import { GumballUI } from './gumballui.js';
 import { WheelHost, WheelPad } from './wheel.js';
+import { Sync } from './sync.js';
 import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
@@ -90,6 +91,7 @@ class App {
     this.wheelHost = new WheelHost(this);
     this.wheelPad = new WheelPad(this);
     this.input.wheel = this.wheelHost;
+    this.sync = new Sync(this);
     this.showroom = new Showroom(this);
     this.portraits = this.showroom.portraits(r, 112);
     $('fps').hidden = !this.settings.showFps;
@@ -124,6 +126,7 @@ class App {
     this.toTitle();
     // Opened from the QR code on a computer: become its steering wheel.
     if (this.wheelPad.wanted) this.wheelPad.open();
+    else if (this.sync.wanted) this.sync.open('title');
     this.loop = this.loop.bind(this);
     this.last = performance.now();
     requestAnimationFrame(this.loop);
