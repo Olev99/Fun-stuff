@@ -279,7 +279,7 @@ export class Race {
     this._updateSkids(dt);
     this.fx.update(dt);
     this._updateCamera(dt);
-    this.tags.update(this.camera, this.app.w, this.app.h);
+    this.tags.update(this.camera, this.app.w / this.app.uiZoom, this.app.h / this.app.uiZoom);
     this.world.update(dt, this.camera, this.player ? this.player.pos : this.karts[this.demoTarget % this.karts.length].pos);
     this._netSend(dt);
 
@@ -435,6 +435,7 @@ export class Race {
           break;
         }
         case 'boost':
+          if (k.isPlayer && data >= 1) this.app.wheelHost.event('boost');
           if (k.isPlayer && data < 1.3) a.play('miniturbo');
           if (k.isPlayer) this.shake = Math.max(this.shake, 0.15);
           break;
@@ -467,7 +468,7 @@ export class Race {
           break;
         case 'hit':
           if (near) a.play('hit');
-          if (k.isPlayer) { this.shake = 0.6; this.flash = Math.max(this.flash, 0.25); }
+          if (k.isPlayer) { this.shake = 0.6; this.flash = Math.max(this.flash, 0.25); this.app.wheelHost.event('hit'); }
           for (let n = 0; n < data; n++) {
             this.fx.glow.emit(k.pos.x, k.pos.y + 1, k.pos.z, (Math.random() - 0.5) * 8, 6 + Math.random() * 4, (Math.random() - 0.5) * 8, '#46f0ff', 0.7, 0.3, 0.9, 16, 0.5);
           }
@@ -704,7 +705,8 @@ export class Race {
     const cp = this.camera.position;
     for (const k of this.karts) {
       const d2 = k.pos.distanceToSquared(cp);
-      k.setLOD(k === this.player && this.mode !== 'demo' ? false : d2 > (k.lodFar ? 26 * 26 : 30 * 30));
+      const ld = this.quality.lodDist || 1;
+      k.setLOD(k === this.player && this.mode !== 'demo' ? false : d2 > (k.lodFar ? 26 * 26 : 30 * 30) * ld * ld);
     }
   }
 
@@ -1167,6 +1169,9 @@ export class Race {
       const v = (this._sunV || (this._sunV = new THREE.Vector3())).copy(this.world.sunDir).multiplyScalar(600).add(this.camera.position).project(this.camera);
       const inView = v.z < 1 && Math.abs(v.x) < 1.2 && Math.abs(v.y) < 1.2;
       this.grade.sunOn = inView ? 1 - Math.max(0, Math.max(Math.abs(v.x), Math.abs(v.y)) - 0.9) / 0.3 : 0;
+      // Light shafts (Max graphics) also stream in from a sun just above or beside the frame.
+      const out = Math.max(0, Math.abs(v.x) - 1) + Math.max(0, Math.abs(v.y) - 1);
+      this.grade.shaftOn = v.z < 1 ? Math.max(0, 1 - out / 1.6) : 0;
       this.grade.sunX = v.x * 0.5 + 0.5;
       this.grade.sunY = v.y * 0.5 + 0.5;
     }

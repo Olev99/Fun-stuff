@@ -362,7 +362,7 @@ export class World {
       this.sun.castShadow = true;
       this.sun.shadow.mapSize.set(shadows, shadows);
       const c = this.sun.shadow.camera;
-      const R = shadows >= 2048 ? 56 : 46;
+      const R = this.quality.shadowRange || (shadows >= 2048 ? 56 : 46);
       c.left = -R; c.right = R; c.top = R; c.bottom = -R; c.near = 1; c.far = 260;
       this.sun.shadow.bias = -0.0004;
       this.sun.shadow.normalBias = 0.04;

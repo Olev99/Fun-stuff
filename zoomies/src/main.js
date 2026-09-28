@@ -6,6 +6,7 @@ import { HUD } from './hud.js';
 import { UI } from './ui.js';
 import { CareerUI } from './careerui.js';
 import { GumballUI } from './gumballui.js';
+import { WheelHost, WheelPad } from './wheel.js';
 import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
@@ -37,7 +38,7 @@ const HDR = (() => {
     return false;
   }
 })();
-const isTouch = matchMedia('(pointer: coarse)').matches;
+import { isTouch, isDesktop, isMac } from './platform.js';
 const $ = (id) => document.getElementById(id);
 
 function shuffle(a) {
@@ -50,6 +51,10 @@ function shuffle(a) {
 
 class App {
   constructor() {
+    // Same game everywhere; computers get keyboard hints, a scaled UI and Max graphics.
+    document.documentElement.classList.add(isDesktop ? 'desktop' : 'touch');
+    if (isMac) document.documentElement.classList.add('mac');
+    this.uiZoom = 1;
     this.settings = loadSettings();
     this.records = loadRecords();
     // One save for career progress, the wallet, XP, stats and achievements.
@@ -81,6 +86,10 @@ class App {
     this.ui = new UI(this);
     this.careerUI = new CareerUI(this, this.ui);
     this.gumballUI = new GumballUI(this);
+    // A phone can be the steering wheel for a computer (see wheel.js).
+    this.wheelHost = new WheelHost(this);
+    this.wheelPad = new WheelPad(this);
+    this.input.wheel = this.wheelHost;
     this.showroom = new Showroom(this);
     this.portraits = this.showroom.portraits(r, 112);
     $('fps').hidden = !this.settings.showFps;
@@ -108,16 +117,13 @@ class App {
     const kick = () => { if (!this.paused && !this.audio.ready) this.audio.unlock(); };
     for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, kick, { capture: true, passive: true });
     document.addEventListener('dblclick', (e) => e.preventDefault());
-    addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' || e.code === 'KeyP') {
-        if (this.paused) this.resume();
-        else this.pause();
-      }
-    });
+    addEventListener('keydown', (e) => this.onKey(e));
     this.canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
     this.canvas.addEventListener('webglcontextrestored', () => location.reload());
 
     this.toTitle();
+    // Opened from the QR code on a computer: become its steering wheel.
+    if (this.wheelPad.wanted) this.wheelPad.open();
     this.loop = this.loop.bind(this);
     this.last = performance.now();
     requestAnimationFrame(this.loop);
@@ -128,15 +134,38 @@ class App {
     }, 60);
   }
 
+  // Keyboard for menus: Enter picks the highlighted (hot) button, Esc goes
+  // back or pauses, P pauses.
+  onKey(e) {
+    if (e.repeat || e.target.tagName === 'INPUT') return;
+    const inRace = this.race && this.race.mode !== 'demo';
+    const scr = document.querySelector('#ui > .screen:not([hidden])');
+    if (inRace && (e.code === 'KeyP' || e.code === 'Escape') && (!scr || scr.id === 'scr-pause')) {
+      if (this.paused || this.menuOpen) this.resume();
+      else this.pause();
+      return;
+    }
+    if (!scr) return;
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      const b = scr.querySelector('.btn.hot:not([hidden]):not(:disabled)');
+      if (b) { e.preventDefault(); b.click(); }
+    } else if (e.code === 'Escape') {
+      const b = scr.querySelector('[data-go="back"]:not([hidden]), [data-go="close"]:not([hidden]), [data-go="menu"]:not([hidden])');
+      if (b) { e.preventDefault(); b.click(); }
+    }
+  }
+
   // ---------------- setup ----------------
   applyQuality(initial = false) {
-    this.quality = QUALITY[this.settings.quality] || QUALITY.auto;
+    // Auto means Max on a Mac or other computer.
+    const q = this.settings.quality === 'auto' && isDesktop ? 'max' : this.settings.quality;
+    this.quality = QUALITY[q] || QUALITY.auto;
     const dpr = window.devicePixelRatio || 1;
     this.maxPR = Math.min(dpr, this.quality.maxPR);
     this.minPR = Math.min(dpr, this.quality.minPR);
     this.pr = Math.min(dpr, this.quality.startPR);
     this.renderer.shadowMap.enabled = !!this.quality.shadows;
-    this.post.configure({ samples: this.quality.msaa, bloom: this.quality.bloom });
+    this.post.configure({ samples: this.quality.msaa, bloom: this.quality.bloom, shafts: this.quality.shafts || 0 });
     this.drTimer = 0;
     this.goodTime = 0;
     this.blockRaise = 3;
@@ -147,6 +176,20 @@ class App {
     const w = window.innerWidth, h = window.innerHeight;
     this.w = w;
     this.h = h;
+    // The UI was laid out for a phone held sideways. On a big screen, scale
+    // it up as one piece so menus and the HUD stay readable.
+    const z = isDesktop ? Math.max(1, Math.min(2.2, Math.min(w / 1000, h / 560))) : 1;
+    this.uiZoom = z;
+    const ui = $('ui');
+    document.documentElement.style.setProperty('--vw', `${w / z / 100}px`);
+    document.documentElement.style.setProperty('--vh', `${h / z / 100}px`);
+    if (z > 1) {
+      ui.style.width = `${w / z}px`;
+      ui.style.height = `${h / z}px`;
+      ui.style.transform = `scale(${z})`;
+    } else {
+      ui.style.width = ui.style.height = ui.style.transform = '';
+    }
     this.renderer.setPixelRatio(this.pr);
     this.renderer.setSize(w, h, false);
     this.post.setSize(Math.floor(w * this.pr), Math.floor(h * this.pr));
@@ -900,6 +943,7 @@ class App {
     if (dt <= 0) return;
     dt = Math.min(dt, 0.05);
 
+    this._pollPad();
     if (!this.paused && this.view) {
       this.renderer.info.reset();
       this.view.update(dt);
@@ -909,6 +953,21 @@ class App {
       else this.renderer.render(this.view.scene, this.view.camera);
     }
     this.ui.tick(dt);
+    this.wheelHost.tick(dt);
+    this.wheelPad.tick(dt);
+  }
+
+  // Controllers work the menus too: A = the hot button, B = back, Start = pause.
+  _pollPad() {
+    const inp = this.input;
+    inp.pollPad();
+    const E = inp.padEdges;
+    if (!E.a && !E.b && !E.start) return;
+    const scr = document.querySelector('#ui > .screen:not([hidden])');
+    const key = (code) => this.onKey({ code, target: document.body, preventDefault() {} });
+    if (E.start) key('Escape');
+    else if (scr && E.a) key('Enter');
+    else if (scr && E.b) key('Escape');
   }
 
   _checkTilt() {

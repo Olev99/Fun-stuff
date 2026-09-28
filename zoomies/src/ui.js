@@ -54,6 +54,7 @@ export class UI {
         else if (action === 'daily') this.dailyScreen();
         else if (action === 'profile') this.profileScreen();
         else if (action === 'gumball') app.gumballUI.open('title');
+        else if (action === 'wheel') app.wheelHost.open('title');
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
@@ -69,8 +70,14 @@ export class UI {
         else app.startFromMenu(this.mode);
         break;
       case 'settings':
+        if (action === 'wheelpad') app.wheelPad.open();
+        else this.closeOverlay();
+        break;
       case 'help':
         this.closeOverlay();
+        break;
+      case 'wheel':
+        app.wheelHost.close();
         break;
       case 'pause':
         if (action === 'resume') app.resume();
@@ -428,6 +435,17 @@ export class UI {
         app.applyControls();
       }
     });
+    $('set-steer-desk').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      if (b.dataset.v === 'wheel') app.wheelHost.open('settings');
+      else {
+        s().steering = 'keys';
+        saveSettings(s());
+        this._syncSettings();
+      }
+    });
     $('set-quality').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;
@@ -473,6 +491,8 @@ export class UI {
   _syncSettings() {
     const s = this.app.settings;
     document.querySelectorAll('#set-steer [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.steering));
+    const wheelOn = this.app.wheelHost && this.app.wheelHost.live;
+    document.querySelectorAll('#set-steer-desk [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (wheelOn ? 'wheel' : 'keys')));
     document.querySelectorAll('#set-quality [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.quality));
     document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
     document.querySelectorAll('#set-assist [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.assist || 'off')));

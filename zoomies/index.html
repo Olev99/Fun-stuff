@@ -35,6 +35,8 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
   color-scheme: dark;
+  /* 1% of the UI area (the whole screen, or the scaled UI on big screens). */
+  --vw: 1vw; --vh: 1vh;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
@@ -44,6 +46,17 @@ html, body {
   overscroll-behavior: none; touch-action: none; -webkit-text-size-adjust: 100%;
 }
 #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: var(--ink); }
+/* All menus and the HUD. On big screens it is scaled up as one piece (see App.resize). */
+#ui { position: fixed; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; z-index: 10; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+#ui > #hud, #ui > #controls { pointer-events: none; }
+.wheel-btn { text-align: center !important; }
+.wheel-btn span:not(:empty) { margin-left: 8px; color: var(--mint); }
+/* Show the right control hints for phones and computers. */
+.desk-only { display: none; }
+html.desktop .desk-only { display: revert; }
+html.desktop .touch-only { display: none !important; }
+kbd { font-family: var(--font-display); font-size: .9em; padding: 1px 6px 0; border-radius: 6px; border: 2px solid currentColor; border-bottom-width: 3px; line-height: 1.3; }
 button { font: inherit; color: inherit; touch-action: manipulation; }
 [hidden] { display: none !important; }
 
@@ -78,7 +91,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 .panel { background: var(--ink-2); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 6px 0 rgba(0,0,0,.35); }
 h2.title {
-  font-family: var(--font-display); font-weight: 400; font-size: clamp(20px, 5.4vh, 30px); margin: 0; line-height: 1;
+  font-family: var(--font-display); font-weight: 400; font-size: clamp(20px, calc(5.4 * var(--vh)), 30px); margin: 0; line-height: 1;
   color: var(--sun); text-shadow: 0 3px 0 var(--ink); letter-spacing: .01em; text-wrap: balance;
 }
 .eyebrow { font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
@@ -87,21 +100,24 @@ h2.title {
 #scr-title { align-items: center; justify-content: space-between; gap: 20px; }
 .logo-wrap { display: flex; flex-direction: column; gap: 10px; max-width: 52%; }
 .logo {
-  font-family: var(--font-display); font-size: clamp(46px, 15vh, 104px); line-height: .88; color: var(--sun);
+  font-family: var(--font-display); font-size: clamp(46px, calc(15 * var(--vh)), 104px); line-height: .88; color: var(--sun);
   transform: rotate(-5deg) skewX(-7deg); transform-origin: left center; margin: 0 0 6px -4px;
   text-shadow: 0 0 0 var(--ink), 3px 3px 0 var(--ink), -3px 3px 0 var(--ink), 3px -3px 0 var(--ink), -3px -3px 0 var(--ink),
     0 8px 0 var(--tang), 3px 11px 0 var(--ink), -3px 11px 0 var(--ink);
 }
 .logo small { display: block; font-size: .36em; color: var(--mint); letter-spacing: .06em; margin-top: 6px; }
-.tagline { font-weight: 700; font-size: clamp(14px, 3.8vh, 18px); color: var(--cream); max-width: 34ch; line-height: 1.25; }
+.tagline { font-weight: 700; font-size: clamp(14px, calc(3.8 * var(--vh)), 18px); color: var(--cream); max-width: 34ch; line-height: 1.25; }
 .tagline b { color: var(--sun); }
-.menu { display: grid; gap: 12px; width: min(300px, 42vw); }
-.menu .btn { text-align: left; font-size: clamp(15px, 4.4vh, 19px); }
+.menu { display: grid; gap: 12px; width: min(300px, calc(42 * var(--vw))); }
+.menu > * { min-width: 0; }
+html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
+.menu-row .btn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 8px; padding-right: 8px; font-size: clamp(14px, calc(4 * var(--vh)), 17px); }
+.menu .btn { text-align: left; font-size: clamp(15px, calc(4.4 * var(--vh)), 19px); }
 .menu-row { display: flex; gap: 10px; }
 .menu-row .btn { flex: 1; text-align: center; }
-.menu-row.tight { gap: 8px; }
-.menu-row.tight .btn { min-width: 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; font-size: clamp(13px, 3.8vh, 16px); }
-.menu-row.tight .btn.ico { flex: 0 0 auto; width: 44px; }
+.menu-row.tight { gap: 6px; }
+.menu-row.tight .btn { min-width: 0; white-space: nowrap; padding-left: 4px; padding-right: 4px; font-size: clamp(12px, calc(3.5 * var(--vh)), 16px); }
+.menu-row.tight .btn.ico { flex: 0 0 auto; width: 40px; }
 .install-tip {
   position: absolute; left: max(18px, var(--sal)); bottom: max(10px, var(--sab)); font-size: 12px; font-weight: 700;
   color: var(--muted); max-width: 46ch;
@@ -119,7 +135,7 @@ h2.title {
   display: flex; flex-direction: column; gap: 4px; max-width: 320px; padding: 10px 12px; border-radius: 16px;
   background: rgba(29,21,55,.78); border: 3px solid var(--ink); box-shadow: 0 5px 0 rgba(0,0,0,.3);
 }
-.char-name { font-family: var(--font-display); font-size: clamp(24px, 7vh, 40px); line-height: .95; color: var(--cream); text-shadow: 0 4px 0 var(--ink); }
+.char-name { font-family: var(--font-display); font-size: clamp(24px, calc(7 * var(--vh)), 40px); line-height: .95; color: var(--cream); text-shadow: 0 4px 0 var(--ink); }
 .char-species { font-weight: 800; color: var(--sun); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
 .char-tag { font-weight: 600; font-size: 14px; line-height: 1.25; color: var(--cream); opacity: .9; max-width: 32ch; }
 .stats { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; align-items: center; margin-top: 4px; }
@@ -130,7 +146,7 @@ h2.title {
 .char-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; align-content: center; }
 .card {
   position: relative; border: 3px solid var(--ink); border-radius: 14px; overflow: hidden; cursor: pointer; padding: 0;
-  aspect-ratio: 1 / 1; max-height: 30vh; background: var(--ink-3); box-shadow: 0 4px 0 var(--ink); transition: transform .12s ease-out;
+  aspect-ratio: 1 / 1; max-height: calc(30 * var(--vh)); background: var(--ink-3); box-shadow: 0 4px 0 var(--ink); transition: transform .12s ease-out;
 }
 .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card .nm {
@@ -146,10 +162,10 @@ h2.title {
 .track-row { flex: 1; min-height: 0; display: flex; gap: 12px; align-items: center; overflow-x: auto; overflow-y: hidden; padding: 6px 2px 10px; scrollbar-width: none; }
 .track-row::-webkit-scrollbar { display: none; }
 .tcard {
-  flex: 0 0 auto; width: clamp(130px, 21vw, 190px); border: 3px solid var(--ink); border-radius: 16px; background: var(--ink-2);
+  flex: 0 0 auto; width: clamp(130px, calc(21 * var(--vw)), 190px); border: 3px solid var(--ink); border-radius: 16px; background: var(--ink-2);
   box-shadow: 0 5px 0 var(--ink); overflow: hidden; cursor: pointer; text-align: left; padding: 0; transition: transform .12s ease-out;
 }
-.tcard canvas { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: 34vh; }
+.tcard canvas { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: calc(34 * var(--vh)); }
 .tcard .tx { padding: 7px 9px 8px; display: grid; gap: 2px; }
 .tcard .tn { font-family: var(--font-display); font-size: 12.5px; line-height: 1.1; color: var(--cream); }
 .tcard .tb { font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -205,7 +221,7 @@ h2.title {
 .lobby-error { min-height: 1.2em; margin: 8px 0 0; font-weight: 800; font-size: 13px; color: var(--berry); }
 .room-code { display: flex; align-items: baseline; gap: 12px; }
 .room-code small { font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
-.room-code b { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 9vh, 46px); letter-spacing: .12em; color: var(--sun); text-shadow: 0 3px 0 var(--ink); }
+.room-code b { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, calc(9 * var(--vh)), 46px); letter-spacing: .12em; color: var(--sun); text-shadow: 0 3px 0 var(--ink); }
 .lobby-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; margin-top: 6px; }
 .players { display: grid; gap: 6px; align-content: start; }
 .pl { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 12px; background: rgba(0,0,0,.2); font-weight: 800; font-size: 14px; }
@@ -258,7 +274,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .res .plus { font-size: 12px; color: var(--mint); min-width: 30px; text-align: right; }
 .res.me .plus { color: var(--ink); }
 .trophy { font-size: 46px; line-height: 1; text-align: center; }
-.big-msg { font-family: var(--font-display); font-size: clamp(22px, 7vh, 36px); color: var(--cream); text-align: center; line-height: 1.05; text-shadow: 0 4px 0 var(--ink); }
+.big-msg { font-family: var(--font-display); font-size: clamp(22px, calc(7 * var(--vh)), 36px); color: var(--cream); text-align: center; line-height: 1.05; text-shadow: 0 4px 0 var(--ink); }
 .big-msg em { font-style: normal; color: var(--sun); }
 .tt-times { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; font-variant-numeric: tabular-nums; }
 .tt-times div { background: rgba(0,0,0,.2); border-radius: 12px; padding: 8px 10px; font-weight: 800; }
@@ -336,7 +352,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .chap-nav span { font-weight: 800; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
 .chap-nav button { width: 32px; height: 32px; border-radius: 10px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); font-family: var(--font-display); font-size: 13px; cursor: pointer; }
 .chap-nav button:disabled { opacity: .3; }
-.chap-name { font-family: var(--font-display); font-size: clamp(20px, 6.2vh, 30px); line-height: 1; color: var(--sun); text-shadow: 0 3px 0 var(--ink); }
+.chap-name { font-family: var(--font-display); font-size: clamp(20px, calc(6.2 * var(--vh)), 30px); line-height: 1; color: var(--sun); text-shadow: 0 3px 0 var(--ink); }
 .chap-blurb { font-weight: 600; font-size: 13px; line-height: 1.25; }
 .chap-rival { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; color: var(--muted); }
 .chap-rival img { width: 42px; height: 42px; border-radius: 11px; border: 3px solid var(--ink); background: var(--ink-3); }
@@ -364,6 +380,50 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .ev.sel { border-color: var(--sun); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--ink); }
 .ev.off { opacity: .55; }
 .btn.dim { opacity: .45; }
+/* Phone as a wheel: pairing on the computer */
+.wheel-dlg { width: min(640px, 100%); }
+.wheel-body { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+#wheel-qr { width: 200px; height: 200px; border-radius: 14px; border: 4px solid var(--ink); image-rendering: pixelated; background: #fff; }
+.wheel-steps { display: grid; gap: 8px; font-weight: 700; font-size: 14px; }
+.wheel-steps > div { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; }
+.wheel-steps > div > b.n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sun); color: var(--ink); font-family: var(--font-display); font-weight: 400; }
+.wheel-steps small { color: var(--muted); font-weight: 700; } .wheel-steps small span { color: var(--cream); word-break: break-all; }
+.wheel-status { margin: 4px 0 0; font-weight: 800; color: var(--sun); min-height: 20px; }
+#scr-wheel.paired .wheel-status { color: var(--mint); }
+#wheel-code { font-family: var(--font-display); font-weight: 400; color: var(--sun); letter-spacing: .12em; font-size: 18px; }
+/* Phone as a wheel: the controller on the phone */
+#scr-wheelpad { background: radial-gradient(circle at 30% 40%, #3a2d6e, #1d1537 70%); padding: 0; }
+.wp-connect { margin: auto; display: grid; gap: 12px; justify-items: center; text-align: center; padding: 20px; max-width: 460px; }
+.wp-connect p { margin: 0; font-weight: 700; color: var(--muted); }
+.wp-row { display: flex; gap: 10px; }
+#wp-code { width: 150px; font: 30px var(--font-display); text-align: center; letter-spacing: .2em; text-transform: uppercase; padding: 6px 10px; border-radius: 14px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); }
+.wp-pad { position: absolute; inset: 0; touch-action: none; }
+.wp-state { position: absolute; left: calc(14px + var(--sal)); top: 10px; display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 16px; }
+.wp-state .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+.wp-state.lost .dot { background: var(--berry); box-shadow: none; }
+.wp-state b { font-weight: 400; font-size: 30px; color: var(--sun); } .wp-state sup { font-size: 13px; }
+.wp-menu { position: absolute; right: calc(14px + var(--sar)); top: 10px; display: flex; gap: 8px; }
+.wp-menu button { font: 15px var(--font-display); padding: 8px 14px 6px; border-radius: 12px; border: 3px solid var(--ink); background: var(--ink-3); color: var(--cream); box-shadow: 0 4px 0 var(--ink); }
+.wp-menu .ok { background: var(--mint); color: var(--ink); min-width: 70px; } .wp-menu .ok.dim { opacity: .5; }
+.wp-wheel-wrap { position: absolute; left: calc(8% + var(--sal)); top: 50%; transform: translateY(-46%); display: grid; justify-items: center; gap: 8px; }
+.wp-wheel { width: min(calc(46 * var(--vh)), calc(34 * var(--vw))); height: min(calc(46 * var(--vh)), calc(34 * var(--vw))); border-radius: 50%; border: 14px solid #2a2438; box-shadow: 0 0 0 4px var(--ink), inset 0 0 0 4px var(--ink), 0 10px 0 var(--ink); position: relative; transition: border-color .2s; }
+.wp-wheel i { position: absolute; left: 50%; top: 50%; width: 100%; height: 15%; transform: translate(-50%, -50%); background: #2a2438; border-block: 4px solid var(--ink); }
+.wp-wheel i::after { content: ""; position: absolute; left: 50%; top: 50%; width: 15%; height: 330%; transform: translate(-50%, 0); background: #2a2438; border-inline: 4px solid var(--ink); }
+.wp-wheel::after { content: "Z"; position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--tang); border: 4px solid var(--ink); display: grid; place-items: center; font: 26px var(--font-display); color: var(--cream); }
+.wp-wheel b { position: absolute; left: 50%; top: -10px; width: 12px; height: 26px; margin-left: -6px; border-radius: 6px; background: var(--sun); border: 3px solid var(--ink); }
+.wp-wheel[data-drift="0"] { border-color: #fff3b0; } .wp-wheel[data-drift="1"] { border-color: #46c8ff; } .wp-wheel[data-drift="2"] { border-color: #ff9a2e; } .wp-wheel[data-drift="3"] { border-color: #c77dff; }
+.wp-tilt { max-width: 260px; text-align: center; font-weight: 800; color: var(--berry); margin: 0; }
+.wp-btn { position: absolute; border-radius: 50%; border: 4px solid var(--ink); font: 17px/1.1 var(--font-display); color: var(--ink); box-shadow: 0 6px 0 var(--ink); touch-action: none; }
+.wp-btn.on { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); filter: brightness(1.15); }
+.wp-btn.drift { right: calc(4% + var(--sar)); bottom: 8%; width: min(calc(38 * var(--vh)), calc(26 * var(--vw))); height: min(calc(38 * var(--vh)), calc(26 * var(--vw))); background: var(--tang); font-size: 24px; }
+.wp-btn.item { right: calc(4% + var(--sar) + min(calc(38 * var(--vh)), calc(26 * var(--vw))) + 4%); bottom: 34%; width: min(calc(28 * var(--vh)), calc(19 * var(--vw))); height: min(calc(28 * var(--vh)), calc(19 * var(--vw))); background: var(--sun); display: grid; place-items: center; align-content: center; }
+.wp-btn.item i { font-style: normal; font-size: 36px; line-height: 1; min-height: 36px; }
+.wp-btn.brake { right: calc(4% + var(--sar) + min(calc(38 * var(--vh)), calc(26 * var(--vw))) + 6%); bottom: 6%; width: min(calc(20 * var(--vh)), calc(14 * var(--vw))); height: min(calc(20 * var(--vh)), calc(14 * var(--vw))); background: var(--cream); font-size: 14px; }
+.wp-btn.look { right: calc(4% + var(--sar) + 4%); top: 22%; width: min(calc(18 * var(--vh)), calc(12 * var(--vw))); height: min(calc(18 * var(--vh)), calc(12 * var(--vw))); background: var(--sky); font-size: 12px; }
+#wp-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+#wp-flash.hit { background: rgba(255,60,90,.45); animation: wpflash .5s ease-out; }
+#wp-flash.boost { background: rgba(255,210,63,.3); animation: wpflash .4s ease-out; }
+@keyframes wpflash { from { opacity: 1; } to { opacity: 0; } }
 /* Gumball machine */
 #scr-gumball { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
 .gum-wearing { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
@@ -461,7 +521,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .story-av img { width: 100%; height: 100%; object-fit: cover; }
 .story-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .story-head b { font-family: var(--font-display); font-weight: 400; font-size: 17px; color: var(--sun); }
-#story-text { margin: 4px 0 2px; font-weight: 700; font-size: clamp(15px, 4.4vh, 19px); line-height: 1.3; min-height: 2.6em; }
+#story-text { margin: 4px 0 2px; font-weight: 700; font-size: clamp(15px, calc(4.4 * var(--vh)), 19px); line-height: 1.3; min-height: 2.6em; }
 #story-text.in { animation: storyIn .3s ease-out; }
 @keyframes storyIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .story-next { font-weight: 800; font-size: 12px; color: var(--muted); animation: blink 1.2s steps(2) infinite; }
@@ -533,23 +593,23 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 }
 #hud-center {
   position: absolute; left: 0; right: 0; top: 30%; text-align: center; font-family: var(--font-display);
-  font-size: clamp(60px, 26vh, 150px); line-height: 1; color: var(--sun); -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill;
+  font-size: clamp(60px, calc(26 * var(--vh)), 150px); line-height: 1; color: var(--sun); -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill;
   text-shadow: 0 8px 0 var(--ink); opacity: 0;
 }
 #hud-center.show { animation: count .9s ease-out forwards; }
 #hud-center.go { color: var(--mint); }
 #hud-banner {
-  position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-family: var(--font-display); font-size: clamp(30px, 11vh, 60px);
+  position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-family: var(--font-display); font-size: clamp(30px, calc(11 * var(--vh)), 60px);
   color: var(--cream); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 var(--ink); opacity: 0;
 }
 #hud-banner.final { color: var(--tang); }
-#hud-banner.finish { color: var(--sun); font-size: clamp(40px, 16vh, 96px); }
+#hud-banner.finish { color: var(--sun); font-size: clamp(40px, calc(16 * var(--vh)), 96px); }
 #hud-banner.show { animation: banner 2.2s ease-out forwards; }
 #hud-banner.stay { animation: bannerIn .5s ease-out forwards; }
 #hud-banner small { display: block; font-size: .45em; color: var(--cream); margin-top: 6px; }
 #hud-trackname {
   position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); text-align: center; white-space: nowrap;
-  font-family: var(--font-display); font-size: clamp(22px, 8vh, 40px); color: var(--cream); text-shadow: 0 4px 0 var(--ink);
+  font-family: var(--font-display); font-size: clamp(22px, calc(8 * var(--vh)), 40px); color: var(--cream); text-shadow: 0 4px 0 var(--ink);
 }
 #hud-trackname small { display: block; font-family: var(--font-body); font-weight: 800; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--sun); text-shadow: 0 2px 0 var(--ink); }
 #hud-toast {
@@ -652,6 +712,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 <body>
 <canvas id="gl"></canvas>
 
+<div id="ui">
 <div id="hud" hidden>
   <div id="hud-tags"></div>
   <div id="hud-style"></div>
@@ -693,7 +754,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 <section id="scr-title" class="screen shade-left" hidden>
   <div class="logo-wrap">
     <h1 class="logo">ZOOMIES!<small>KART CHAOS</small></h1>
-    <p class="tagline">Tilt your phone to steer. Hold <b>DRIFT</b> through corners, let go for a turbo.</p>
+    <p class="tagline touch-only">Tilt your phone to steer. Hold <b>DRIFT</b> through corners, let go for a turbo.</p>
+    <p class="tagline desk-only">Steer with <kbd>←</kbd> <kbd>→</kbd>. Hold <kbd>SPACE</kbd> through corners, let go for a turbo. Or grab a controller, or turn your phone into a wheel.</p>
   </div>
   <button class="pchip" id="pchip" data-go="profile" aria-label="Your level and trophies"></button>
   <nav class="menu">
@@ -707,6 +769,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <button class="btn mint small" data-go="tt">Time Trial</button>
       <button class="btn sky small" data-go="mp">Multiplayer</button>
     </div>
+    <button class="btn sky small desk-only wheel-btn" data-go="wheel">📱 Phone as a wheel<span id="menu-wheel"></span></button>
     <div class="menu-row tight">
       <button class="btn alt small ico" data-go="settings" aria-label="Settings">⚙️</button>
       <button class="btn alt small ico" data-go="help" aria-label="Help">❓</button>
@@ -819,6 +882,44 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   </div>
 </section>
 
+<section id="scr-wheel" class="screen center shade-full" hidden>
+  <div class="dialog panel wheel-dlg">
+    <div class="top-bar"><h2 class="title">Phone as a wheel</h2><span class="eyebrow">Code <b id="wheel-code">····</b></span></div>
+    <div class="wheel-body">
+      <canvas id="wheel-qr" width="220" height="220" aria-label="QR code to pair your phone"></canvas>
+      <div class="wheel-steps">
+        <div><b class="n">1</b><span>Point your iPhone's <b>Camera</b> at the code and tap the link.</span></div>
+        <div><b class="n">2</b><span>Tap <b>Connect</b> and allow motion access.</span></div>
+        <div><b class="n">3</b><span>Hold the phone sideways and tilt it to steer. Its big buttons drift, use items and brake, and <b>OK</b> works the menus.</span></div>
+        <small>Or open <span id="wheel-url"></span> on the phone and type the code.</small>
+        <p class="wheel-status" id="wheel-status"></p>
+      </div>
+    </div>
+    <div class="bottom-bar"><button class="btn hot" data-go="close">Done</button></div>
+  </div>
+</section>
+
+<section id="scr-wheelpad" class="screen" hidden>
+  <div class="wp-connect" id="wp-connect">
+    <h2 class="title">Wheel for a computer</h2>
+    <p id="wp-msg"></p>
+    <div class="wp-row"><input id="wp-code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Code from the computer">
+      <button class="btn hot" id="wp-go">Connect</button></div>
+    <button class="btn ghost small" id="wp-cancel">Back to the game</button>
+  </div>
+  <div class="wp-pad" id="wp-pad" hidden>
+    <div class="wp-state" id="wp-state"><span class="dot"></span><span id="wp-lap"></span><b id="wp-place"></b></div>
+    <div class="wp-menu"><button id="wp-back">◀ Back</button><button id="wp-pause">II</button><button id="wp-ok" class="ok">OK</button></div>
+    <div class="wp-wheel-wrap"><div class="wp-wheel" id="wp-wheel" data-drift="-1"><i></i><b></b></div>
+      <p class="wp-tilt" id="wp-tilt" hidden>Motion access is off, so tilt can't steer. Reload and allow it.</p></div>
+    <button class="wp-btn look" id="wp-look">LOOK<br>BACK</button>
+    <button class="wp-btn item" id="wp-item"><i></i>ITEM</button>
+    <button class="wp-btn brake" id="wp-brake">BRAKE</button>
+    <button class="wp-btn drift" id="wp-drift">DRIFT</button>
+    <div id="wp-flash"></div>
+  </div>
+</section>
+
 <section id="scr-story" class="screen shade-full" hidden>
   <button class="btn ghost small story-skip" data-go="skip">Skip</button>
   <div class="story-box panel">
@@ -887,17 +988,21 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   <div class="dialog panel">
     <h2 class="title">Settings</h2>
     <div class="scroll">
-      <div class="row"><div><div class="lbl">Steering</div><div class="hint">Tilt your phone like a wheel, or drag on the left side.</div></div>
+      <div class="row touch-only"><div><div class="lbl">Steering</div><div class="hint">Tilt your phone like a wheel, or drag on the left side.</div></div>
         <div class="seg" id="set-steer"><button data-v="tilt">Tilt</button><button data-v="touch">Touch</button></div></div>
+      <div class="row desk-only"><div><div class="lbl">Steering</div><div class="hint">Arrow keys (or A/D), a game controller, or your phone as a tilt wheel.</div></div>
+        <div class="seg" id="set-steer-desk"><button data-v="keys">Keyboard</button><button data-v="wheel">Phone wheel</button></div></div>
+      <div class="row touch-only"><div><div class="lbl">Wheel for a computer</div><div class="hint">Playing on a Mac? Use this phone as its steering wheel.</div></div>
+        <button class="btn sky small" data-go="wheelpad">Connect</button></div>
       <div class="row"><div><div class="lbl">Steering assist</div><div class="hint">Gently keeps you on the road and off the walls. Great for younger drivers.</div></div>
         <div class="seg" id="set-assist"><button data-v="off">Off</button><button data-v="light">Light</button><button data-v="strong">Strong</button></div></div>
-      <div class="row"><div><div class="lbl">Tilt sensitivity</div><div class="hint">Higher means less tilt for a full turn.</div></div>
+      <div class="row touch-only"><div><div class="lbl">Tilt sensitivity</div><div class="hint">Higher means less tilt for a full turn.</div></div>
         <input type="range" id="set-sens" min="0" max="1" step="0.05" aria-label="Tilt sensitivity"></div>
-      <div class="row"><div><div class="lbl">Tilt check</div><div class="hint" id="tilt-status">Tilt the phone: the dot should follow.</div></div>
+      <div class="row touch-only"><div><div class="lbl">Tilt check</div><div class="hint" id="tilt-status">Tilt the phone: the dot should follow.</div></div>
         <div class="tiltmeter"><i id="tilt-dot"></i></div></div>
-      <div class="row"><div class="lbl">Invert tilt</div><label class="toggle"><input type="checkbox" id="set-invert" aria-label="Invert tilt"></label></div>
-      <div class="row"><div><div class="lbl">Graphics</div><div class="hint">Ultra is sharpest, Battery skips bloom and saves power. All keep 60 fps by adjusting resolution.</div></div>
-        <div class="seg" id="set-quality"><button data-v="auto">Auto</button><button data-v="high">Ultra</button><button data-v="low">Battery</button></div></div>
+      <div class="row touch-only"><div class="lbl">Invert tilt</div><label class="toggle"><input type="checkbox" id="set-invert" aria-label="Invert tilt"></label></div>
+      <div class="row"><div><div class="lbl">Graphics</div><div class="hint"><span class="touch-only">Ultra is sharpest, Battery skips bloom and saves power.</span><span class="desk-only">Auto uses Max on a computer: big soft shadows, sun rays, thicker grass and more scenery.</span> All keep 60 fps by adjusting resolution.</div></div>
+        <div class="seg" id="set-quality"><button data-v="auto">Auto</button><button data-v="max" class="desk-only">Max</button><button data-v="high">Ultra</button><button data-v="low">Battery</button></div></div>
       <div class="row"><div><div class="lbl">Name tags</div><div class="hint">Names and places over the other karts. Friends stand out in online races.</div></div>
         <div class="seg" id="set-tags"><button data-v="all">Everyone</button><button data-v="friends">Friends</button><button data-v="off">Off</button></div></div>
       <div class="row"><div class="lbl">Music</div><label class="toggle"><input type="checkbox" id="set-music" aria-label="Music"></label></div>
@@ -916,7 +1021,10 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="scroll">
       <div class="help-grid">
         <div><b>Career</b>Start with the Rust Bucket and win coins in story events. Spend them in the Garage on new karts, upgrades, paint and racers. Beat each chapter's rival to open the next one.</div>
-        <div><b>Steer</b>Hold the phone sideways and turn it like a steering wheel. Gas is automatic.</div>
+        <div class="touch-only"><b>Steer</b>Hold the phone sideways and turn it like a steering wheel. Gas is automatic.</div>
+        <div class="desk-only"><b>Keyboard</b><kbd>←</kbd> <kbd>→</kbd> steer (tap to nudge) · <kbd>SPACE</kbd> drift · <kbd>E</kbd> item (hold <kbd>↑</kbd> or <kbd>↓</kbd> to throw ahead or behind) · <kbd>↓</kbd> brake and reverse · <kbd>Q</kbd> look back · <kbd>ESC</kbd> pause. Gas is automatic. <kbd>ENTER</kbd> picks the highlighted button in menus.</div>
+        <div class="desk-only"><b>Controller</b>PlayStation, Xbox and Switch Pro controllers work: stick steers, R drift, L item, B brake, Y look back, Start pause. A and B work the menus.</div>
+        <div class="desk-only"><b>Phone as a wheel</b>Tap <i>Use your phone as a wheel</i> on the title screen and scan the code with your iPhone's camera. Tilt the phone to steer and use its big buttons.</div>
         <div><b>Drift + turbo</b>Hold DRIFT while turning. Sparks go blue, orange, then purple. Let go for a boost.</div>
         <div><b>Tricks</b>Tap DRIFT just after launching off a ramp. You get a boost when you land.</div>
         <div><b>Slipstream</b>Tuck in right behind another kart for a moment and you get a free boost.</div>
@@ -975,6 +1083,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="bottom-bar" id="res-buttons"></div>
   </div>
 </section>
+
+</div>
 
 <div id="rotate"><div class="phone"></div><p>Turn your phone sideways</p><span>Zoomies is played in landscape, like a steering wheel.</span></div>
 <div id="loading"><div class="logo">ZOOMIES!</div><div class="bar2"><i></i></div><p id="loading-msg">Warming up the engines…</p></div>

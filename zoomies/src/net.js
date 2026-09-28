@@ -69,15 +69,17 @@ function peerOptions() {
   return o;
 }
 
-class PeerTransport {
-  constructor(cb) {
+// ns keeps races and phone wheels (wheel.js) apart on the broker.
+export class PeerTransport {
+  constructor(cb, ns = 'kart') {
     this.cb = cb;
+    this.ns = ns;
     this.conns = new Map();
   }
 
   async start(role, code) {
     const Peer = await loadPeerJS();
-    const id = `zoomies-kart-${code.toLowerCase()}`;
+    const id = `zoomies-${this.ns}-${code.toLowerCase()}`;
     if (role === 'host') {
       this.peer = new Peer(id, peerOptions());
       await new Promise((res, rej) => {
@@ -102,7 +104,7 @@ class PeerTransport {
       const conn = this.peer.connect(id, { reliable: true, serialization: 'json' });
       await new Promise((res, rej) => {
         conn.once('open', res);
-        this.peer.once('error', (e) => rej(e.type === 'peer-unavailable' ? new Error('No race found with that code') : e));
+        this.peer.once('error', (e) => rej(e.type === 'peer-unavailable' ? new Error(this.ns === 'kart' ? 'No race found with that code' : 'Nothing found with that code') : e));
         setTimeout(() => rej(new Error('Could not connect. Check the code and try again.')), 15000);
       });
       this.conns.set('host', conn);
@@ -148,9 +150,10 @@ class PeerTransport {
 }
 
 // Same-browser transport for testing two tabs side by side.
-class LocalTransport {
-  constructor(cb) {
+export class LocalTransport {
+  constructor(cb, ns = 'kart') {
     this.cb = cb;
+    this.ns = ns;
     this.lag = +(params.get('lag') || 0);
     this.peers = new Set();
   }
@@ -158,7 +161,7 @@ class LocalTransport {
   start(role, code) {
     this.role = role;
     this.id = role === 'host' ? 'host' : `g${Math.random().toString(36).slice(2, 8)}`;
-    this.ch = new BroadcastChannel(`zoomies-${code}`);
+    this.ch = new BroadcastChannel(`zoomies-${this.ns}-${code}`);
     return new Promise((res, rej) => {
       this.ch.onmessage = (e) => {
         const m = e.data;

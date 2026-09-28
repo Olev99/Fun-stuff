@@ -64,7 +64,7 @@ uniform sampler2D tScene; uniform sampler2D tBloom;
 uniform float bloom; uniform float exposure; uniform float saturation; uniform float contrast;
 uniform float vignette; uniform float boost; uniform float time; uniform float aspect;
 uniform vec3 tint; uniform vec3 lift;
-uniform vec2 sunPos; uniform float sunOn;
+uniform vec2 sunPos; uniform float sunOn; uniform float shafts;
 varying vec2 vUv;
 
 // Khronos PBR Neutral: keeps saturated base colours true, rolls off highlights.
@@ -129,6 +129,23 @@ void main() {
       col += fl * vis;
     }
   }
+  if (shafts > 0.0) {
+    // Light shafts (Max graphics): march from each pixel towards the sun
+    // through the bloom buffer, so bright sky between trees and scenery
+    // streaks across the frame. The sun may be just off-screen.
+    vec2 d = (sunPos - vUv) * (1.0 / 28.0);
+    vec2 p = vUv;
+    vec3 acc = vec3(0.0);
+    float w = 1.0;
+    for (int i = 0; i < 28; i++) {
+      p += d;
+      float inside = step(0.0, p.x) * step(p.x, 1.0) * step(0.0, p.y) * step(p.y, 1.0);
+      acc += texture2D(tBloom, p).rgb * (w * inside);
+      w *= 0.955;
+    }
+    float fall = smoothstep(2.4, 0.0, length((vUv - sunPos) * vec2(aspect, 1.0)));
+    col += acc * shafts * 0.011 * fall;
+  }
   col *= exposure;
   col = neutral(col);
   float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
@@ -191,7 +208,7 @@ export class PostFX {
       tScene: { value: null }, tBloom: { value: null }, bloom: { value: 0 }, exposure: { value: 1 }, saturation: { value: 1 },
       contrast: { value: 0 }, vignette: { value: 0 }, boost: { value: 0 }, time: { value: 0 }, aspect: { value: 1 },
       tint: { value: new THREE.Color(1, 1, 1) }, lift: { value: new THREE.Color(0, 0, 0) },
-      sunPos: { value: new THREE.Vector2(0.5, 0.5) }, sunOn: { value: 0 },
+      sunPos: { value: new THREE.Vector2(0.5, 0.5) }, sunOn: { value: 0 }, shafts: { value: 0 },
     });
     this.black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
     this.black.needsUpdate = true;
@@ -205,8 +222,9 @@ export class PostFX {
     return this.enabled && this.hdr;
   }
 
-  configure({ samples = 4, bloom = true } = {}) {
+  configure({ samples = 4, bloom = true, shafts = 0 } = {}) {
     this.bloomOn = bloom;
+    this.shafts = shafts;
     if (samples !== this.samples) {
       this.samples = samples;
       if (this.rt) {
@@ -318,7 +336,8 @@ export class PostFX {
     u.tint.value.set(g.tint ?? GRADE.tint);
     u.lift.value.set(g.lift ?? GRADE.lift).convertLinearToSRGB();
     u.sunOn.value = bloom && g.sunOn ? g.sunOn * (g.flare ?? 1) : 0;
-    if (g.sunOn) u.sunPos.value.set(g.sunX, g.sunY);
+    if (g.sunOn || g.shaftOn) u.sunPos.value.set(g.sunX, g.sunY);
+    u.shafts.value = bloom && g.shaftOn ? (this.shafts || 0) * g.shaftOn * (g.flare ?? 1) : 0;
     this._pass(this.mComp, null);
     r.autoClear = autoClear;
   }

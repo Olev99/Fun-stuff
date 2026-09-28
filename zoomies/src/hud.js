@@ -1,6 +1,7 @@
 import { ITEMS, ITEM_ICONS, AIM_DEFAULT } from './items.js';
 import { fmtTime, ordinal } from './util.js';
 import { hudGoal } from './career.js';
+import { isDesktop } from './platform.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,12 +65,21 @@ export class HUD {
     this.pos.style.visibility = tt ? 'hidden' : 'visible';
     $('hud-gems').style.visibility = tt ? 'hidden' : 'visible';
     this.showTrackName(race);
-    if (race.mode !== 'demo') {
-      this.hint(this.app.settings.steering === 'tilt' && this.app.input.tilt.listening
-        ? 'Tilt to steer. Hold DRIFT after the 2 for a rocket start!'
-        : 'Drag on the left to steer. Hold DRIFT after the 2 for a rocket start!', 5.5);
-    }
+    if (race.mode !== 'demo') this.hint(this.controlsHint(), 5.5);
     if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
+  }
+
+  // How to drive, for whatever you're driving with.
+  controlsHint() {
+    const inp = this.app.input;
+    if (inp.wheel && inp.wheel.live) return 'Tilt your phone to steer. Hold DRIFT after the 2 for a rocket start!';
+    if (isDesktop) {
+      if (inp.padActive) return 'Stick steers · R drift · L item · B brake. Hold R after the 2 for a rocket start!';
+      return '← → steer · SPACE drift · E item · ↓ brake. Hold SPACE after the 2 for a rocket start!';
+    }
+    return this.app.settings.steering === 'tilt' && inp.tilt.listening
+      ? 'Tilt to steer. Hold DRIFT after the 2 for a rocket start!'
+      : 'Drag on the left to steer. Hold DRIFT after the 2 for a rocket start!';
   }
 
   showTrackName(race) {
