@@ -212,6 +212,8 @@ export function newCareer() {
     v: 1, coins: 0, racer: 'mochi', racers: ['mochi'], body: 'buggy', bodies: ['buggy'],
     upgrades: { buggy: { engine: 0, turbo: 0, tyres: 0, armor: 0 } }, paint: 'stock', paints: ['stock'],
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
+    // profile: XP, lifetime stats, trophies, daily streak and cosmetics
+    xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
   };
 }
 

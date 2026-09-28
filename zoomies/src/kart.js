@@ -55,12 +55,14 @@ export class Kart {
     this.turnRate = 1.8 + st.handling * 0.12;
     this.driftTurn = 2.35 + st.handling * 0.1;
     this.weight = 0.8 + st.weight * 0.1;
-    this.grip = 9 * (race.trackDef.grip ?? 1) * (st.grip ?? 1);
-    this.driftGrip = 2.6 * (race.trackDef.grip ?? 1) * (st.grip ?? 1);
+    const mods = race.mods || {};
+    const trackGrip = Math.min(race.trackDef.grip ?? 1, mods.grip ?? 1);
+    this.grip = 9 * trackGrip * (st.grip ?? 1);
+    this.driftGrip = 2.6 * trackGrip * (st.grip ?? 1);
     // How well the tyres put power down (snow and ice tracks are below 1).
-    this.traction = race.trackDef.traction ?? 1;
+    this.traction = Math.min(race.trackDef.traction ?? 1, mods.traction ?? 1);
     // Low gravity on the moon: longer, floatier jumps.
-    this.gravityK = race.trackDef.gravity ?? 1;
+    this.gravityK = Math.min(race.trackDef.gravity ?? 1, mods.gravity ?? 1);
     this.patch = null;
     this.path = race.track;
     this.gliding = false;
@@ -127,6 +129,7 @@ export class Kart {
     this.stuck = 0;
     this.progT = 0;
     this.progAt = 0;
+    this.wallStall = 0;
     this.visualYaw = 0;
     this.spinAngle = 0;
     this.wheelSpin = 0;
@@ -320,6 +323,10 @@ export class Kart {
       return;
     }
 
+    if (this.rescueReq) {
+      this.rescueReq = false;
+      this._rescue();
+    }
     if (this.respawnT > 0) this.respawnT -= dt;
     const spinning = this.spinTime > 0 || this.respawnT > 0.3;
     const steerIn = spinning ? 0 : clamp(c.steer, -1, 1);
@@ -343,7 +350,10 @@ export class Kart {
       if (spd > 7 || !this.grounded) this.driftPending = true;
     }
     if (driftRelease) {
-      if (this.drifting && this.driftLevel > 0) this.startBoost(DRIFT_BOOST[this.driftLevel] * (this.stats.turbo ?? 1), 4 + this.driftLevel * 2);
+      if (this.drifting && this.driftLevel > 0) {
+        this.startBoost(DRIFT_BOOST[this.driftLevel] * (this.stats.turbo ?? 1), 4 + this.driftLevel * 2);
+        this.emit('driftBoost', this.driftLevel);
+      }
       this.drifting = false;
       this.driftPending = false;
       this.driftCharge = 0;
@@ -406,7 +416,9 @@ export class Kart {
         this.emit('driftLevel', lvl);
       }
     } else {
-      yawRate = -this.steerS * this.turnRate * sf * (vf < -0.5 ? -1 : 1);
+      // Reversing on purpose steers like a car in reverse. Rolling back after
+      // bouncing off a wall doesn't, or steering away would turn you into it.
+      yawRate = -this.steerS * this.turnRate * sf * (vf < -0.5 && c.brake ? -1 : 1);
       if (!this.grounded) yawRate *= 0.6;
     }
     if (spinning) yawRate = 0;
@@ -432,7 +444,7 @@ export class Kart {
 
     // Track projection and walls; may switch between main road and shortcuts.
     const prevPath = this.path;
-    const vn = tr.resolve(this, 1.15, 0.45);
+    const vn = tr.resolve(this, 1.15, 0.3);
     const trk = this.trk;
     if (this.path !== prevPath) {
       if (this.path !== tr) this.emit('shortcut', this.path);
@@ -451,16 +463,17 @@ export class Kart {
           this.driftLevel = 0;
         }
       }
-      // Nudge the heading to slide along the wall instead of grinding into
-      // it, unless the driver is already steering away from the wall.
+      // Nudge the nose off the wall and back towards the race direction so
+      // the kart slides along it instead of grinding into it. It always
+      // swings the way that points away from the wall, even when the kart
+      // hit the wall facing backwards, so you never end up driving the
+      // wrong way along it. The driver's own steering away takes over.
       const awayFromWall = this.steerS * Math.sign(trk.d) < -0.15;
-      if (!awayFromWall) {
-        const along = Math.atan2(trk.tx, trk.tz);
-        const fwdDot = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
-        const target = fwdDot >= 0 ? along : along + Math.PI;
-        let dy = target - this.yaw;
-        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        this.yaw += dy * Math.min(1, dt * 3);
+      if (!awayFromWall && !c.brake) {
+        let rel = this.yaw - Math.atan2(trk.tx, trk.tz);
+        rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+        // d > 0 is the right-hand wall; turning right lowers yaw.
+        if (-Math.sign(trk.d) * rel > 0) this.yaw -= rel * Math.min(1, dt * 3);
       }
     }
     this.offroad = this.path.offroadAll || Math.abs(trk.d) > trk.ed - 0.3;
@@ -530,12 +543,21 @@ export class Kart {
     const trying = (c.throttle > 0 || c.brake) && !spinning && this.respawnT <= 0 && this.grounded;
     if (trying && this.speed < 2.5) this.stuck += dt;
     else this.stuck = Math.max(0, this.stuck - dt * 2);
-    // Also catch bouncing back and forth against a wall without getting anywhere.
-    if (trying && c.throttle > 0) {
+    // Also catch a kart that isn't getting anywhere: pinned on a wall,
+    // bouncing back and forth, wedged, or going round in circles. Progress
+    // counts from the furthest-back point, so it has to be real forward
+    // progress; brief spins and hops don't reset the clock.
+    if (c.throttle > 0 && this.respawnT <= 0 && !this.finished) {
       this.progT += dt;
-      if (Math.abs(this.total - this.progAt) > 12) { this.progAt = this.total; this.progT = 0; }
-    } else this.progT = 0;
-    if (this.stuck > 2.8 || this.progT > 5) this._rescue();
+      if (this.total < this.progAt) this.progAt = this.total;
+      else if (this.total - this.progAt > 12) { this.progAt = this.total; this.progT = 0; }
+      if (vn > 0) this.wallStall = 1.5;
+    } else {
+      this.progT = 0;
+      this.progAt = this.total;
+    }
+    if (this.wallStall > 0) this.wallStall -= dt;
+    if (this.stuck > 2.8 || this.progT > (this.wallStall > 0 ? 4 : 6.5)) this._rescue();
 
     // Item button edge
     const itemEdge = c.item && !this.prevItem;
@@ -560,7 +582,7 @@ export class Kart {
     this.path = tr;
     this.seg = -1;
     this.pos.set(fr.x, 0, fr.z);
-    tr.project(this.pos.x, this.pos.z, -1, this.trk);
+    tr.project(this.pos.x, this.pos.z, fr.idx ?? -1, this.trk);
     this.seg = this.trk.idx;
     this.pos.y = this.trk.y + 5;
     this.yaw = Math.atan2(fr.tx, fr.tz);

@@ -72,6 +72,9 @@ export class Race {
     this.mode = opts.mode; // 'gp' | 'quick' | 'tt' | 'demo' | 'mp'
     this.trackDef = opts.trackDef;
     this.careerEv = opts.careerEv || null;
+    // Daily challenge twists: { items: [...], noItems, grip, traction, gravity }.
+    this.mods = opts.mods || null;
+    this.dailyEv = opts.dailyEv || null;
     this.laps = opts.laps ?? 3;
     this.speedClass = SPEED_CLASSES[opts.speedClass] || SPEED_CLASSES.zoom;
     this.diff = DIFFICULTY[opts.difficulty] || DIFFICULTY.normal;
@@ -115,6 +118,12 @@ export class Race {
     this.flash = 0;
     this.shake = 0;
     this.found = new Set();
+    this.stylePts = 0;
+    this.styleCounts = {};
+    this.lapWalls = 0;
+    this._lastPlace = 0;
+    this._overtakeT = 0;
+    this.lookBack = false;
 
     this._makeKarts(opts);
     this.tags = new NameTags(this, this.app.settings.tags || 'all');
@@ -234,6 +243,7 @@ export class Race {
     if (inp && this.player) {
       Object.assign(this.player.ctl, inp);
       this._assist(this.player, this.player.ctl);
+      this.lookBack = !!inp.lookBack && this.state === 'race';
       if (this.state === 'countdown') this._trackRocket(inp);
     }
 
@@ -251,6 +261,8 @@ export class Race {
 
     for (const k of this.karts) if (k.remote) this._updateRemote(k, dt);
     if (this.ghostRec && this.state === 'race' && this.player) this.ghostRec.sample(this.raceTime, this.player);
+    this._slipstream(dt);
+    this._styleChecks(dt);
     if (this.ghost) this.ghost.update(locked ? 0 : this.raceTime);
 
     this.items.update(dt, this.session ? this.netClock : this.time);
@@ -359,7 +371,7 @@ export class Race {
       const pt = this.rocket.pressT;
       if (pt >= 1.85 && pt <= 2.8) {
         k.startBoost(1.2, 14);
-        this.app.hud.toast('ROCKET START!');
+        this.style('PERFECT START', 50, 'gold');
         this.app.audio.play('boost');
       } else if (pt >= 0 && pt < 1.85) {
         k.spinTime = 0.7;
@@ -442,12 +454,15 @@ export class Race {
           if (k.isPlayer) a.play('land');
           this.fx.burst(k.pos.x, k.pos.y + 0.2, k.pos.z, [this.dust], 8, 4, 1.2, 0.5, 2, false);
           break;
+        case 'driftBoost':
+          if (k.isPlayer) this.style(['', 'MINI-TURBO', 'SUPER TURBO', 'ULTRA TURBO'][data], [0, 5, 12, 25][data], `t${data}`);
+          break;
         case 'trick':
-          if (k.isPlayer) { a.play('trick'); hud.toast('TRICK!'); }
+          if (k.isPlayer) { a.play('trick'); this.style('TRICK', 15, 'gold'); }
           this.fx.burst(k.pos.x, k.pos.y + 1, k.pos.z, ['#ffd23f', '#ffffff', '#46f0ff'], 12, 6, 0.5, 0.5, 4);
           break;
         case 'glide':
-          if (k.isPlayer) { a.play('trick'); hud.toast('GLIDE!'); }
+          if (k.isPlayer) { a.play('trick'); this.style('GLIDE', 10, 'mint'); }
           break;
         case 'hit':
           if (near) a.play('hit');
@@ -461,6 +476,7 @@ export class Race {
           this.fx.burst(k.pos.x, k.pos.y + 1, k.pos.z, ['#8fe6ff', '#ffffff'], 18, 8, 0.5, 0.5, 2);
           break;
         case 'wall':
+          if (k.isPlayer) this.lapWalls++;
           if (k.isPlayer) { a.play('wall', data); this.shake = Math.max(this.shake, Math.min(0.4, data * 0.02)); }
           this.fx.burst(k.pos.x + Math.sin(k.yaw) * 1.2, k.pos.y + 0.5, k.pos.z + Math.cos(k.yaw) * 1.2, ['#ffd23f', '#ffffff'], 6, 7, 0.3, 0.3, 14);
           break;
@@ -475,6 +491,7 @@ export class Race {
             const ever = this.mode !== 'demo' && this.app.markShortcut(this.trackDef.id, data.name);
             hud.toast(ever ? `SECRET FOUND! ${data.name}` : first ? `SECRET! ${data.name}` : data.name);
             if (first) a.play('secret');
+            this.style('SHORTCUT', 25, 'mint');
             if (ever) hud.refreshMap(this);
           }
           break;
@@ -515,6 +532,7 @@ export class Race {
         this._onFinish(k);
       } else if (k.isPlayer && k.laps >= 1) {
         this._ghostSplit(k);
+        this._cleanLap();
         if (k.laps === this.laps - 1) {
           this.app.hud.banner('FINAL LAP!', 'final');
           this.app.audio.play('finalLap');
@@ -566,8 +584,14 @@ export class Race {
     this.app.hud.split(d);
   }
 
+  _cleanLap() {
+    if (this.lapWalls === 0) this.style('CLEAN LAP', 20, 'gold');
+    this.lapWalls = 0;
+  }
+
   _onFinish(k) {
     if (!k.isPlayer || this.mode === 'demo') return;
+    this._cleanLap();
     if (this.ghostRec) {
       this._ghostSplit(k);
       let acc = 0;
@@ -758,10 +782,71 @@ export class Race {
     k.gemsGot = (k.gemsGot || 0) + 1;
     if (k.isPlayer) this.app.audio.play('gem');
   }
-  onHazardHit() {}
-  onProjectileHit() {}
+  onHazardHit(k, h) { this._hitBy(k, h && h.owner); }
+  onProjectileHit(k, p) { this._hitBy(k, p && p.owner); }
+
+  // The player's item landed on someone: style points.
+  _hitBy(k, owner) {
+    if (owner && owner === this.player && k !== owner && k.spinTime > 0) this.style('HIT', 20, 'hit');
+  }
+
+  // Skill feedback: a floating label plus style points (they become XP).
+  style(label, pts, cls = '') {
+    if (!this.player || this.mode === 'demo') return;
+    this.stylePts += pts;
+    this.styleCounts[label] = (this.styleCounts[label] || 0) + 1;
+    this.app.hud.style(label, pts, cls);
+  }
+
+  // Overtakes (a place gained and kept for a moment) earn style points.
+  _styleChecks(dt) {
+    const p = this.player;
+    if (!p || this.mode === 'demo' || this.mode === 'tt' || this.state !== 'race') return;
+    if (this._overtakeT > 0) this._overtakeT -= dt;
+    if (this._lastPlace && p.place < this._lastPlace && this.raceTime > 4 && this._overtakeT <= 0) {
+      this.style('OVERTAKE', 10, 'mint');
+      this._overtakeT = 1.2;
+    }
+    this._lastPlace = p.place;
+  }
+
+  // Slipstream: tuck in right behind another kart for a moment to get a boost.
+  _slipstream(dt) {
+    if (this.state !== 'race' && this.state !== 'finished') return;
+    for (const k of this.karts) {
+      if (k.remote) continue;
+      let tucked = false;
+      if (k.fwdSpeed > 16 && k.grounded && k.boostTime <= 0 && k.spinTime <= 0) {
+        const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw);
+        for (const o of this.karts) {
+          if (o === k || o.fwdSpeed < 10) continue;
+          const dx = o.pos.x - k.pos.x, dz = o.pos.z - k.pos.z;
+          const ahead = dx * fx + dz * fz;
+          if (ahead < 3 || ahead > 15) continue;
+          if (Math.abs(dx * fz - dz * fx) > 2.3 || Math.abs(o.pos.y - k.pos.y) > 2) continue;
+          tucked = true;
+          break;
+        }
+      }
+      if (tucked) {
+        k.draftT = (k.draftT || 0) + dt;
+        if (k.draftT > 1.2) {
+          k.startBoost(0.8, 4);
+          k.draftT = -1.5;
+          if (k.isPlayer) {
+            this.app.audio.play('miniturbo');
+            this.style('SLIPSTREAM', 10, 'mint');
+          }
+        }
+      } else if (k.draftT > 0) k.draftT = Math.max(0, k.draftT - dt * 2);
+      else if (k.draftT < 0) k.draftT = Math.min(0, k.draftT + dt);
+    }
+  }
   onSlip(k) { if (k.isPlayer) this.app.hud.toast('SLIPPERY!'); }
-  onBlastHit(k) { if (k.isPlayer) this.shake = Math.max(this.shake, 0.7); }
+  onBlastHit(k, kind, owner) {
+    if (k.isPlayer) this.shake = Math.max(this.shake, 0.7);
+    this._hitBy(k, owner);
+  }
   onBlast(x, y, z, r, kind) {
     const p = this.player;
     const d2 = p ? (p.pos.x - x) ** 2 + (p.pos.z - z) ** 2 : 1e9;
@@ -974,17 +1059,39 @@ export class Race {
     this.camYaw = snap ? tgt : dampAngle(this.camYaw, tgt, 5.5, dt);
     const distT = 5.9 + sf * 0.9 + (k.boostTime > 0 || k.rocketTime > 0 ? 0.9 : 0) + (k.gliding ? 1.5 : 0) + far;
     this.camDist = snap || !this.camDist ? distT : damp(this.camDist, distT, 3, dt);
-    const dist = this.camDist;
-    const height = 2.5 + far * 0.3 + (k.gliding ? 0.8 : 0);
-    const fx = Math.sin(this.camYaw), fz = Math.cos(this.camYaw);
+    let dist = this.camDist;
+    let height = 2.5 + far * 0.3 + (k.gliding ? 0.8 : 0);
+    // Looking back flips the camera around the kart.
+    const back = this.lookBack && k === this.player ? Math.PI : 0;
+    const fx = Math.sin(this.camYaw + back), fz = Math.cos(this.camYaw + back);
     this.camPos.x = k.pos.x - fx * dist;
     this.camPos.z = k.pos.z - fz * dist;
-    const wantY = k.pos.y + height;
-    this.camPos.y = snap ? wantY : damp(this.camPos.y, wantY, 7, dt);
     const cp = k.path || this.track;
     if (cp !== this.camPath) { this.camPath = cp; this.camSeg = -1; }
-    const trk = cp.project(this.camPos.x, this.camPos.z, this.camSeg, this.camTrk);
+    let trk = cp.project(this.camPos.x, this.camPos.z, this.camSeg, this.camTrk);
     this.camSeg = trk.idx;
+    // Keep the camera on our side of the walls. With the kart's nose turned
+    // away from a wall, a full-length boom would put the camera out in the
+    // scenery behind it, and you couldn't see the road to drive back to.
+    const kd = k.trk && k.path === cp ? k.trk.d : null;
+    const lim = trk.wd - 0.6;
+    if (kd !== null && Math.abs(trk.d) > lim && Math.abs(kd) < trk.wd && trk.over === 0 && !far) {
+      const side = trk.d > 0 ? 1 : 0;
+      const open = cp === this.track && (this.track.gap[side][trk.idx] || this.track.noWall[side][trk.idx]);
+      if (!open) {
+        const edge = Math.sign(trk.d) * lim;
+        const t = clamp((edge - kd) / (trk.d - kd), 0, 1);
+        const nd = Math.max(1.6, dist * t);
+        height += (dist - nd) * 0.45;
+        dist = nd;
+        this.camPos.x = k.pos.x - fx * dist;
+        this.camPos.z = k.pos.z - fz * dist;
+        trk = cp.project(this.camPos.x, this.camPos.z, this.camSeg, this.camTrk);
+        this.camSeg = trk.idx;
+      }
+    }
+    const wantY = k.pos.y + height;
+    this.camPos.y = snap || back ? wantY : damp(this.camPos.y, wantY, 7, dt);
     if (Math.abs(trk.d) < trk.wd + 1 && !(cp.voids.length && cp.isVoid(trk.s))) this.camPos.y = Math.max(this.camPos.y, trk.y + 1.3);
     this.camLook.set(k.pos.x + fx * 3.5, k.pos.y + 1.25, k.pos.z + fz * 3.5);
     this.camera.position.copy(this.camPos);

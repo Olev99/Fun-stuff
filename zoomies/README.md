@@ -37,10 +37,15 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Progress is saved on the phone. Settings has a reset.
 - **Modes:**
   - Career.
+  - Daily Challenge: a new track, twist and goal every day.
   - Grand Prix: 9 cups of 4 races with points.
   - Quick Race.
   - Time Trial, with saved records.
   - Multiplayer.
+- **Player level and coins everywhere:** every race in every mode pays coins and XP, and online races pay extra. Levelling up pays a coin bonus, and every 5th level also gives a free prize capsule. The chip on the title screen shows your level, coins and daily streak.
+- **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
+- **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
+- **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.
 - **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter.
 - **Driving:** drift mini-turbos with blue, orange and purple sparks, rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
 - **17 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Thunder Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️ and Boo Mask 👻. The racers at the back get the catch-up items. Throwable items can be aimed: swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it.
@@ -86,6 +91,9 @@ How it works:
 | Pause | **II** button | Esc / P |
 
 - **Rocket start:** press and hold DRIFT right after the "2" disappears.
+- **Slipstream:** tuck in close behind another kart for a second and you get a free boost.
+- **Look back:** hold your finger on the minimap (or Q / C on a keyboard) to see behind you.
+- **Hitting walls:** steer away and the kart swings back into the race direction. If you're ever pinned, the drone lifts you back onto the road after a few seconds, and the pause menu has **Stuck? Back on the road** to do it at once.
 - **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
 - **Steering assist:** Off, Light or Strong in Settings. It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
@@ -111,6 +119,7 @@ zoomies/
   src/main.js         app shell, menus, Grand Prix, career and multiplayer flow, dynamic resolution
   src/career.js       career chapters, events, story, prices, scoring and save data
   src/careerui.js     career hub, garage, story dialogue and career results
+  src/profile.js      player level, race rewards, achievements and the daily challenge
   src/race.js         race loop, laps, positions, collisions, camera, network sync
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
   src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur

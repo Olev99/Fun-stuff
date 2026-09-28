@@ -6,6 +6,7 @@ import { HUD } from './hud.js';
 import { UI } from './ui.js';
 import { CareerUI } from './careerui.js';
 import { cleanNick } from './nametags.js';
+import { awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
 import { CHARACTERS } from './characters.js';
@@ -49,7 +50,8 @@ class App {
   constructor() {
     this.settings = loadSettings();
     this.records = loadRecords();
-    this.career = loadCareer();
+    // One save for career progress, the wallet, XP, stats and achievements.
+    this.career = loadCareer() || newCareer();
     this.careerRun = null;
     this.canvas = $('gl');
     installHeightFog();
@@ -185,6 +187,7 @@ class App {
     this.paused = false;
     this.gp = null;
     this.careerRun = null;
+    this.dailyRun = null;
     this.audio.stopEngine();
     this.audio.setTempo(1);
     this.hud.show(false);
@@ -258,6 +261,8 @@ class App {
   startRace(cfg) {
     // A track preview still pending would replace this race with a demo.
     clearTimeout(this._prevT);
+    // Only daily challenge races report back as the daily.
+    if (!cfg.dailyEv) this.dailyRun = null;
     this.lastCfg = cfg;
     this.disposeRace();
     this.paused = false;
@@ -268,7 +273,7 @@ class App {
     this.race = new Race(this, {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
-      loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null,
+      loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
     });
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
@@ -293,6 +298,7 @@ class App {
     const r = this.race;
     if (!r || r.mode === 'demo' || this.paused || !['intro', 'countdown', 'race', 'wait'].includes(r.state)) return;
     document.querySelector('#scr-pause [data-go="restart"]').hidden = r.mode === 'mp';
+    document.querySelector('#scr-pause [data-go="rescue"]').hidden = r.state !== 'race' || !r.player || r.player.finished;
     document.querySelector('#scr-pause [data-go="quit"]').textContent = this.careerRun ? 'Quit to career' : 'Quit to menu';
     if (r.mode === 'mp') {
       // Online races cannot stop for one player: show the menu but keep racing.
@@ -307,6 +313,13 @@ class App {
     this.input.resetButtons();
     this.ui.show('pause');
     this.applyControls();
+  }
+
+  // Pause menu escape hatch: the drone puts you back on the road.
+  rescuePlayer() {
+    const k = this.race && this.race.player;
+    if (k && this.race.state === 'race' && !k.finished && k.respawnT <= 0) k.rescueReq = true;
+    this.resume();
   }
 
   resume() {
@@ -366,12 +379,17 @@ class App {
       this.onCareerComplete(race, rows);
       return;
     }
+    if (this.dailyRun) {
+      this.onDailyComplete(race, rows);
+      return;
+    }
     if (race.mode === 'mp') {
       const host = this.session && this.session.isHost;
+      const rw = this.profileAward(race, me);
       ui.results({
         title: me ? `${me.place}${ordinal(me.place).toLowerCase()} place` : 'Results',
         sub: `Online · ${race.trackDef.name}`,
-        html: `<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`)).join('')}</div>`
+        html: rw + `<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`)).join('')}</div>`
           + (host ? '' : '<p class="lobby-summary" style="margin:8px 0 0">Waiting for the host to pick the next race…</p>'),
         buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Back to lobby', 'hot']] : [['leave', 'Leave', 'ghost small']],
       });
@@ -387,10 +405,13 @@ class App {
       if (!rec.lap || bestLap < rec.lap) rec.lap = bestLap;
       this.records[key] = rec;
       saveRecords(this.records);
+      if (newBest) addStat(this.career, 'tt');
+      if (race.newGhost && race.ghost) addStat(this.career, 'ghosts');
+      const rw = this.profileAward(race, me, { record: newBest });
       ui.results({
         title: newBest ? 'New record!' : 'Time trial',
         sub: race.trackDef.name,
-        html: `<div class="big-msg"><em>${fmtTime(total)}</em></div>
+        html: `${rw}<div class="big-msg"><em>${fmtTime(total)}</em></div>
           <div class="tt-times">${me.lapTimes.map((t, i) => `<div><small>Lap ${i + 1}</small>${fmtTime(t)}</div>`).join('')}
           <div><small>Best total</small>${fmtTime(rec.tt)}</div><div><small>Best lap</small>${fmtTime(rec.lap)}</div></div>
           ${race.newGhost ? '<p class="car-goal" style="text-align:center;margin:8px 0 0">👻 Ghost saved. Race against it next time!</p>' : ''}`,
@@ -408,19 +429,84 @@ class App {
       if (me.place === 1) gp.wins = (gp.wins || 0) + 1;
       gp.gems = (gp.gems || 0) + (race.player.gemsGot || 0);
       const quit = gp.careerEv ? 'career' : 'menu';
+      // Career cups pay out at the end; their races only give XP.
+      const rw = this.profileAward(race, me, gp.careerEv ? { coins: 0 } : {});
       ui.results({
         title: `${me.place}${ordinal(me.place).toLowerCase()} place`,
         sub: `Race ${gp.index + 1} of ${gp.tracks.length} · ${race.trackDef.name}`,
-        html: `<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">+${r.plus}</span><span class="pts">${gp.points[r.ch.id]}</span>`)).join('')}</div>`,
+        html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">+${r.plus}</span><span class="pts">${gp.points[r.ch.id]}</span>`)).join('')}</div>`,
         buttons: last ? [[quit, 'Quit', 'ghost small'], ['final', 'Final standings', 'hot']] : [[quit, 'Quit', 'ghost small'], ['next', 'Next race', 'hot']],
       });
       return;
     }
+    const rw = this.profileAward(race, me);
     ui.results({
       title: `${me.place}${ordinal(me.place).toLowerCase()} place`,
       sub: race.trackDef.name,
-      html: `<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`,
+      html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`,
       buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Race again', 'hot']],
+    });
+  }
+
+  // ---------------- profile ----------------
+  // Coins, XP, stats and achievements for a finished race. Returns the
+  // rewards block for the results screen.
+  profileAward(race, me, extra = {}) {
+    const sum = awardRace(this.career, {
+      mode: race.mode, place: me ? me.place : 0, gems: (race.player && race.player.gemsGot) || 0,
+      style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id, online: race.mode === 'mp', ...extra,
+    });
+    return this.rewardsFinish(sum);
+  }
+
+  rewardsFinish(sum, extraLines = []) {
+    const achs = checkAchievements(this.career, this.records);
+    saveCareer(this.career);
+    if ((sum && sum.ups.length) || achs.length) setTimeout(() => this.audio.play('levelup'), 400);
+    return this.ui.rewardsHtml(this.career, sum, achs, extraLines);
+  }
+
+  // ---------------- daily challenge ----------------
+  startDaily() {
+    const d = dailyFor();
+    this.gp = null;
+    this.careerRun = null;
+    this.dailyRun = d;
+    const player = this.career.racer || this.settings.char;
+    this.startRace({
+      mode: 'quick', trackId: d.track, reverse: d.rev, player, speedClass: d.cls, difficulty: d.diff, mods: d.mod,
+      dailyEv: d,
+    });
+  }
+
+  onDailyComplete(race, rows) {
+    const d = this.dailyRun;
+    const me = rows.find((r) => r.isPlayer);
+    const gems = (race.player && race.player.gemsGot) || 0;
+    const pass = me.place <= d.goal && gems >= (d.gems || 0);
+    const sum = awardRace(this.career, {
+      mode: race.mode, place: me.place, gems, style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id,
+    });
+    const lines = [];
+    let title = pass ? 'Challenge complete!' : 'Not quite!';
+    if (pass) {
+      const dr = completeDaily(this.career);
+      if (dr) {
+        lines.push(`🔥 ${dr.streak}-day streak! Daily reward +${dr.coins} 🪙 · +${dr.xp} XP`);
+        sum.coins += dr.coins;
+        sum.xp += dr.xp;
+        sum.levelCoins += dr.levelCoins;
+        sum.ups.push(...dr.ups);
+        sum.level = dr.level;
+      } else lines.push('Already completed today. Come back tomorrow for a new challenge!');
+    }
+    this.audio.play(pass ? 'finish' : 'lose');
+    const rw = this.rewardsFinish(sum, lines);
+    this.ui.results({
+      title,
+      sub: `Daily challenge · ${d.mod.name}`,
+      html: `${rw}<div class="results">${rows.map((r) => this.ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`,
+      buttons: [['menu', 'Menu', 'ghost small'], ['daily', pass ? 'Race again' : 'Retry', 'hot']],
     });
   }
 
@@ -444,10 +530,13 @@ class App {
     }
     const msg = me.place === 1 ? `You won the <em>${gp.cup.name}</em>!` : `You finished <em>${me.place}${ordinal(me.place).toLowerCase()}</em> overall`;
     this.audio.play(me.place <= 3 ? 'finish' : 'lose');
+    if (me.place === 1) addToSet(this.career, 'cups', gp.cup.id);
+    const bonus = [150, 90, 60][me.place - 1] || 20;
+    const rw = this.rewardsFinish(grant(this.career, bonus, me.place <= 3 ? 150 : 50), [`Cup bonus for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
     this.ui.results({
       title: 'Final standings',
       sub: gp.cup.name,
-      html: `<div class="trophy">${trophy}</div><div class="big-msg" style="margin:4px 0 10px">${msg}</div>
+      html: `${rw}<div class="trophy">${trophy}</div><div class="big-msg" style="margin:4px 0 10px">${msg}</div>
         <div class="results">${table.map((r) => this.ui.row(r, `<span></span><span class="pts">${r.pts}</span>`)).join('')}</div>`,
       buttons: [['menu', 'Menu', 'ghost small'], ['again', 'Play again', 'hot']],
     });
@@ -457,6 +546,9 @@ class App {
     switch (action) {
       case 'career':
         this.openCareer();
+        break;
+      case 'daily':
+        this.startDaily();
         break;
       case 'garage':
         this.openCareer(true);
@@ -468,7 +560,8 @@ class App {
         this.leaveMP();
         break;
       case 'retry':
-        if (this.careerRun) this.startCareerEvent(this.careerRun.evId);
+        if (this.dailyRun) this.startDaily();
+        else if (this.careerRun) this.startCareerEvent(this.careerRun.evId);
         else this.restart();
         break;
       case 'tracks':
@@ -516,14 +609,12 @@ class App {
     this.menuOpen = false;
     this.gp = null;
     this.careerRun = null;
+    this.dailyRun = null;
     this.audio.stopEngine();
     this.audio.setTempo(1);
     this.hud.show(false);
     this.releaseWake();
-    if (!this.career) {
-      this.career = newCareer();
-      saveCareer(this.career);
-    }
+    saveCareer(this.career);
     if (!this.race || this.race.mode !== 'demo') this.disposeRace();
     this.applyControls();
     if (garage) this.careerUI.openGarage();
@@ -532,7 +623,7 @@ class App {
 
   resetCareer() {
     clearCareer();
-    this.career = null;
+    this.career = newCareer();
     this.careerUI.ci = null;
   }
 
@@ -571,10 +662,11 @@ class App {
     res.margin = me.place === 1 && next ? next.time - me.time : 0;
     const out = applyResult(this.career, ev.id, res);
     if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    const rw = this.profileAward(race, me, { coins: 0, xpBonus: out.pass ? 50 : 0 });
     let extra = '';
     if (ev.type === 'time') extra = `<div class="big-msg"><em>${fmtTime(me.time)}</em></div><div class="car-goal">Target ${fmtTime(ev.target)}</div>`;
     const rowsHtml = ev.type === 'time' ? '' : `<div class="results">${rows.map((r) => this.ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`;
-    this.careerUI.results(out, rowsHtml, extra);
+    this.careerUI.results(out, rw + rowsHtml, extra);
   }
 
   onCareerCupFinal(table, me) {
@@ -582,11 +674,13 @@ class App {
     const res = { place: me.place, wins: gp.wins || 0, gems: gp.gems || 0, finished: true };
     const out = applyResult(this.career, gp.careerEv.id, res);
     if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    if (me.place === 1) addToSet(this.career, 'cups', gp.careerEv.id);
+    const rw = this.rewardsFinish(grant(this.career, 0, me.place <= 3 ? 200 : 60));
     this.audio.play(me.place === 1 ? 'finish' : 'lose');
     const trophy = me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁';
     const rowsHtml = `<div class="trophy">${trophy}</div><div class="results">${table.map((r) => this.ui.row(r, `<span></span><span class="pts">${r.pts}</span>`)).join('')}</div>`;
     this.gp = null;
-    this.careerUI.results(out, rowsHtml);
+    this.careerUI.results(out, rw + rowsHtml);
   }
 
   // ---------------- multiplayer ----------------

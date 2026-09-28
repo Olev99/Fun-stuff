@@ -10,6 +10,7 @@ export class Input {
     this.btn = { drift: false, item: false, brake: false };
     this.itemPulse = null; // set when the ITEM button fires: +1 ahead, -1 behind, 0 default
     this.touchSteer = 0;
+    this.lookBack = false; // held on the minimap
     this.tilt = { listening: false, angle: 0, smooth: 0, events: 0, lastT: 0, flip: 1, gsy: -1 };
     this.enabled = false;
     this._onOrient = this._onOrient.bind(this);
@@ -221,6 +222,7 @@ export class Input {
     // Holding brake (or down) throws behind, holding up throws ahead.
     if (item && !aim) aim = brake ? -1 : k.has('ArrowUp') || k.has('KeyW') ? 1 : 0;
     return {
+      lookBack: this.lookBack || k.has('KeyQ') || k.has('KeyC'),
       steer,
       throttle: 1,
       brake,

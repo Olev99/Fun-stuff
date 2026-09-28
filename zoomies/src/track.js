@@ -95,6 +95,22 @@ export class Path {
     this.curv = this._smooth(curv, 3);
     this.curvWide = this._smooth(curv, 16);
 
+    // A bend tighter than the wall offset would fold the inside wall over
+    // itself and leave a pocket karts can get wedged in: pull both walls in.
+    const cap = A();
+    for (let i = 0; i < count; i++) cap[i] = Math.max(ed[i] + 1.2, 0.9 / Math.max(1e-4, Math.abs(curv[i])));
+    const reach = Math.ceil(12 / this.ds);
+    let capped = false;
+    for (let i = 0; i < count; i++) {
+      let m = Infinity;
+      for (let k = -reach; k <= reach; k++) m = Math.min(m, cap[this.I(i + k)]);
+      if (m < wd[i]) { wd[i] = m; capped = true; }
+    }
+    if (capped) {
+      const sm = this._smooth(wd, 3);
+      for (let i = 0; i < count; i++) wd[i] = Math.max(ed[i] + 1.2, Math.min(wd[i], sm[i]));
+    }
+
     const bankK = opts.bank ?? 3.0;
     const slope = A();
     for (let i = 0; i < count; i++) slope[i] = clamp(this.curvWide[i] * bankK, -0.09, 0.09);

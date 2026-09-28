@@ -263,6 +263,10 @@ export class Audio {
       case 'ui':
         this._tone('triangle', 880, 1100, 0.07, 0.12);
         break;
+      case 'levelup':
+        [0, 4, 7, 12].forEach((st, i) => this._tone('square', mtof(76 + st), 0, 0.16, 0.11, i * 0.08));
+        this._tone('triangle', mtof(88), 0, 0.5, 0.12, 0.34);
+        break;
       case 'coin':
         this._tone('square', 988, 988, 0.07, 0.1);
         this._tone('square', 1319, 1319, 0.22, 0.1, 0.07);

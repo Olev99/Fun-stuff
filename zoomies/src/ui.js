@@ -5,6 +5,7 @@ import { THEMES } from './world.js';
 import { fmtTime, ordinal } from './util.js';
 import { saveSettings } from './settings.js';
 import { cleanNick } from './nametags.js';
+import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -50,6 +51,8 @@ export class UI {
         if (action === 'settings' || action === 'help') this.overlay(action, 'title');
         else if (action === 'mp') app.openMultiplayer();
         else if (action === 'career') app.openCareer();
+        else if (action === 'daily') this.dailyScreen();
+        else if (action === 'profile') this.profileScreen();
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
@@ -70,6 +73,7 @@ export class UI {
         break;
       case 'pause':
         if (action === 'resume') app.resume();
+        else if (action === 'rescue') app.rescuePlayer();
         else if (action === 'restart') app.restart();
         else if (action === 'settings') this.overlay('settings', 'pause');
         else if (action === 'quit') (app.session ? app.leaveMP() : app.quitRace());
@@ -85,6 +89,13 @@ export class UI {
         break;
       case 'story':
         if (action === 'skip') app.careerUI.endStory();
+        break;
+      case 'daily':
+        if (action === 'race') app.startDaily();
+        else app.toTitle();
+        break;
+      case 'profile':
+        this.title();
         break;
     }
   }
@@ -103,7 +114,77 @@ export class UI {
 
   // ---------------- Title ----------------
   title() {
+    this.refreshChip();
     this.show('title');
+  }
+
+  // Level, coins and streak in the corner of the title screen.
+  refreshChip() {
+    const c = this.app.career;
+    const lv = levelOf(c.xp || 0);
+    const streak = dailyStreak(c);
+    $('pchip').innerHTML = `<b>Lv ${lv.level}</b><i class="pbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></i><span>🪙 ${c.coins.toLocaleString('en-US')}</span>${streak ? `<span>🔥 ${streak}</span>` : ''}`;
+    const d = dailyFor();
+    const done = dailyDoneToday(c);
+    $('menu-daily').textContent = done ? `Done today ✓ · ${streak}-day streak` : `${d.mod.icon} ${d.mod.name} · +${dailyReward(streak + 1)} 🪙`;
+    document.querySelector('[data-go="daily"]').classList.toggle('done', done);
+    const nAch = Object.keys(c.ach || {}).length;
+    $('menu-trophies').textContent = `🏆 ${nAch}/${ACHIEVEMENTS.length}`;
+  }
+
+  // ---------------- Daily challenge ----------------
+  dailyScreen() {
+    const c = this.app.career;
+    const d = dailyFor();
+    const def = trackById(d.track);
+    this._thumb($('daily-thumb'), [def], d.rev);
+    const streak = dailyStreak(c);
+    const done = dailyDoneToday(c);
+    $('daily-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    $('daily-icon').textContent = d.mod.icon;
+    $('daily-mod').textContent = d.mod.name;
+    $('daily-desc').textContent = d.mod.desc;
+    const cls = { chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[d.cls];
+    $('daily-facts').innerHTML = `<div><small>Track</small>${dailyTrackName(d)}</div><div><small>Goal</small>${dailyGoalText(d)}</div><div><small>Speed</small>${cls} · ${d.diff === 'hard' ? 'Hard' : 'Normal'} racers</div>`;
+    const flames = Array.from({ length: 7 }, (_, i) => `<i class="${i < streak ? 'on' : ''}">🔥</i>`).join('');
+    $('daily-streak').innerHTML = `<div class="flames">${flames}</div><span>${streak ? `${streak}-day streak` : 'Start a streak today'}${done ? ' · done today ✓' : ''}</span>`;
+    $('daily-reward').innerHTML = done ? 'Completed! A new challenge arrives tomorrow. You can still race it for fun.' : `Reward: <b>+${dailyReward(streak + 1)} 🪙</b> and <b>+150 XP</b>. Longer streaks pay more.`;
+    this.app.previewTrack(d.track, d.rev);
+    this.show('daily');
+  }
+
+  // ---------------- Trophies ----------------
+  profileScreen() {
+    const app = this.app;
+    const c = app.career;
+    const lv = levelOf(c.xp || 0);
+    const st = c.stats || {};
+    const n = (k) => (Array.isArray(st[k]) ? st[k].length : st[k] || 0);
+    const nAch = Object.keys(c.ach || {}).length;
+    $('prof-count').textContent = `${nAch} of ${ACHIEVEMENTS.length} trophies`;
+    $('prof-top').innerHTML = `<div class="lvbadge"><small>Level</small>${lv.level}</div>
+      <div class="lvinfo"><div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div><small>${lv.into} / ${lv.need} XP to level ${lv.level + 1}</small>
+      <div class="pstats"><span>🪙 ${c.coins.toLocaleString('en-US')}</span><span>🏁 ${n('races')} races</span><span>🥇 ${n('wins')} wins</span><span>🔥 best streak ${(c.daily && c.daily.best) || 0}</span></div></div>`;
+    $('ach-grid').innerHTML = ACHIEVEMENTS.map((a) => {
+      const got = !!(c.ach && c.ach[a.id]);
+      const [cur, max] = a.prog(c, app.records);
+      const pct = Math.round((Math.min(cur, max) / max) * 100);
+      return `<div class="ach${got ? ' got' : ''}"><span class="ai">${a.icon}</span><span class="am"><b>${a.name}</b><small>${a.desc}</small>
+        ${got ? '<em>Unlocked</em>' : `<span class="abar"><i style="width:${pct}%"></i></span><em>${cur.toLocaleString('en-US')} / ${max.toLocaleString('en-US')} · 🪙 ${a.reward}</em>`}</span></div>`;
+    }).join('');
+    this.show('profile');
+  }
+
+  // Coins, XP bar, level-ups and new trophies for a results screen.
+  rewardsHtml(c, sum, achs = [], lines = []) {
+    const lv = levelOf(c.xp || 0);
+    const pct = Math.round((lv.into / lv.need) * 100);
+    const coins = sum ? sum.coins : 0;
+    const top = sum ? `<div class="rw-top">${coins ? `<span class="rw-c">+${coins} 🪙</span>` : ''}<span class="rw-x">+${sum.xp} XP</span><span class="rw-l">Lv ${lv.level}</span><span class="xpbar"><i style="width:${pct}%"></i></span></div>` : '';
+    const extra = lines.map((l) => `<div class="rw-line">${l}</div>`).join('');
+    const ups = sum && sum.ups.length ? sum.ups.map((L) => `<div class="rw-up">⭐ LEVEL ${L}! +${80 + 20 * L} 🪙${L % 5 === 0 ? ' · free gumball 🍬' : ''}</div>`).join('') : '';
+    const ach = achs.map((a) => `<div class="rw-ach">🏆 ${a.icon} <b>${a.name}</b> · ${a.desc} <span>+${a.reward} 🪙</span></div>`).join('');
+    return `<div class="rewards">${top}${extra}${ups}${ach}</div>`;
   }
 
   // ---------------- Characters ----------------
@@ -374,8 +455,7 @@ export class UI {
     $('set-sfx').addEventListener('change', (e) => { s().sfx = e.target.checked; app.audio.setSfx(s().sfx); saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
     $('set-reset-career').addEventListener('click', () => {
-      if (!app.career) { app.hud.toast('No career yet'); return; }
-      if (!confirm('Start the career over? Coins, karts, racers and stars will be lost.')) return;
+      if (!confirm('Start over? Your level, coins, trophies, karts, racers and career progress will be lost.')) return;
       app.resetCareer();
       app.audio.play('uiBack');
       $('set-reset-career').textContent = 'Done';

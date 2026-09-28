@@ -29,6 +29,12 @@ export class HUD {
     this.flash = $('flash');
     this.fpsEl = $('fps');
     this.goalEl = $('hud-goal');
+    this.styleEl = $('hud-style');
+    this.rearEl = $('hud-rear');
+    // Hold the minimap to look behind you.
+    const look = (on) => (e) => { e.preventDefault(); this.app.input.lookBack = on; };
+    this.map.addEventListener('pointerdown', look(true));
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) this.map.addEventListener(ev, look(false));
     this.cache = {};
     this.mapFrame = 0;
     this.rollTimer = 0;
@@ -49,7 +55,9 @@ export class HUD {
     this.speed.classList.remove('on');
     this.flash.style.opacity = 0;
     this._buildMap(race);
-    this.goalEl.hidden = !race.careerEv || race.careerEv.type === 'cup';
+    this.goalEl.hidden = !(race.careerEv && race.careerEv.type !== 'cup') && !race.dailyEv;
+    this.styleEl.innerHTML = '';
+    this.app.input.lookBack = false;
     const sp = document.getElementById('hud-split');
     if (sp) sp.className = '';
     const tt = race.mode === 'tt';
@@ -70,7 +78,8 @@ export class HUD {
       return;
     }
     const ev = race.careerEv;
-    const cls = ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : `${race.speedClass.name} class`;
+    const dv = race.dailyEv;
+    const cls = dv ? `Daily challenge · ${dv.mod.icon} ${dv.mod.name}` : ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : `${race.speedClass.name} class`;
     const extra = this.app.gp ? ` · Race ${this.app.gp.index + 1} of ${this.app.gp.tracks.length}` : '';
     this.trackName.innerHTML = `<small>${cls}${extra}</small>${race.trackDef.name}${race.track.reverse ? ' ⟲' : ''}`;
     this.trackName.hidden = false;
@@ -190,6 +199,11 @@ export class HUD {
     });
     this._set('gems', p.gems, (v) => { this.gems.textContent = v; });
     if (race.careerEv) this._set('goal', hudGoal(race.careerEv, race), (v) => { this.goalEl.textContent = v; });
+    else if (race.dailyEv) {
+      const d = race.dailyEv;
+      const txt = (d.goal === 1 ? 'Goal: win' : 'Goal: top 3') + (d.gems ? ` · 💎 ${p.gemsGot || 0}/${d.gems}` : '');
+      this._set('goal', txt, (v) => { this.goalEl.textContent = v; });
+    }
     const t = race.state === 'finished' ? p.finishTime : race.raceTime;
     this._set('time', Math.floor(t * 20), () => { this.timeEl.textContent = fmtTime(t); });
 
@@ -221,6 +235,8 @@ export class HUD {
     }
 
     this._set('boost', p.boostTime > 0 || p.starTime > 0, (v) => this.speed.classList.toggle('on', v));
+    this._set('draft', (p.draftT || 0) > 0.3 && p.boostTime <= 0, (v) => this.speed.classList.toggle('draft', v));
+    this._set('rear', !!race.lookBack, (v) => { this.rearEl.hidden = !v; });
     this._set('wrong', p.wrongWay > 1.2 && race.state === 'race', (v) => { this.wrong.hidden = !v; });
     this._set('flash', Math.round(race.flash * 20), (v) => { this.flash.style.opacity = (v / 20) * 0.85; });
 
@@ -257,6 +273,16 @@ export class HUD {
     void el.offsetWidth;
     el.className = 'stay finish';
     this.speed.classList.remove('on');
+  }
+
+  // Skill popups ("SUPER TURBO +12") stacking on the left.
+  style(label, pts, cls) {
+    const el = document.createElement('div');
+    el.className = `sp ${cls}`;
+    el.innerHTML = `${label}<b>+${pts}</b>`;
+    this.styleEl.appendChild(el);
+    while (this.styleEl.children.length > 3) this.styleEl.firstChild.remove();
+    el.addEventListener('animationend', () => el.remove());
   }
 
   // Time trial split against the ghost: green when ahead, red when behind.

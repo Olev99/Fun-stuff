@@ -241,7 +241,7 @@ export class ItemSystem {
     this._c = new THREE.Color();
     this._fr = {};
     const on = race.mode !== 'tt';
-    this._buildBoxes(on);
+    this._buildBoxes(on && !(race.mods && race.mods.noItems));
     this._buildGems(on);
     this._buildObstacles();
     this._buildCrates();
@@ -342,6 +342,8 @@ export class ItemSystem {
   }
 
   roll(kart) {
+    const pool = this.race.mods && this.race.mods.items;
+    if (pool) return pool[Math.floor(Math.random() * pool.length)];
     const n = this.race.karts.length;
     const p = n > 1 ? (kart.place - 1) / (n - 1) : 0;
     const table = kart.place === 1 ? TABLES[0] : p < 0.45 ? TABLES[1] : p < 0.8 ? TABLES[2] : TABLES[3];
@@ -479,7 +481,7 @@ export class ItemSystem {
         k.vel.z += (dz / l) * push;
       }
       if (k.hit(kind) && kind === 'spin') k.vy = Math.max(k.vy, 9);
-      race.onBlastHit(k, kind);
+      race.onBlastHit(k, kind, owner);
     }
     if (!this.replica) {
       for (let i = this.hazards.length - 1; i >= 0; i--) {
@@ -809,7 +811,7 @@ export class ItemSystem {
       if (dx * dx + dz * dz < 7 && !p._hitLocal) {
         p._hitLocal = true;
         if (k.hit('spin')) k.vy = Math.max(k.vy, 11);
-        this.race.onBlastHit(k, 'twister');
+        this.race.onBlastHit(k, 'twister', p.owner);
       }
       return;
     }
@@ -915,7 +917,7 @@ export class ItemSystem {
         if (dx * dx + dz * dz < 7) {
           p.hitSet.add(k);
           if (k.hit('spin')) k.vy = Math.max(k.vy, 11);
-          race.onBlastHit(k, 'twister');
+          race.onBlastHit(k, 'twister', p.owner);
         }
       }
     }
