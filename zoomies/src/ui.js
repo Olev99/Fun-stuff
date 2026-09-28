@@ -507,6 +507,7 @@ export class UI {
     $('set-sfx').checked = s.sfx;
     $('set-fps').checked = s.showFps;
     $('set-reset-career').textContent = 'Reset';
+    $('set-about').textContent = this.app.versionInfo;
   }
 
   tick() {

@@ -39,7 +39,9 @@ const HDR = (() => {
     return false;
   }
 })();
-import { isTouch, isDesktop, isMac } from './platform.js';
+import { isTouch, isDesktop, isMac, platformName } from './platform.js';
+
+const VERSION = (document.querySelector('meta[name="zoomies-version"]') || {}).content || 'dev';
 const $ = (id) => document.getElementById(id);
 
 function shuffle(a) {
@@ -124,6 +126,7 @@ class App {
     this.canvas.addEventListener('webglcontextrestored', () => location.reload());
 
     this.toTitle();
+    this._checkVersion();
     // Opened from the QR code on a computer: become its steering wheel.
     if (this.wheelPad.wanted) this.wheelPad.open();
     else if (this.sync.wanted) this.sync.open('title');
@@ -135,6 +138,29 @@ class App {
       l.style.opacity = 0;
       setTimeout(() => l.remove(), 450);
     }, 60);
+  }
+
+  // After an update, a browser may still hold the previous page. If a newer
+  // version is live, reload once (between races) so everything matches.
+  _checkVersion() {
+    if (VERSION === 'dev' || !/^https?:$/.test(location.protocol)) return;
+    fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j || !j.v || j.v === VERSION) return;
+        let tried = null;
+        try { tried = sessionStorage.getItem('zoomies.reloadFor'); } catch (e) { /* storage blocked */ }
+        if (tried === j.v) return;
+        try { sessionStorage.setItem('zoomies.reloadFor', j.v); } catch (e) { /* ignore */ }
+        this.pendingReload = true;
+        if (!this.race || this.race.mode === 'demo') location.reload();
+      })
+      .catch(() => {});
+  }
+
+  get versionInfo() {
+    const steer = { keys: 'keyboard or controller', wheel: 'phone wheel', tilt: 'tilt', touch: 'touch' }[this.settings.steering] || this.settings.steering;
+    return `Version ${VERSION} · ${platformName} · ${this.wheelHost && this.wheelHost.live ? 'phone wheel' : steer} · ${this.quality.name} graphics`;
   }
 
   // Keyboard for menus: Enter picks the highlighted (hot) button, Esc goes
@@ -233,6 +259,7 @@ class App {
   }
 
   toTitle() {
+    if (this.pendingReload) { location.reload(); return; }
     this.paused = false;
     this.gp = null;
     this.careerRun = null;

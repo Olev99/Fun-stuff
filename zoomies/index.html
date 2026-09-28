@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="zoomies-version" content="672e5c9">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -424,6 +425,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #wp-flash.hit { background: rgba(255,60,90,.45); animation: wpflash .5s ease-out; }
 #wp-flash.boost { background: rgba(255,210,63,.3); animation: wpflash .4s ease-out; }
 @keyframes wpflash { from { opacity: 1; } to { opacity: 0; } }
+.set-about { margin: 6px 0 0; font-size: 11.5px; font-weight: 700; color: var(--muted); text-align: center; }
 /* Sync progress */
 .sync-dlg { width: min(620px, 100%); }
 .sync-intro { margin: 0 0 8px; font-weight: 700; color: var(--muted); font-size: 13px; }
@@ -1046,6 +1048,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <button class="btn sky small" data-go="sync">Sync</button></div>
       <div class="row"><div><div class="lbl">Start over</div><div class="hint">Wipes your level, coins, trophies, karts and career progress.</div></div>
         <button class="btn ghost small" id="set-reset-career">Reset</button></div>
+      <p class="set-about" id="set-about"></p>
     </div>
     <div class="bottom-bar"><button class="btn" data-go="close">Done</button></div>
   </div>
@@ -1134,7 +1137,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
-<script type="module" src="./src/main.js"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=4b94c025", "./src/audio.js": "./src/audio.js?v=810c7ccb", "./src/career.js": "./src/career.js?v=ddbd9f32", "./src/careerui.js": "./src/careerui.js?v=59b6b2ab", "./src/characters.js": "./src/characters.js?v=018032fd", "./src/cosmetics.js": "./src/cosmetics.js?v=b8dcc622", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=eda2b231", "./src/hud.js": "./src/hud.js?v=91ff8f3f", "./src/input.js": "./src/input.js?v=03f51b46", "./src/items.js": "./src/items.js?v=4b482cc7", "./src/kart.js": "./src/kart.js?v=b43c1aa7", "./src/karts.js": "./src/karts.js?v=7470bb98", "./src/main.js": "./src/main.js?v=8a0806dc", "./src/nametags.js": "./src/nametags.js?v=270747a4", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/profile.js": "./src/profile.js?v=5dbc7892", "./src/race.js": "./src/race.js?v=bace4dca", "./src/settings.js": "./src/settings.js?v=1d97d9b2", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=dbed08c9", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=31913f92", "./src/tracks.js": "./src/tracks.js?v=8bad8289", "./src/ui.js": "./src/ui.js?v=7e28858b", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=22c8adb1", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=8a0806dc"></script>
 </body>
 </html>

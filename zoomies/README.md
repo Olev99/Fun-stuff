@@ -174,4 +174,6 @@ zoomies/
   tools/build-single.mjs  bundles everything into one HTML file
 ```
 
+Before committing, run `node tools/stamp.mjs`. It stamps each code file's URL with a hash of its contents (in the import map in `index.html`) and writes `version.json`. Browsers then never run a mix of old and new files, and a page left open reloads itself once when a newer version goes live.
+
 To run it locally, serve the folder over HTTP, for example with `python3 -m http.server` inside `zoomies/`, then open `http://localhost:8000`.
