@@ -1,5 +1,6 @@
 import { TRACKS, trackById } from './tracks.js';
 import { BODY_LIST } from './karts.js';
+import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
 
 // The player profile lives in the career save (one wallet for everything):
@@ -132,6 +133,10 @@ export const ACHIEVEMENTS = [
   { id: 'battle1', icon: '🎈', name: 'Balloon Buster', desc: 'Win a balloon battle', reward: 150, ...count('battleWins', 1) },
   { id: 'lv10', icon: '⭐', name: 'Rising Star', desc: 'Reach level 10', reward: 300, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 10), 10] },
   { id: 'lv30', icon: '🌟', name: 'Superstar', desc: 'Reach level 30', reward: 1500, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 30), 30] },
+  { id: 'cap1', icon: '🍬', name: 'Sweet Tooth', desc: 'Open a gumball capsule', reward: 50, ...count('capsules', 1) },
+  { id: 'cos10', icon: '🎩', name: 'Dress Up', desc: 'Collect 10 gumball prizes', reward: 300, prog: (c) => [Math.min(ownedCount(c), 10), 10] },
+  { id: 'cosall', icon: '🧺', name: 'Completionist', desc: 'Collect every gumball prize', reward: 2000, prog: (c) => [ownedCount(c), COSMETIC_TOTAL] },
+  { id: 'legend', icon: '🦄', name: 'Lucky Dip', desc: 'Win a legendary prize', reward: 250, prog: (c) => [(c.cos || []).some((id) => (cosmeticById(id) || {}).rarity === 'legendary') ? 1 : 0, 1] },
   { id: 'garage', icon: '🏎️', name: 'Full Garage', desc: 'Own every kart', reward: 800, prog: (c) => [c.bodies.length, BODY_LIST.length] },
   { id: 'champ', icon: '🥇', name: 'Golden Wheel', desc: 'Become the career champion', reward: 1000, prog: (c) => [c.champion ? 1 : 0, 1] },
 ];

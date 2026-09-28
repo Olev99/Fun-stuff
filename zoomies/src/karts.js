@@ -336,8 +336,9 @@ const _cache = new Map();
 // { chassis, driver } geometries for a racer in a body. `lo` builds the
 // cheaper version used for karts far from the camera; `paint` overrides the
 // body colour (career paint jobs).
-export function kartGeometry(ch, { body = 'classic', lo = false, paint = null } = {}) {
-  const key = `${ch.id}|${body}|${lo ? 1 : 0}|${paint || ''}`;
+export function kartGeometry(ch, { body = 'classic', lo = false, paint = null, hat = null } = {}) {
+  if (hat === 'nohat') hat = null;
+  const key = `${ch.id}|${body}|${lo ? 1 : 0}|${paint || ''}|${hat || ''}`;
   if (_cache.has(key)) return _cache.get(key);
   LOW = lo;
   let chassis;
@@ -348,7 +349,7 @@ export function kartGeometry(ch, { body = 'classic', lo = false, paint = null } 
   } finally {
     LOW = false;
   }
-  const g = { chassis, driver: driverGeometry(ch, lo) };
+  const g = { chassis, driver: driverGeometry(ch, lo, hat) };
   g.chassis.userData.shared = true;
   g.driver.userData.shared = true;
   _cache.set(key, g);

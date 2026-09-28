@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GeoBuilder } from './util.js';
+import { addHat } from './cosmetics.js';
 
 // Eight original racers. Stats are 1-5 and each racer's total is 12.
 export const CHARACTERS = [
@@ -40,7 +41,7 @@ function googlyEyes(B, hx, hy, hz, spread, r = 0.14) {
   }
 }
 
-function driver(ch) {
+function driver(ch, hat) {
   const B = new GeoBuilder('fur');
   const H = { x: 0, y: 1.66, z: -0.22 };
   const suit = ch.color;
@@ -178,13 +179,14 @@ function driver(ch) {
       torso(suit);
       B.add(sphere(0.45), suit, [H.x, H.y, H.z]);
   }
+  if (hat) addHat(B, ch, hat);
   return B.build();
 }
 
-export function driverGeometry(ch, lo = false) {
+export function driverGeometry(ch, lo = false, hat = null) {
   LOW = lo;
   try {
-    return driver(ch);
+    return driver(ch, hat);
   } finally {
     LOW = false;
   }

@@ -137,6 +137,49 @@ export class Audio {
     s.stop(t + dur + 0.02);
   }
 
+  // ---- horns (gumball machine) ----
+  horn(id, when = 0) {
+    if (!this.ready || !this.sfxOn) return;
+    const T = (type, f0, f1, dur, vol, at = 0, attack) => this._tone(type, f0, f1, dur, vol, when + at, this.sfx, attack);
+    const N = (dur, vol, type, f0, f1, at = 0, q) => this._noise(dur, vol, type, f0, f1, when + at, this.sfx, q);
+    switch (id) {
+      case 'duck':
+        for (const at of [0, 0.2]) { T('sawtooth', 1100, 600, 0.14, 0.09, at); T('square', 700, 420, 0.14, 0.06, at); }
+        break;
+      case 'clown':
+        T('sawtooth', 520, 470, 0.22, 0.12, 0, 0.02); T('square', 260, 240, 0.22, 0.08, 0, 0.02);
+        T('sawtooth', 390, 350, 0.3, 0.12, 0.26, 0.02); T('square', 195, 180, 0.3, 0.08, 0.26, 0.02);
+        break;
+      case 'kazoo':
+        [0, 4, 7, 12].forEach((s, i) => { T('sawtooth', mtof(67 + s), mtof(67 + s) * 1.02, 0.14, 0.08, i * 0.12, 0.02); N(0.14, 0.05, 'bandpass', 1400, 1400, i * 0.12, 6); });
+        break;
+      case 'meow':
+        T('sawtooth', 700, 1100, 0.18, 0.08, 0, 0.03); T('sawtooth', 1100, 520, 0.32, 0.08, 0.16);
+        N(0.45, 0.04, 'bandpass', 1800, 900, 0, 4);
+        break;
+      case 'laser':
+        for (const at of [0, 0.14, 0.28]) T('square', 1800, 180, 0.13, 0.08, at);
+        break;
+      case 'train':
+        for (const f of [277, 349, 415]) T('sawtooth', f, f * 0.99, 0.75, 0.05, 0, 0.06);
+        N(0.8, 0.12, 'bandpass', 700, 500, 0, 1.5);
+        break;
+      case 'airhorn':
+        for (const at of [0, 0.3, 0.6]) { T('sawtooth', 466, 460, 0.24, 0.1, at, 0.01); T('sawtooth', 554, 548, 0.24, 0.08, at, 0.01); N(0.24, 0.1, 'bandpass', 1200, 1000, at, 2); }
+        break;
+      case 'fanfare':
+        [[0, 0], [4, 0.12], [7, 0.24], [12, 0.36]].forEach(([s, at]) => T('square', mtof(72 + s), 0, at === 0.36 ? 0.5 : 0.14, 0.09, at));
+        T('triangle', mtof(60), 0, 0.8, 0.12, 0.36);
+        break;
+      case 'dino':
+        N(0.9, 0.35, 'lowpass', 900, 160, 0, 1.2);
+        T('sawtooth', 190, 70, 0.9, 0.14, 0, 0.08); T('sawtooth', 240, 90, 0.8, 0.08, 0.05, 0.08);
+        break;
+      default: // beep beep
+        for (const at of [0, 0.18]) { T('square', 440, 430, 0.13, 0.1, at); T('square', 554, 544, 0.13, 0.08, at); }
+    }
+  }
+
   // ---- sound effects ----
   play(name, arg) {
     if (!this.ready || !this.sfxOn) return;
@@ -267,6 +310,20 @@ export class Audio {
         [0, 4, 7, 12].forEach((st, i) => this._tone('square', mtof(76 + st), 0, 0.16, 0.11, i * 0.08));
         this._tone('triangle', mtof(88), 0, 0.5, 0.12, 0.34);
         break;
+      case 'crank':
+        for (let i = 0; i < 6; i++) this._noise(0.04, 0.3, 'bandpass', 2600, 1800, i * 0.09, this.sfx, 4);
+        this._tone('triangle', 300, 120, 0.3, 0.12, 0.62);
+        break;
+      case 'capsule':
+        this._tone('sine', 900, 1500, 0.08, 0.12);
+        this._noise(0.12, 0.25, 'bandpass', 1500, 3000, 0.02, this.sfx, 2);
+        break;
+      case 'reveal': {
+        const run = { common: [0, 7], rare: [0, 4, 7, 12], epic: [0, 4, 7, 11, 14, 19], legendary: [0, 4, 7, 12, 16, 19, 24, 28] }[arg] || [0, 7];
+        run.forEach((s, i) => this._tone('square', mtof(76 + s), 0, 0.16, 0.1, i * 0.07));
+        if (arg === 'epic' || arg === 'legendary') this._tone('triangle', mtof(64), 0, 1, 0.14, run.length * 0.07);
+        break;
+      }
       case 'coin':
         this._tone('square', 988, 988, 0.07, 0.1);
         this._tone('square', 1319, 1319, 0.22, 0.1, 0.07);

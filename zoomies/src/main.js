@@ -5,7 +5,9 @@ import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { UI } from './ui.js';
 import { CareerUI } from './careerui.js';
+import { GumballUI } from './gumballui.js';
 import { cleanNick } from './nametags.js';
+import { lookOf, cleanLook } from './cosmetics.js';
 import { awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
@@ -78,6 +80,7 @@ class App {
     this.hud = new HUD(this);
     this.ui = new UI(this);
     this.careerUI = new CareerUI(this, this.ui);
+    this.gumballUI = new GumballUI(this);
     this.showroom = new Showroom(this);
     this.portraits = this.showroom.portraits(r, 112);
     $('fps').hidden = !this.settings.showFps;
@@ -274,6 +277,7 @@ class App {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
+      look: lookOf(this.career),
     });
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
@@ -755,7 +759,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.host(this.settings.char, this.settings.name);
+      await ses.host(this.settings.char, this.settings.name, lookOf(this.career));
     } catch (e) {
       ses.close();
       this.ui.lobby('start', `Could not create a room: ${(e && e.message) || e}. Check your internet connection.`);
@@ -777,7 +781,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.join(code, this.settings.char, this.settings.name);
+      await ses.join(code, this.settings.char, this.settings.name, lookOf(this.career));
     } catch (e) {
       ses.close();
       this.ui.lobby('start', (e && e.message) || 'Could not connect.');
@@ -826,7 +830,7 @@ class App {
     const L = ses.lobby;
     // Only players we've heard from recently get a kart.
     const now = performance.now();
-    const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char, nick: p.nick || p.name }));
+    const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char, nick: p.nick || p.name, look: p.look || null }));
     if (humans.length < 2) return;
     const taken = new Set(humans.map((h) => h.char));
     const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, 8 - humans.length)) : [];
@@ -834,7 +838,7 @@ class App {
     const grid = [...ai];
     const hs = shuffle(humans.slice());
     const slots = [];
-    for (const h of hs) { slots.push({ id: h.id, slot: grid.length, nick: h.nick }); grid.push(h.char); }
+    for (const h of hs) { slots.push({ id: h.id, slot: grid.length, nick: h.nick, look: h.look }); grid.push(h.char); }
     const cfg = { trackId: L.track, reverse: L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
     ses.inRace = true;
     ses.send({ t: 'start', cfg });
@@ -868,6 +872,7 @@ class App {
       laps: def.laps || 3, net: ses, playerSlot: mine.slot, humans: ses.isHost ? cfg.humans.filter((h) => h.id !== 'host') : [],
       humanSlots: cfg.humans.map((h) => h.slot),
       nicks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanNick(h.nick)])),
+      looks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanLook(h.look)])),
     });
     ses.race = this.race;
     this.race.setSize(this.w, this.h, this.pr);

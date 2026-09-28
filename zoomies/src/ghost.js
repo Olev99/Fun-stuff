@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { kartGeometry, wheelGeometry, bodyById } from './karts.js';
 import { charById } from './characters.js';
 import { pbrMat } from './util.js';
+import { hatById } from './cosmetics.js';
 
 // Time trial ghosts: your best run on each track (and direction) is recorded
 // at 10 samples a second, saved on the phone and replayed as a see-through
@@ -60,7 +61,7 @@ export class GhostRecorder {
   save(key, time, splits, kart) {
     const old = loadGhost(key);
     if (old && old.time <= time) return false;
-    const g = { time, splits, char: kart.ch.id, body: kart.bodyDef.id, paint: kart.paint || null, data: toB64(new Int16Array(this.buf)) };
+    const g = { time, splits, char: kart.ch.id, body: kart.bodyDef.id, paint: kart.paint || null, hat: (kart.look && kart.look.hat) || null, data: toB64(new Int16Array(this.buf)) };
     try {
       localStorage.setItem(KEY + key, JSON.stringify(g));
       return true;
@@ -77,7 +78,7 @@ export class GhostPlayer {
     this.n = g.samples.length / 4;
     const ch = charById(g.char);
     const body = bodyById(g.body);
-    const geo = kartGeometry(ch, { body: body.id, paint: g.paint });
+    const geo = kartGeometry(ch, { body: body.id, paint: g.paint, hat: typeof g.hat === 'string' ? hatById(g.hat).id : null });
     this.mat = pbrMat({ color: '#bfeaff', transparent: true, opacity: 0.42, depthWrite: false });
     this.root = new THREE.Group();
     this.root.add(new THREE.Mesh(geo.chassis, this.mat));

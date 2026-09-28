@@ -99,6 +99,9 @@ h2.title {
 .menu .btn { text-align: left; font-size: clamp(15px, 4.4vh, 19px); }
 .menu-row { display: flex; gap: 10px; }
 .menu-row .btn { flex: 1; text-align: center; }
+.menu-row.tight { gap: 8px; }
+.menu-row.tight .btn { min-width: 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; font-size: clamp(13px, 3.8vh, 16px); }
+.menu-row.tight .btn.ico { flex: 0 0 auto; width: 44px; }
 .install-tip {
   position: absolute; left: max(18px, var(--sal)); bottom: max(10px, var(--sab)); font-size: 12px; font-weight: 700;
   color: var(--muted); max-width: 46ch;
@@ -361,6 +364,57 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .ev.sel { border-color: var(--sun); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--ink); }
 .ev.off { opacity: .55; }
 .btn.dim { opacity: .45; }
+/* Gumball machine */
+#scr-gumball { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
+.gum-wearing { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.gum-wearing span { font-size: 11.5px; font-weight: 800; padding: 3px 8px; border-radius: 9px; background: rgba(29,21,55,.78); border: 2px solid var(--ink); }
+.gum-note { min-height: 16px; font-size: 12px; font-weight: 800; color: var(--sun); margin-top: 6px; }
+.gum-note.flash { animation: rwin .4s ease-out; }
+.gum-btn { position: relative; }
+.gum-btn i { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--berry); color: #fff; font: 11px/18px var(--font-display); font-style: normal; border: 2px solid var(--ink); }
+.gum-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 2px 4px 4px 2px; }
+.gwrap { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.gmachine { position: relative; width: 138px; height: 190px; margin: 0 auto; }
+.globe { position: absolute; left: 4px; top: 0; width: 130px; height: 122px; border-radius: 50%; border: 4px solid var(--ink); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.35), rgba(160,220,255,.12) 55%, rgba(60,80,140,.25)); overflow: hidden; box-shadow: inset 0 -8px 16px rgba(0,0,0,.25); }
+.globe .balls i { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; border: 2px solid rgba(29,21,55,.55); box-shadow: inset -3px -3px 0 rgba(0,0,0,.18), inset 3px 3px 0 rgba(255,255,255,.35); }
+.globe .shine { position: absolute; left: 18%; top: 10%; width: 26%; height: 20%; border-radius: 50%; background: rgba(255,255,255,.35); filter: blur(1px); }
+.gneck { position: absolute; left: 49px; top: 116px; width: 40px; height: 12px; background: #c9d2e0; border: 3px solid var(--ink); border-radius: 4px; }
+.gbase { position: absolute; left: 14px; top: 124px; width: 110px; height: 64px; background: linear-gradient(#ff5a5f, #d9343c); border: 4px solid var(--ink); border-radius: 12px 12px 16px 16px; box-shadow: 0 5px 0 var(--ink); }
+.coin-slot { position: absolute; left: 12px; top: 12px; width: 8px; height: 20px; border-radius: 3px; background: var(--ink); }
+.crank { position: absolute; left: 39px; top: 8px; width: 32px; height: 32px; border-radius: 50%; background: #e6e9ef; border: 3px solid var(--ink); }
+.crank b { position: absolute; left: 11px; top: -3px; width: 5px; height: 32px; border-radius: 3px; background: var(--ink); }
+.chute { position: absolute; right: 10px; bottom: 8px; width: 30px; height: 22px; border-radius: 8px 8px 4px 4px; background: #2a2438; border: 3px solid var(--ink); }
+.capsule { position: absolute; right: 18px; top: 150px; width: 26px; height: 26px; border-radius: 50%; opacity: 0; border: 3px solid var(--ink); background: linear-gradient(var(--r, #ffd23f) 50%, #ffffff 50%); z-index: 2; }
+.gmachine.spin .globe .balls { animation: tumble .8s ease-in-out; }
+.gmachine.spin .crank { animation: crank .8s ease-in-out; }
+.gmachine.drop .capsule { animation: capdrop .9s cubic-bezier(.3,1.6,.5,1) forwards; }
+.gmachine.pop .capsule { animation: cappop .35s ease-out forwards; }
+@keyframes tumble { 0%,100% { transform: none; } 25% { transform: rotate(14deg) translateY(-6px); } 50% { transform: rotate(-12deg) translateY(4px); } 75% { transform: rotate(8deg); } }
+@keyframes crank { 0% { transform: rotate(0); } 100% { transform: rotate(720deg); } }
+@keyframes capdrop { 0% { opacity: 1; transform: translate(0, -10px) scale(.6); } 60% { opacity: 1; transform: translate(34px, 26px) scale(1.4) rotate(160deg); } 100% { opacity: 1; transform: translate(40px, 20px) scale(1.5) rotate(200deg); } }
+@keyframes cappop { 0% { opacity: 1; transform: translate(40px, 20px) scale(1.5) rotate(200deg); } 100% { opacity: 0; transform: translate(40px, 10px) scale(2.6) rotate(240deg); } }
+.greveal { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; padding: 12px 14px; border: 3px solid var(--ink); border-radius: 16px; background: rgba(44,35,82,.94); box-shadow: 0 4px 0 var(--ink); min-height: 96px; }
+.greveal.idle { grid-template-columns: 1fr; font-size: 13px; }
+.greveal.idle b { font-family: var(--font-display); font-weight: 400; font-size: 15px; color: var(--sun); }
+.greveal.idle small { color: var(--muted); font-weight: 700; }
+.greveal.show { border-color: var(--r); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--ink), 0 0 26px var(--r); animation: rwin .45s ease-out; }
+.greveal .ri { font-size: 44px; line-height: 1; grid-row: span 2; }
+.greveal .rm { display: grid; gap: 1px; }
+.greveal .rm small { font-family: var(--font-display); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.greveal .rm b { font-family: var(--font-display); font-weight: 400; font-size: 19px; }
+.greveal .rm em { font-style: normal; font-weight: 800; font-size: 12px; color: var(--muted); } .greveal .rm em.new { color: var(--mint); font-family: var(--font-display); font-weight: 400; font-size: 14px; }
+.greveal .btn, .greveal .rw { grid-column: 2; justify-self: start; }
+.greveal .rw { font-weight: 800; font-size: 12px; color: var(--mint); }
+.greveal.legendary .ri { animation: pop 1s ease-in-out infinite; }
+.godds { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; font-size: 11px; font-weight: 800; }
+.cos-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.cos { position: relative; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px; border: 3px solid var(--ink); border-radius: 14px; background: rgba(44,35,82,.92); box-shadow: 0 4px 0 var(--ink), inset 0 -3px 0 var(--r); color: var(--cream); cursor: pointer; }
+.cos .ci { font-size: 26px; line-height: 1.1; }
+.cos .cn { font-family: var(--font-display); font-size: 11px; line-height: 1.1; text-align: center; }
+.cos.locked { opacity: .6; } .cos.locked .cn { color: var(--r); }
+.cos.on { border-color: var(--sun); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 var(--ink), inset 0 -3px 0 var(--r); }
+.cos em { position: absolute; top: 3px; right: 5px; font-style: normal; font-family: var(--font-display); font-size: 9.5px; color: var(--sun); }
+.cos .tsw { display: flex; gap: 2px; } .cos .tsw i { width: 10px; height: 6px; border-radius: 3px; }
 /* Garage */
 #scr-garage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
 .gar-info { max-width: 340px; }
@@ -653,10 +707,11 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <button class="btn mint small" data-go="tt">Time Trial</button>
       <button class="btn sky small" data-go="mp">Multiplayer</button>
     </div>
-    <div class="menu-row">
-      <button class="btn alt small" data-go="settings">Settings</button>
-      <button class="btn alt small" data-go="help">Help</button>
+    <div class="menu-row tight">
+      <button class="btn alt small ico" data-go="settings" aria-label="Settings">⚙️</button>
+      <button class="btn alt small ico" data-go="help" aria-label="Help">❓</button>
       <button class="btn alt small" data-go="profile" id="menu-trophies">🏆</button>
+      <button class="btn alt small gum-btn" data-go="gumball" aria-label="Gumball machine">🍬 Prizes<i id="menu-gum" hidden></i></button>
     </div>
   </nav>
   <p class="install-tip" id="install-tip" hidden>For full screen: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
@@ -718,6 +773,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="bottom-bar">
       <button class="btn ghost small" data-go="back">Menu</button>
       <button class="btn alt small" data-go="garage">Garage</button>
+      <button class="btn alt small gum-btn" data-go="gumball" aria-label="Gumball machine">🍬</button>
       <button class="btn hot" data-go="race" id="car-go">Race!</button>
     </div>
   </div>
@@ -739,6 +795,26 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <div class="bottom-bar">
       <button class="btn ghost small" data-go="back">Back</button>
       <button class="btn hot" data-go="act" id="gar-act">Buy</button>
+    </div>
+  </div>
+</section>
+
+<section id="scr-gumball" class="screen" hidden>
+  <div class="char-left">
+    <div class="top-bar"><h2 class="title">Gumball</h2><span class="wallet"><span>🪙 <b id="gum-coins">0</b></span></span></div>
+    <div class="char-info gar-info">
+      <div class="char-species" id="gum-count"></div>
+      <div class="char-name">Prize Machine</div>
+      <div class="gum-wearing" id="gum-wearing"></div>
+      <div class="gum-note" id="gum-note"></div>
+    </div>
+  </div>
+  <div class="char-right">
+    <div class="seg gtabs" id="gum-tabs" role="tablist"><button data-tab="machine">🍬 Machine</button><button data-tab="hat">Hats</button><button data-tab="trail">Trails</button><button data-tab="horn">Horns</button></div>
+    <div class="gum-body" id="gum-body"></div>
+    <div class="bottom-bar">
+      <button class="btn ghost small" data-go="back">Back</button>
+      <button class="btn hot" data-go="act" id="gum-act">Turn</button>
     </div>
   </div>
 </section>

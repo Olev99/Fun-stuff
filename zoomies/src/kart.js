@@ -3,6 +3,9 @@ import { clamp, damp, lerp } from './util.js';
 import { kartGeometry, kartStats, bodyById } from './karts.js';
 import { PATCHES } from './track.js';
 import { pbrMat, GeoBuilder } from './util.js';
+import { trailById } from './cosmetics.js';
+
+const STAR_COLS = ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'];
 
 const GRAVITY = 34;
 const DRIFT_COLORS = [null, '#43c8ff', '#ff9a1f', '#d45cff'];
@@ -48,6 +51,9 @@ export class Kart {
     this.index = opts.index ?? 0;
     this.bodyDef = bodyById(opts.body || 'classic');
     this.paint = opts.paint || null;
+    // Cosmetics from the gumball machine: hat, boost trail and horn.
+    this.look = opts.look || null;
+    this.trailDef = trailById(this.look && this.look.trail);
     const st = (this.stats = opts.stats || kartStats(ch, this.bodyDef.id, opts.upgrades));
     const cls = race.speedClass;
     this.baseTop = cls.top * (0.93 + st.speed * 0.022);
@@ -139,7 +145,7 @@ export class Kart {
   }
 
   _buildVisual() {
-    const gopt = { body: this.bodyDef.id, paint: this.paint };
+    const gopt = { body: this.bodyDef.id, paint: this.paint, hat: this.look && this.look.hat };
     const geo = (this.geoHi = kartGeometry(this.ch, gopt));
     this.geoLo = kartGeometry(this.ch, { ...gopt, lo: true });
     this.lodFar = false;
@@ -736,12 +742,19 @@ export class Kart {
     }
     // Boost flames
     if (this.boostTime > 0 || this.starTime > 0 || this.rocketTime > 0) {
-      const big = this.rocketTime > 0 ? 2 : 1;
-      for (const sx of big > 1 ? [-0.3, 0.3, 0, -0.3, 0.3] : [-0.3, 0.3]) {
+      const td = this.trailDef;
+      const big = this.rocketTime > 0 ? 2 : td.big || 1;
+      for (const sx of big > 1.5 ? [-0.3, 0.3, 0, -0.3, 0.3] : [-0.3, 0.3]) {
         local(sx, 0.72, -1.62, v);
-        const cols = this.starTime > 0 ? ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'] : ['#fff3a0', '#ffb020', '#ff6a1f'];
+        const cols = this.starTime > 0 ? STAR_COLS : td.cols;
         fx.glow.emit(v[0], v[1], v[2], -fxs * 8 + (Math.random() - 0.5) * 2, 0.5 + Math.random(), -fzs * 8 + (Math.random() - 0.5) * 2,
           cols[Math.floor(Math.random() * cols.length)], 0.9 * big, 0.2, (0.18 + Math.random() * 0.1) * big, 0, 3);
+      }
+      // Trail sparkles hang in the air behind you.
+      if (td.spark && this.boostTime > 0 && Math.random() < 0.7) {
+        local((Math.random() - 0.5) * 1.4, 0.3 + Math.random() * 0.8, -1.4, v);
+        const col = td.spark === 'rainbow' ? `hsl(${Math.floor(Math.random() * 360)},100%,65%)` : td.spark;
+        fx.glow.emit(v[0], v[1], v[2], (Math.random() - 0.5), 0.6, (Math.random() - 0.5), col, 0.35, 0.06, 0.7, -0.5, 1);
       }
     }
     // Dust when off-road

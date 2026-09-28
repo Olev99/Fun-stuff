@@ -214,6 +214,8 @@ export function newCareer() {
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
     xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    // gumball machine prizes: owned ids and what you're wearing
+    cos: [], hat: 'nohat', trail: 'classic', horn: 'beep',
   };
 }
 

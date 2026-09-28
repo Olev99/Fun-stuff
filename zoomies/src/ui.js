@@ -53,6 +53,7 @@ export class UI {
         else if (action === 'career') app.openCareer();
         else if (action === 'daily') this.dailyScreen();
         else if (action === 'profile') this.profileScreen();
+        else if (action === 'gumball') app.gumballUI.open('title');
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
@@ -97,6 +98,9 @@ export class UI {
       case 'profile':
         this.title();
         break;
+      case 'gumball':
+        app.gumballUI.action(action);
+        break;
     }
   }
 
@@ -130,6 +134,10 @@ export class UI {
     document.querySelector('[data-go="daily"]').classList.toggle('done', done);
     const nAch = Object.keys(c.ach || {}).length;
     $('menu-trophies').textContent = `🏆 ${nAch}/${ACHIEVEMENTS.length}`;
+    // A badge on the gumball button when a free turn is waiting.
+    const free = c.freeCaps || 0;
+    $('menu-gum').hidden = !free;
+    $('menu-gum').textContent = free;
   }
 
   // ---------------- Daily challenge ----------------

@@ -5,6 +5,7 @@
 // (?net=local) lets two tabs in one browser play together for testing.
 
 import { cleanNick } from './nametags.js';
+import { cleanLook } from './cosmetics.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const MAX_PLAYERS = 4;
@@ -276,14 +277,14 @@ export class NetSession {
     return !framed && (typeof RTCPeerConnection !== 'undefined' || params.get('net') === 'local');
   }
 
-  async host(char, nick) {
+  async host(char, nick, look = null) {
     this.role = 'host';
     let lastErr;
     for (let attempt = 0; attempt < 4; attempt++) {
       this.code = params.get('code') || makeCode();
       try {
         await this.transport.start('host', this.code);
-        this.players = [{ id: 'host', char, name: 'P1', nick: cleanNick(nick) }];
+        this.players = [{ id: 'host', char, name: 'P1', nick: cleanNick(nick), look: cleanLook(look) }];
         this.me = 'host';
         return this.code;
       } catch (e) {
@@ -294,13 +295,13 @@ export class NetSession {
     throw lastErr || new Error('Could not create a race');
   }
 
-  async join(code, char, nick) {
+  async join(code, char, nick, look = null) {
     this.role = 'guest';
     this.code = code.toUpperCase();
     await this.transport.start('guest', this.code);
     this.meId = this.transport.peer ? this.transport.peer.id : this.transport.id;
     this.seen.set('host', performance.now());
-    this.transport.send('host', { t: 'hello', char, cid: this.cid, nick: cleanNick(nick) });
+    this.transport.send('host', { t: 'hello', char, cid: this.cid, nick: cleanNick(nick), look: cleanLook(look) });
   }
 
   send(msg) {
@@ -370,7 +371,7 @@ export class NetSession {
           const used = new Set(this.players.map((p) => p.name));
           let n = 2;
           while (used.has(`P${n}`)) n++;
-          this.players.push({ id: from, cid: msg.cid, char: msg.char, name: `P${n}`, nick: cleanNick(msg.nick) });
+          this.players.push({ id: from, cid: msg.cid, char: msg.char, name: `P${n}`, nick: cleanNick(msg.nick), look: cleanLook(msg.look) });
         }
         this.broadcastLobby();
         return;

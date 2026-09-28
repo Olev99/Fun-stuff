@@ -175,7 +175,8 @@ export class Race {
       const ch = charById(id);
       const isPlayer = this.mode === 'mp' ? i === this.mySlot : this.mode !== 'demo' && id === opts.player;
       const lo = (opts.loadouts && opts.loadouts[i]) || (isPlayer && opts.playerLoadout) || {};
-      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body, upgrades: lo.upgrades, paint: lo.paint });
+      const look = (opts.looks && opts.looks[i]) || (isPlayer && opts.look) || null;
+      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body, upgrades: lo.upgrades, paint: lo.paint, look });
       k.nick = (opts.nicks && opts.nicks[i]) || null;
       const slot = tr.gridSlot(i);
       k.placeAt(slot.s, this.mode === 'tt' ? 0 : slot.d);
@@ -605,6 +606,7 @@ export class Race {
     const place = this.mode === 'tt' ? null : k.place;
     this.app.hud.finish(place);
     this.app.audio.play(!place || place <= 3 ? 'finish' : 'lose');
+    if (!place || place <= 3) { this._hornAt = -99; this.honk(1.1); }
     this.app.input.resetButtons();
     this.app.applyControls();
     this.fx.burst(k.pos.x, k.pos.y + 2, k.pos.z, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], 60, 14, 0.6, 1.4, 12);
@@ -798,6 +800,14 @@ export class Race {
     this.app.hud.style(label, pts, cls);
   }
 
+  // Your horn from the gumball machine, honked when you pass someone.
+  honk(delay = 0) {
+    const p = this.player;
+    if (!p || this.time - (this._hornAt ?? -99) < 4) return;
+    this._hornAt = this.time;
+    this.app.audio.horn((p.look && p.look.horn) || 'beep', delay);
+  }
+
   // Overtakes (a place gained and kept for a moment) earn style points.
   _styleChecks(dt) {
     const p = this.player;
@@ -806,6 +816,7 @@ export class Race {
     if (this._lastPlace && p.place < this._lastPlace && this.raceTime > 4 && this._overtakeT <= 0) {
       this.style('OVERTAKE', 10, 'mint');
       this._overtakeT = 1.2;
+      this.honk();
     }
     this._lastPlace = p.place;
   }

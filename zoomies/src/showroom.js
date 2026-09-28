@@ -82,7 +82,9 @@ export class Showroom {
   // loadout: { body, paint } for career karts; defaults to the classic kart.
   setChar(ch, loadout = null) {
     const body = bodyById(loadout && loadout.body);
-    const g = kartGeometry(ch, { body: body.id, paint: loadout && loadout.paint });
+    // Your gumball hat, unless the caller says otherwise.
+    const hat = loadout && 'hat' in loadout ? loadout.hat : this.app.career && this.app.career.hat;
+    const g = kartGeometry(ch, { body: body.id, paint: loadout && loadout.paint, hat });
     this.chassis.geometry = g.chassis;
     this.driver.geometry = g.driver;
     this.driverBaseY = body.seat;
@@ -153,7 +155,7 @@ export class Showroom {
     this.turn.rotation.y = 0.5;
     this.podium.visible = false;
     for (const ch of CHARACTERS) {
-      this.setChar(ch);
+      this.setChar(ch, { hat: null });
       this.bounce = 0;
       this.driver.position.y = 0;
       this.driver.rotation.z = 0;
