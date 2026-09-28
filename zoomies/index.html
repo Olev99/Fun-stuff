@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="31c3a39">
+<meta name="zoomies-version" content="61871ae">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -412,7 +412,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .wp-wheel i::after { content: ""; position: absolute; left: 50%; top: 50%; width: 15%; height: 330%; transform: translate(-50%, 0); background: #2a2438; border-inline: 4px solid var(--ink); }
 .wp-wheel::after { content: "Z"; position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--tang); border: 4px solid var(--ink); display: grid; place-items: center; font: 26px var(--font-display); color: var(--cream); }
 .wp-wheel b { position: absolute; left: 50%; top: -10px; width: 12px; height: 26px; margin-left: -6px; border-radius: 6px; background: var(--sun); border: 3px solid var(--ink); }
-.wp-wheel[data-drift="0"] { border-color: #fff3b0; } .wp-wheel[data-drift="1"] { border-color: #46c8ff; } .wp-wheel[data-drift="2"] { border-color: #ff9a2e; } .wp-wheel[data-drift="3"] { border-color: #c77dff; }
+.wp-wheel[data-drift="0"] { border-color: #fff3b0; } .wp-wheel[data-drift="1"] { border-color: #6fffd2; } .wp-wheel[data-drift="2"] { border-color: #ffc21f; } .wp-wheel[data-drift="3"] { border-color: #ff4fb4; }
 .wp-tilt { max-width: 260px; text-align: center; font-weight: 800; color: var(--berry); margin: 0; }
 .wp-btn { position: absolute; border-radius: 50%; border: 4px solid var(--ink); font: 17px/1.1 var(--font-display); color: var(--ink); box-shadow: 0 6px 0 var(--ink); touch-action: none; }
 .wp-btn.on { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); filter: brightness(1.15); }
@@ -573,7 +573,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #hud-style .sp b { font-weight: 400; margin-left: 6px; font-size: .8em; color: var(--sun); }
 #hud-style .sp.gold { color: var(--sun); } #hud-style .sp.gold b { color: var(--cream); }
 #hud-style .sp.mint { color: var(--mint); } #hud-style .sp.hit { color: var(--berry); }
-#hud-style .sp.t1 { color: #5ab8ff; } #hud-style .sp.t2 { color: #ff9a3c; } #hud-style .sp.t3 { color: #c77dff; }
+#hud-style .sp.t1 { color: #6fffd2; } #hud-style .sp.t2 { color: #ffc21f; } #hud-style .sp.t3 { color: #ff4fb4; }
 @keyframes spIn { 0% { opacity: 0; transform: translateX(-24px) scale(1.3); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
 #hud-rear { position: absolute; left: 50%; top: calc(64px + var(--sat)); transform: translateX(-50%); font-family: var(--font-display); font-size: 14px; letter-spacing: .1em; color: var(--sun); background: rgba(29,21,55,.7); padding: 3px 10px 2px; border-radius: 9px; }
 #hud-map { pointer-events: auto; touch-action: none; }
@@ -1082,7 +1082,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div class="desk-only"><b>Keyboard</b><kbd>←</kbd> <kbd>→</kbd> steer (tap to nudge) · <kbd>SPACE</kbd> drift · <kbd>E</kbd> item (hold <kbd>↑</kbd> or <kbd>↓</kbd> to throw ahead or behind) · <kbd>↓</kbd> brake and reverse · <kbd>Q</kbd> look back · <kbd>ESC</kbd> pause. Gas is automatic. <kbd>ENTER</kbd> picks the highlighted button in menus.</div>
         <div class="desk-only"><b>Controller</b>PlayStation, Xbox and Switch Pro controllers work: stick steers, R drift, L item, B brake, Y look back, Start pause. A and B work the menus.</div>
         <div class="desk-only"><b>Phone as a wheel</b>Tap <i>Use your phone as a wheel</i> on the title screen and scan the code with your iPhone's camera. Tilt the phone to steer and use its big buttons.</div>
-        <div><b>Drift + turbo</b>Hold DRIFT while turning. Sparks go blue, orange, then purple. Let go for a boost.</div>
+        <div><b>Drift + turbo</b>Hold DRIFT while turning. Sparks go mint, gold, then hot pink. Let go for a boost.</div>
         <div><b>Tricks</b>Tap DRIFT just after launching off a ramp. You get a boost when you land.</div>
         <div><b>Slipstream</b>Tuck in right behind another kart for a moment and you get a free boost.</div>
         <div><b>Look back</b>Hold the minimap (or Q on a keyboard) to see what's behind you.</div>
@@ -1103,7 +1103,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><span>🐝</span>Buzz Bee: chases the racer ahead</div>
         <div><span>🫧</span>Bubble Shield: blocks one hit</div>
         <div><span>🌈</span>Rainbow Rush: invincible and fast</div>
-        <div><span>⛈️</span>Thunder Cloud: zaps everyone ahead</div>
+        <div><span>⛈️</span>Zap Cloud: zaps everyone ahead</div>
         <div><span>🪃</span>Boomerang: hits on the way out and back</div>
         <div><span>🧲</span>Gem Magnet: pulls in gems, small speed-up</div>
         <div><span>🌀</span>Warp Swirl: teleports you up the road</div>
@@ -1113,7 +1113,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><span>📯</span>Honk Blast: shoves nearby karts, wipes out incoming items</div>
         <div><span>🎆</span>Firework: fast straight shot that explodes</div>
         <div><span>🌪️</span>Twister: a tornado that tears down the track</div>
-        <div><span>👻</span>Boo Mask: pass through everything, then a surprise item</div>
+        <div><span>👻</span>Spook Mask: pass through everything, then a surprise item</div>
       </div>
     </div>
     <div class="bottom-bar"><button class="btn" data-go="close">Got it</button></div>
@@ -1155,7 +1155,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=15e177b3", "./src/audio.js": "./src/audio.js?v=18637c1f", "./src/career.js": "./src/career.js?v=ddbd9f32", "./src/careerui.js": "./src/careerui.js?v=59b6b2ab", "./src/characters.js": "./src/characters.js?v=018032fd", "./src/cosmetics.js": "./src/cosmetics.js?v=b8dcc622", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=eda2b231", "./src/hud.js": "./src/hud.js?v=77eed815", "./src/input.js": "./src/input.js?v=03f51b46", "./src/items.js": "./src/items.js?v=4b482cc7", "./src/kart.js": "./src/kart.js?v=21fb488e", "./src/karts.js": "./src/karts.js?v=7470bb98", "./src/main.js": "./src/main.js?v=1cdd7cdd", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=270747a4", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/profile.js": "./src/profile.js?v=5dbc7892", "./src/race.js": "./src/race.js?v=85089e3e", "./src/settings.js": "./src/settings.js?v=5824d5a2", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=dbed08c9", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=2d447375", "./src/tracks.js": "./src/tracks.js?v=f15933f5", "./src/ui.js": "./src/ui.js?v=c24983e6", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=22c8adb1", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=15e177b3", "./src/audio.js": "./src/audio.js?v=18637c1f", "./src/career.js": "./src/career.js?v=ddbd9f32", "./src/careerui.js": "./src/careerui.js?v=c2db87bc", "./src/characters.js": "./src/characters.js?v=ebc1a99e", "./src/cosmetics.js": "./src/cosmetics.js?v=a3b3eff3", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=eda2b231", "./src/hud.js": "./src/hud.js?v=e8687a00", "./src/input.js": "./src/input.js?v=03f51b46", "./src/items.js": "./src/items.js?v=5946665d", "./src/kart.js": "./src/kart.js?v=00a98242", "./src/karts.js": "./src/karts.js?v=7470bb98", "./src/main.js": "./src/main.js?v=1cdd7cdd", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=270747a4", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/profile.js": "./src/profile.js?v=c43a3f76", "./src/race.js": "./src/race.js?v=a4c60e9c", "./src/settings.js": "./src/settings.js?v=5824d5a2", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=dbed08c9", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=2d447375", "./src/tracks.js": "./src/tracks.js?v=0d66baec", "./src/ui.js": "./src/ui.js?v=c24983e6", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=22c8adb1", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
 <script type="module" src="./src/main.js?v=1cdd7cdd"></script>
 </body>
 </html>

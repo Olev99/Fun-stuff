@@ -458,7 +458,7 @@ export class Race {
           this.fx.burst(k.pos.x, k.pos.y + 0.2, k.pos.z, [this.dust], 8, 4, 1.2, 0.5, 2, false);
           break;
         case 'driftBoost':
-          if (k.isPlayer) this.style(['', 'MINI-TURBO', 'SUPER TURBO', 'ULTRA TURBO'][data], [0, 5, 12, 25][data], `t${data}`);
+          if (k.isPlayer) this.style(['', 'SPARK BOOST', 'BLAZE BOOST', 'NOVA BOOST'][data], [0, 5, 12, 25][data], `t${data}`);
           break;
         case 'trick':
           if (k.isPlayer) { a.play('trick'); this.style('TRICK', 15, 'gold'); }
@@ -748,7 +748,7 @@ export class Race {
     sk.update(dt);
   }
 
-  // Thunder Cloud: zap everyone ahead of the user.
+  // Zap Cloud: zap everyone ahead of the user.
   storm(user) {
     for (const k of this.karts) {
       if (k === user || k.place > user.place) continue;

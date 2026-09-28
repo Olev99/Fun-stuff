@@ -8,7 +8,8 @@ import { trailById } from './cosmetics.js';
 const STAR_COLS = ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'];
 
 const GRAVITY = 34;
-const DRIFT_COLORS = [null, '#43c8ff', '#ff9a1f', '#d45cff'];
+// Drift sparks: mint (spark boost), gold (blaze boost), hot pink (nova boost).
+const DRIFT_COLORS = [null, '#6fffd2', '#ffc21f', '#ff4fb4'];
 const DRIFT_THRESH = [0, 0.85, 1.9, 3.1];
 const DRIFT_BOOST = [0, 0.75, 1.25, 1.8];
 
@@ -78,7 +79,7 @@ export class Kart {
     this.wallT = 0;
     this.slipTime = 0; // oil: tyres lose grip
     this.slipSpin = 0;
-    this.ghostTime = 0; // Boo Mask: pass through everything
+    this.ghostTime = 0; // Spook Mask: pass through everything
     this.speedMul = 1; // AI rubber banding / difficulty
 
     this.ctl = { steer: 0, throttle: 0, brake: false, drift: false, item: false };

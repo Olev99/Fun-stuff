@@ -7,7 +7,7 @@ export const CHARACTERS = [
   { id: 'mochi', name: 'Mochi', species: 'Cat', tagline: 'Balanced, unflappable, always lands on four wheels.', color: '#ff7eb0', accent: '#fff3e0', stats: { speed: 3, accel: 3, handling: 3, weight: 3 } },
   { id: 'pip', name: 'Pip', species: 'Penguin', tagline: 'Tiny, zippy and totally fearless on ice.', color: '#3fb0ff', accent: '#ffffff', stats: { speed: 2, accel: 5, handling: 4, weight: 1 } },
   { id: 'bruno', name: 'Bruno', species: 'Bear', tagline: 'Heavy paws, huge top speed, brakes optional.', color: '#e0503a', accent: '#ffd23f', stats: { speed: 5, accel: 1, handling: 2, weight: 4 } },
-  { id: 'rexi', name: 'Rexi', species: 'Dino', tagline: 'Big stomps, bigger bumps.', color: '#35b85c', accent: '#ffd23f', stats: { speed: 4, accel: 2, handling: 2, weight: 4 } },
+  { id: 'rexi', name: 'Rexi', species: 'Dino', tagline: 'Big stomps, bigger bumps.', color: '#1fa9b0', accent: '#ff8a2b', stats: { speed: 4, accel: 2, handling: 2, weight: 4 } },
   { id: 'volt', name: 'Volt', species: 'Robot', tagline: 'Computes the perfect drift line in 0.01s.', color: '#aab6c8', accent: '#39f5ff', stats: { speed: 3, accel: 2, handling: 5, weight: 2 } },
   { id: 'ember', name: 'Ember', species: 'Fox', tagline: 'Quick paws and an even quicker smirk.', color: '#ff7a1a', accent: '#1d1537', stats: { speed: 4, accel: 3, handling: 3, weight: 2 } },
   { id: 'zorp', name: 'Zorp', species: 'Alien', tagline: 'Came for the gems. Stayed for the drifts.', color: '#8f5cff', accent: '#7dff9a', stats: { speed: 3, accel: 4, handling: 2, weight: 3 } },
@@ -101,16 +101,16 @@ function driver(ch, hat) {
       break;
     }
     case 'rexi': {
-      const skin = '#35b85c';
+      const skin = '#2bb8b0';
       B.mat = 'skin';
-      torso(skin, '#ffe7a1');
+      torso(skin, '#d6f5ee');
       armL(skin);
       B.add(sphere(0.44), skin, [H.x, H.y, H.z - 0.05], [0, 0, 0], [0.95, 0.9, 1.1]);
       B.add(sphere(0.3), skin, [0, H.y - 0.1, H.z + 0.38], [0, 0, 0], [1.05, 0.72, 1]);
       for (const s of [-1, 1]) B.add(sphere(0.035, 6, 4), '#1b1530', [s * 0.1, H.y - 0.02, H.z + 0.66]);
       for (let k = 0; k < 4; k++) B.add(new THREE.ConeGeometry(0.035, 0.08, 4), '#ffffff', [-0.15 + k * 0.1, H.y - 0.24, H.z + 0.56], [Math.PI, 0, 0]);
       googlyEyes(B, 0, H.y + 0.2, H.z + 0.22, 0.2, 0.13);
-      for (let k = 0; k < 4; k++) B.add(new THREE.ConeGeometry(0.1, 0.24, 4), '#ffd23f', [0, H.y + 0.38 - k * 0.2, H.z - 0.36 - k * 0.14], [-0.6 - k * 0.2, 0, 0]);
+      for (let k = 0; k < 4; k++) B.add(new THREE.ConeGeometry(0.1, 0.24, 4), '#ff8a2b', [0, H.y + 0.38 - k * 0.2, H.z - 0.36 - k * 0.14], [-0.6 - k * 0.2, 0, 0]);
       break;
     }
     case 'volt': {

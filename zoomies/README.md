@@ -51,8 +51,8 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Duplicates pay coins back.
 - **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.
 - **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter.
-- **Driving:** drift mini-turbos with blue, orange and purple sparks, rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
-- **17 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Thunder Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️ and Boo Mask 👻. The racers at the back get the catch-up items. Throwable items can be aimed: swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it.
+- **Driving:** drift boosts with mint, gold and hot pink sparks (spark, blaze and nova boosts), rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
+- **17 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Zap Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️ and Spook Mask 👻. The racers at the back get the catch-up items. Throwable items can be aimed: swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
 
 ## Playing on iPhone

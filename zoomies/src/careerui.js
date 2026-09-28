@@ -382,7 +382,7 @@ export class CareerUI {
     const total = Object.values(up).reduce((a, b) => a + b, 0);
     if (out.ev.type === 'gems') return 'Gems sit in rows on the racing line and in shortcuts. The Gem Magnet item pulls in everything nearby.';
     if (c.coins >= 300 && total < 12) return 'You have coins to spend: engine and turbo upgrades in the garage make a big difference.';
-    if (out.ev.type === 'time') return 'Drift through long corners and let go on purple sparks for the biggest turbo. Shortcuts help too.';
-    return 'Hold DRIFT through corners for mini-turbos, and look for the shortcut on this track.';
+    if (out.ev.type === 'time') return 'Drift through long corners and let go on hot pink sparks for a nova boost, the biggest there is. Shortcuts help too.';
+    return 'Hold DRIFT through corners for drift boosts, and look for the shortcut on this track.';
   }
 }

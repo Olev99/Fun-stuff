@@ -501,13 +501,13 @@ export const TRACKS = [
 
 export const CUPS = [
   { id: 'sprout-cup', name: 'Sprout Cup', tracks: ['sprout', 'coral', 'dunes', 'frost'], reverse: false },
-  { id: 'star-cup', name: 'Star Cup', tracks: ['candy', 'neon', 'magma', 'cloud'], reverse: false },
-  { id: 'leaf-cup', name: 'Leaf Cup', tracks: ['downs', 'tidal', 'blossom', 'maple'], reverse: false },
+  { id: 'star-cup', name: 'Blaze Cup', tracks: ['candy', 'neon', 'magma', 'cloud'], reverse: false },
+  { id: 'leaf-cup', name: 'Harvest Cup', tracks: ['downs', 'tidal', 'blossom', 'maple'], reverse: false },
   { id: 'moon-cup', name: 'Moon Cup', tracks: ['hollow', 'jungle', 'gear', 'glacier'], reverse: false },
   { id: 'comet-cup', name: 'Comet Cup', tracks: ['obsidian', 'moon', 'neon', 'magma'], reverse: false },
   { id: 'flip-sprout', name: 'Flipside Cup', tracks: ['frost', 'dunes', 'coral', 'sprout'], reverse: true },
-  { id: 'flip-star', name: 'Flipside Star Cup', tracks: ['cloud', 'magma', 'neon', 'candy'], reverse: true },
-  { id: 'flip-leaf', name: 'Flipside Leaf Cup', tracks: ['maple', 'blossom', 'tidal', 'downs'], reverse: true },
+  { id: 'flip-star', name: 'Flipside Blaze Cup', tracks: ['cloud', 'magma', 'neon', 'candy'], reverse: true },
+  { id: 'flip-leaf', name: 'Flipside Harvest Cup', tracks: ['maple', 'blossom', 'tidal', 'downs'], reverse: true },
   { id: 'flip-moon', name: 'Flipside Moon Cup', tracks: ['glacier', 'gear', 'jungle', 'hollow'], reverse: true },
 ];
 

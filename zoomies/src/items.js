@@ -9,7 +9,7 @@ export const ITEMS = {
   bee: { icon: '🐝', name: 'Buzz Bee' },
   bubble: { icon: '🫧', name: 'Bubble Shield' },
   rainbow: { icon: '🌈', name: 'Rainbow Rush' },
-  storm: { icon: '⛈️', name: 'Thunder Cloud' },
+  storm: { icon: '⛈️', name: 'Zap Cloud' },
   boomerang: { icon: '🪃', name: 'Boomerang' },
   magnet: { icon: '🧲', name: 'Gem Magnet' },
   warp: { icon: '🌀', name: 'Warp Swirl' },
@@ -19,7 +19,7 @@ export const ITEMS = {
   horn: { icon: '📯', name: 'Honk Blast' },
   firework: { icon: '🎆', name: 'Firework' },
   twister: { icon: '🌪️', name: 'Twister' },
-  ghost: { icon: '👻', name: 'Boo Mask' },
+  ghost: { icon: '👻', name: 'Spook Mask' },
 };
 export const ITEM_ICONS = Object.values(ITEMS).map((i) => i.icon);
 
@@ -447,7 +447,7 @@ export class ItemSystem {
     }
   }
 
-  // Boo Mask wears off: a surprise item appears.
+  // Spook Mask wears off: a surprise item appears.
   surprise(kart) {
     if (kart.item || kart.rolling > 0) return;
     if (this.replica) { if (kart.isPlayer) this.race.net.claimBox(-1); return; }

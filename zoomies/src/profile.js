@@ -28,7 +28,7 @@ const PLACE_XP = [80, 60, 45, 35, 28, 20, 14, 10];
 
 // Style labels from the race and the stat they count towards.
 const STYLE_STATS = {
-  'PERFECT START': ['perfect'], 'MINI-TURBO': ['turbos'], 'SUPER TURBO': ['turbos'], 'ULTRA TURBO': ['turbos', 'ultra'],
+  'PERFECT START': ['perfect'], 'SPARK BOOST': ['turbos'], 'BLAZE BOOST': ['turbos'], 'NOVA BOOST': ['turbos', 'ultra'],
   TRICK: ['tricks'], HIT: ['hits'], SLIPSTREAM: ['slips'], 'CLEAN LAP': ['clean'], OVERTAKE: ['overtakes'], SHORTCUT: ['shortcutRuns'],
 };
 
@@ -105,9 +105,9 @@ export const ACHIEVEMENTS = [
   { id: 'cup5', icon: '🗄️', name: 'Trophy Cabinet', desc: 'Win 5 different cups', reward: 600, ...count('cups', 5) },
   { id: 'perfect1', icon: '🚀', name: 'Rocket Science', desc: 'Nail a perfect start', reward: 50, ...count('perfect', 1) },
   { id: 'perfect25', icon: '🛫', name: 'Launch Control', desc: '25 perfect starts', reward: 300, ...count('perfect', 25) },
-  { id: 'ultra1', icon: '💜', name: 'Purple Rain', desc: 'Fire an ultra turbo (purple sparks)', reward: 75, ...count('ultra', 1) },
-  { id: 'ultra100', icon: '🌀', name: 'Drift King', desc: 'Fire 100 ultra turbos', reward: 600, ...count('ultra', 100) },
-  { id: 'turbo500', icon: '🔥', name: 'Sideways', desc: 'Fire 500 drift turbos', reward: 500, ...count('turbos', 500) },
+  { id: 'ultra1', icon: '💖', name: 'Supernova', desc: 'Fire a nova boost (hot pink sparks)', reward: 75, ...count('ultra', 1) },
+  { id: 'ultra100', icon: '🌀', name: 'Drift King', desc: 'Fire 100 nova boosts', reward: 600, ...count('ultra', 100) },
+  { id: 'turbo500', icon: '🔥', name: 'Sideways', desc: 'Fire 500 drift boosts', reward: 500, ...count('turbos', 500) },
   { id: 'trick50', icon: '🤸', name: 'Showboat', desc: 'Land 50 ramp tricks', reward: 300, ...count('tricks', 50) },
   { id: 'hit1', icon: '🎯', name: 'Bullseye', desc: 'Hit a racer with an item', reward: 50, ...count('hits', 1) },
   { id: 'hit100', icon: '💥', name: 'Menace', desc: 'Hit racers 100 times', reward: 500, ...count('hits', 100) },
@@ -168,7 +168,7 @@ export const DAILY_MODS = [
   { id: 'turbo', name: 'Turbo Trouble', icon: '⚡', desc: 'Turbo speed against hard racers.', cls: 'turbo', diff: 'hard' },
   { id: 'bees', name: 'Bee Swarm', icon: '🐝', desc: 'Buzz bees, boomerangs and bumper balls only.', items: ['bee', 'boomerang', 'ball'] },
   { id: 'gems', name: 'Gem Rush', icon: '💎', desc: 'Grab 25 gems and finish in the top 3.', gems: 25 },
-  { id: 'ghosts', name: 'Spooky Swap', icon: '👻', desc: 'Only Boo Masks, oil and honey. Sneaky!', items: ['ghost', 'oil', 'honey'] },
+  { id: 'ghosts', name: 'Spooky Swap', icon: '👻', desc: 'Only Spook Masks, oil and honey. Sneaky!', items: ['ghost', 'oil', 'honey'] },
 ];
 
 export function today(d = new Date()) {

@@ -195,7 +195,7 @@ export const TRAILS = [
   { id: 'neon', name: 'Neon Nights', rarity: 'rare', icon: '💡', cols: ['#e0fffd', '#39f5ff', '#ff3dc8'], spark: '#ff8ae0' },
   { id: 'inferno', name: 'Inferno', rarity: 'epic', icon: '🌋', cols: ['#ffffff', '#ff3d3d', '#b01010', '#ffb020'], spark: '#ff5a1a', big: 1.35 },
   { id: 'galaxy', name: 'Galaxy', rarity: 'epic', icon: '🌌', cols: ['#ffffff', '#8f5cff', '#36a9ff', '#ff5ad8'], spark: '#ffffff' },
-  { id: 'rainbow', name: 'Rainbow Road', rarity: 'legendary', icon: '🌈', cols: ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], spark: 'rainbow', big: 1.25 },
+  { id: 'rainbow', name: 'Prism Streak', rarity: 'legendary', icon: '🌈', cols: ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], spark: 'rainbow', big: 1.25 },
 ];
 
 // Honked when you overtake someone and when you cross the line.

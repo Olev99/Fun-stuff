@@ -297,7 +297,7 @@ export class HUD {
     this.speed.classList.remove('on');
   }
 
-  // Skill popups ("SUPER TURBO +12") stacking on the left.
+  // Skill popups ("BLAZE BOOST +12") stacking on the left.
   style(label, pts, cls) {
     const el = document.createElement('div');
     el.className = `sp ${cls}`;
