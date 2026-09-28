@@ -82,6 +82,7 @@ class App {
 
     this.audio = new Audio();
     this.audio.musicOn = this.settings.music;
+    this.audio.musicVol = this.settings.musicVol ?? 0.7;
     this.audio.sfxOn = this.settings.sfx;
     this.input = new Input(this.settings);
     this.input.bindTouch($('controls'));
@@ -244,7 +245,7 @@ class App {
         this.applyControls();
       });
     }
-    if (this.race && this.race.mode === 'demo') this.audio.playSong(this.race.trackDef.music);
+    if (this.race && this.race.mode === 'demo') this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
   }
 
   applyControls() {
@@ -288,7 +289,7 @@ class App {
     // let the demo pack spread out a little before we show it
     for (let i = 0; i < 90; i++) this.race.update(1 / 60);
     this.view = this.race;
-    if (this.audio.ready) this.audio.playSong(this.race.trackDef.music);
+    if (this.audio.ready) this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
   }
 
   previewTrack(trackId, reverse) {
@@ -368,7 +369,7 @@ class App {
     this.audio.unlock();
     this.audio.startEngine();
     this.audio.setTempo(1);
-    this.audio.playSong(this.race.trackDef.music);
+    this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
     this._tiltChecked = false;
     this.requestWake();
   }
@@ -980,7 +981,7 @@ class App {
     this.audio.unlock();
     this.audio.startEngine();
     this.audio.setTempo(1);
-    this.audio.playSong(def.music);
+    this.audio.playSong(def.music, def.theme);
     this._tiltChecked = false;
     this.requestWake();
     if (ses.isGuest) ses.send({ t: 'ready' });

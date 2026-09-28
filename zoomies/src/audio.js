@@ -1,17 +1,5 @@
 // All audio is synthesised with WebAudio: no files to download.
-import { rng } from './util.js';
-
-const SCALES = {
-  major: [0, 2, 4, 5, 7, 9, 11],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-};
-// Chord progressions as scale degrees (0-based).
-const PROGS = {
-  major: [[0, 4, 5, 3], [0, 5, 3, 4]],
-  minor: [[0, 5, 2, 6], [0, 3, 5, 4]],
-  dorian: [[0, 3, 0, 6], [0, 6, 3, 4]],
-};
+import { Music } from './music.js';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -19,6 +7,7 @@ export class Audio {
   constructor() {
     this.ctx = null;
     this.musicOn = true;
+    this.musicVol = 0.7; // 0..1 from Settings
     this.sfxOn = true;
     this.engine = null;
     this.song = null;
@@ -47,7 +36,7 @@ export class Audio {
       this.sfx.gain.value = this.sfxOn ? 0.7 : 0;
       this.sfx.connect(this.master);
       this.music = c.createGain();
-      this.music.gain.value = this.musicOn ? 0.32 : 0;
+      this.music.gain.value = this.musicOn ? this.musicLevel : 0;
       this.music.connect(this.master);
       // one second of white noise, reused everywhere
       const len = c.sampleRate;
@@ -82,9 +71,18 @@ export class Audio {
     return this.ctx && this.ctx.state === 'running';
   }
 
+  get musicLevel() {
+    return 0.42 * this.musicVol * this.musicVol;
+  }
+
   setMusic(on) {
     this.musicOn = on;
-    if (this.music) this.music.gain.setTargetAtTime(on ? 0.32 : 0, this.ctx.currentTime, 0.1);
+    if (this.music) this.music.gain.setTargetAtTime(on ? this.musicLevel : 0, this.ctx.currentTime, 0.1);
+  }
+
+  setMusicVolume(v) {
+    this.musicVol = Math.max(0, Math.min(1, v));
+    if (this.music) this.music.gain.setTargetAtTime(this.musicOn ? this.musicLevel : 0, this.ctx.currentTime, 0.1);
   }
 
   setSfx(on) {
@@ -596,101 +594,22 @@ export class Audio {
     this.engine = null;
   }
 
-  // ---- music: a tiny procedural chiptune sequencer ----
-  playSong(def, intensity = 1) {
-    this.stopSong();
+  // ---- music (see music.js) ----
+  playSong(def, theme) {
     if (!this.ctx) return;
-    const r = rng(def.seed || 1);
-    const scale = SCALES[def.scale] || SCALES.major;
-    const prog = PROGS[def.scale || 'major'][Math.floor(r() * 2)];
-    const root = 48 + (def.key || 0);
-    const note = (deg, oct = 0) => {
-      const o = Math.floor(deg / 7);
-      const dd = ((deg % 7) + 7) % 7;
-      return root + scale[dd] + 12 * (o + oct);
-    };
-    // Melody: chord tones on strong beats, passing tones between.
-    const rhythms = [
-      [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0],
-      [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0],
-      [1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0],
-    ];
-    const bars = [];
-    for (let b = 0; b < 4; b++) {
-      const rh = rhythms[Math.floor(r() * rhythms.length)];
-      const chord = prog[b];
-      const notes = [];
-      let cur = chord + 7 + [0, 2, 4][Math.floor(r() * 3)];
-      for (let s = 0; s < 16; s++) {
-        if (!rh[s]) { notes.push(null); continue; }
-        if (s % 4 === 0) {
-          const tones = [chord, chord + 2, chord + 4].map((d) => d + 7);
-          cur = tones.reduce((a, b2) => (Math.abs(b2 - cur) < Math.abs(a - cur) ? b2 : a));
-        } else {
-          cur += r() < 0.5 ? 1 : -1;
-          if (r() < 0.2) cur += r() < 0.5 ? 2 : -2;
-        }
-        notes.push(cur);
-      }
-      bars.push(notes);
-    }
-    // AABA'
-    const melody = [bars[0], bars[1], bars[0], bars[3]];
-    const bpm = def.bpm || 140;
-    this.song = {
-      step: 0, next: this.ctx.currentTime + 0.1, bpm, tempo: 1, melody, prog, note, intensity,
-      timer: setInterval(() => this._schedule(), 25),
-    };
+    if (!this.musicGen) this.musicGen = new Music(this.ctx, this.music, this.noise);
+    this.musicGen.play(def || {}, theme);
   }
 
   setTempo(mul) {
-    if (this.song) this.song.tempo = mul;
+    if (this.musicGen) this.musicGen.setTempo(mul);
+  }
+
+  finalLap() {
+    if (this.musicGen) this.musicGen.finalLap();
   }
 
   stopSong() {
-    if (this.song) {
-      clearInterval(this.song.timer);
-      this.song = null;
-    }
-  }
-
-  _schedule() {
-    const s = this.song;
-    if (!s || !this.ready) return;
-    const c = this.ctx;
-    const stepDur = 60 / (s.bpm * s.tempo) / 4;
-    if (s.next < c.currentTime - 0.2) s.next = c.currentTime + 0.05;
-    while (s.next < c.currentTime + 0.12) {
-      this._playStep(s, s.step, s.next - c.currentTime, stepDur);
-      s.next += stepDur;
-      s.step = (s.step + 1) % 64;
-    }
-  }
-
-  _playStep(s, step, when, dur) {
-    const bar = Math.floor(step / 16);
-    const st = step % 16;
-    const chord = s.prog[bar];
-    const M = this.music;
-    // drums
-    if (st % 8 === 0 || st === 10) this._kick(when);
-    if (st === 4 || st === 12) this._noise(0.12, 0.35, 'bandpass', 1800, 900, when, M, 0.8);
-    if (st % 2 === 0) this._noise(0.035, 0.12, 'highpass', 7000, 0, when, M);
-    // bass
-    if (st % 2 === 0) {
-      // root / octave / fifth pattern
-      const off = [0, 0, 12, 0, 0, 12, 7, 12][st / 2];
-      this._tone('triangle', mtof(s.note(chord) - 12 + off), 0, dur * 1.8, 0.5, when, M);
-    }
-    // arpeggio
-    const arp = [0, 2, 4, 7][st % 4];
-    this._tone('square', mtof(s.note(chord + arp, 1)), 0, dur * 0.9, 0.05, when, M);
-    // lead
-    const n = s.melody[bar][st];
-    if (n !== null && n !== undefined) this._tone('square', mtof(s.note(n, 0) + 12), 0, dur * 1.9, 0.11, when, M, 0.01);
-  }
-
-  _kick(when) {
-    this._tone('sine', 150, 45, 0.18, 0.7, when, this.music, 0.002);
+    if (this.musicGen) this.musicGen.stop();
   }
 }

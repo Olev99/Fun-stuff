@@ -154,8 +154,9 @@ export const TRACKS = [
     ],
     items: [0.07, 0.3, 0.55, 0.8],
     boosts: [{ at: 0.2, d: 0 }, { at: 0.47, d: 3 }, { at: 0.66, d: -3 }, { at: 0.92, d: 0 }],
-    ramps: [{ at: 0.43, len: 9, h: 2.2, glide: true }],
-    gems: [{ at: 0.04, d: 0, n: 6 }, { at: 0.24, d: -3, n: 5 }, { at: 0.5, d: 3, n: 5 }, { at: 0.7, d: 0, n: 6 }, { at: 0.86, d: -2, n: 5 }],
+    // Glide ramps sit so the landing comes before a shortcut entrance in both directions.
+    ramps: [{ at: 0.49, len: 9, h: 2.2, glide: true }],
+    gems: [{ at: 0.04, d: 0, n: 6 }, { at: 0.24, d: -3, n: 5 }, { at: 0.45, d: 3, n: 5 }, { at: 0.7, d: 0, n: 6 }, { at: 0.86, d: -2, n: 5 }],
     obstacles: [{ at: 0.36, type: 'fireball', amp: 6, speed: 1 }, { at: 0.58, type: 'fireball', amp: 6, speed: 1.3 }, { at: 0.75, type: 'boulder', amp: 7, speed: 0.8 }],
     shoulder: 6, wallH: 1.8,
     lakes: [{ x: 184, z: -104, rx: 22, rz: 14, lava: true }, { x: 205, z: 132, rx: 30, rz: 24, lava: true }],
@@ -177,10 +178,11 @@ export const TRACKS = [
       [-120, -90, 6], [-40, -30, 10], [40, 40, 14, 1.1], [120, 90, 14], [200, 80, 12, 0.9], [240, 10, 10], [210, -70, 8],
       [140, -110, 6, 1.1], [100, -180, 5], [50, -226, 4], [10, -214, 4],
     ],
-    items: [0.08, 0.34, 0.6, 0.84],
-    boosts: [{ at: 0.2, d: 0 }, { at: 0.45, d: -3 }, { at: 0.7, d: 3 }, { at: 0.93, d: 0 }],
-    ramps: [{ at: 0.52, len: 9, h: 2.4, glide: true }, { at: 0.78, len: 8, h: 2.0, glide: true }],
-    gems: [{ at: 0.05, d: 0, n: 6 }, { at: 0.27, d: 3, n: 5 }, { at: 0.56, d: -3, n: 5 }, { at: 0.83, d: 0, n: 6 }],
+    items: [0.08, 0.34, 0.6, 0.91],
+    boosts: [{ at: 0.2, d: 0 }, { at: 0.45, d: -3 }, { at: 0.7, d: 3 }, { at: 0.95, d: 0 }],
+    // Glide ramps sit so the landing comes before a shortcut entrance in both directions.
+    ramps: [{ at: 0.52, len: 9, h: 2.4, glide: true }, { at: 0.835, len: 8, h: 2.0, glide: true }],
+    gems: [{ at: 0.05, d: 0, n: 6 }, { at: 0.27, d: 3, n: 5 }, { at: 0.56, d: -3, n: 5 }, { at: 0.79, d: 0, n: 6 }],
     obstacles: [{ at: 0.15, type: 'balloon', amp: 7, speed: 0.8 }, { at: 0.65, type: 'balloon', amp: 7, speed: 1 }],
     shortcuts: [
       { name: 'Rainbow Leap', from: 0.595, to: 0.73, side: 1, surface: 'road', width: 9, deco: 'rainbow',

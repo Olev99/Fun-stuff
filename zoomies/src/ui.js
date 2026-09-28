@@ -483,6 +483,7 @@ export class UI {
     $('set-sens').addEventListener('input', (e) => { s().tiltSens = +e.target.value; saveSettings(s()); });
     $('set-invert').addEventListener('change', (e) => { s().invertTilt = e.target.checked; saveSettings(s()); });
     $('set-music').addEventListener('change', (e) => { s().music = e.target.checked; app.audio.setMusic(s().music); saveSettings(s()); });
+    $('set-musicvol').addEventListener('input', (e) => { s().musicVol = +e.target.value; app.audio.setMusicVolume(s().musicVol); saveSettings(s()); });
     $('set-sfx').addEventListener('change', (e) => { s().sfx = e.target.checked; app.audio.setSfx(s().sfx); saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
     $('set-reset-career').addEventListener('click', () => {
@@ -504,6 +505,7 @@ export class UI {
     $('set-sens').value = s.tiltSens;
     $('set-invert').checked = s.invertTilt;
     $('set-music').checked = s.music;
+    $('set-musicvol').value = s.musicVol ?? 0.7;
     $('set-sfx').checked = s.sfx;
     $('set-fps').checked = s.showFps;
     $('set-reset-career').textContent = 'Reset';

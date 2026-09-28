@@ -465,7 +465,14 @@ export class Race {
           this.fx.burst(k.pos.x, k.pos.y + 1, k.pos.z, ['#ffd23f', '#ffffff', '#46f0ff'], 12, 6, 0.5, 0.5, 4);
           break;
         case 'glide':
-          if (k.isPlayer) { a.play('trick'); this.style('GLIDE', 10, 'mint'); }
+          if (k.isPlayer) {
+            a.play('trick');
+            this.style('GLIDE', 10, 'mint');
+            if (!this._glideHinted) { this._glideHinted = true; hud.hint('Hold BRAKE to dive, land for a boost!', 2.2); }
+          }
+          break;
+        case 'glideLand':
+          if (k.isPlayer) this.style('SMOOTH LANDING', 10, 'mint');
           break;
         case 'hit':
           if (near) a.play('hit');
@@ -539,7 +546,7 @@ export class Race {
         if (k.laps === this.laps - 1) {
           this.app.hud.banner('FINAL LAP!', 'final');
           this.app.audio.play('finalLap');
-          this.app.audio.setTempo(1.12);
+          this.app.audio.finalLap();
         } else {
           this.app.hud.banner(`LAP ${k.laps + 1}`, 'lap');
           this.app.audio.play('lap');

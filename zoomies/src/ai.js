@@ -92,7 +92,7 @@ export class AIDriver {
           this.boostAt = sc.offroadAll && boost ? sc.id : -1;
         }
         // Missed the turn-in: give up instead of grinding along the wall.
-        if (this.plan[sc.id] && dist < -4 && main.gap[sc.side > 0 ? 1 : 0][k.trk.idx] !== sc.id + 1) {
+        if (this.plan[sc.id] && dist < -4 && !(main.gapOwners[sc.side > 0 ? 1 : 0][k.trk.idx] || []).includes(sc.id)) {
           this.plan[sc.id] = false;
           continue;
         }

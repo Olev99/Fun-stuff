@@ -10,6 +10,7 @@ export const DEFAULTS = {
   invertTilt: false,
   quality: 'auto',
   music: true,
+  musicVol: 0.7,
   sfx: true,
   showFps: false,
   speedClass: 'zoom',

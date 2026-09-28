@@ -131,6 +131,7 @@ export class Path {
     this.speedMul = 1;
     this.bridge = new Uint8Array(count);
     this.gap = [new Uint8Array(count), new Uint8Array(count)]; // [left(-1), right(+1)] -> shortcut id + 1
+    this.gapOwners = [new Array(count), new Array(count)]; // every shortcut id using each opening
     this.noWall = [new Uint8Array(count), new Uint8Array(count)];
   }
 
@@ -493,14 +494,24 @@ export class Track extends Path {
     if (p === this) {
       if (Math.abs(trk.d) <= lim) return 0;
       const side = trk.d > 0 ? 1 : 0;
-      const owner = this.gap[side][trk.idx];
-      if (owner) {
-        const sc = this.shortcuts[owner - 1];
-        const t2 = sc.project(o.pos.x, o.pos.z, -1, _tmpTrk);
-        if (t2.over === 0 && Math.abs(t2.d) < t2.wd - radius * 0.5) {
-          o.path = sc;
-          o.seg = t2.idx;
-          Object.assign(o.trk, t2);
+      const owners = this.gapOwners[side][trk.idx];
+      if (owners) {
+        // Through the opening onto whichever branch we're actually on.
+        let best = null, bestK = Infinity;
+        for (const id of owners) {
+          const sc = this.shortcuts[id];
+          const t2 = sc.project(o.pos.x, o.pos.z, -1, _tmpTrk);
+          const k = Math.abs(t2.d) / t2.wd;
+          if (t2.over === 0 && Math.abs(t2.d) < t2.wd - radius * 0.5 && k < bestK) {
+            best = sc;
+            bestK = k;
+            Object.assign(_bestTrk, t2);
+          }
+        }
+        if (best) {
+          o.path = best;
+          o.seg = _bestTrk.idx;
+          Object.assign(o.trk, _bestTrk);
           return 0;
         }
       }
@@ -508,6 +519,10 @@ export class Track extends Path {
     }
     // On a shortcut
     if (trk.over === 0 && Math.abs(trk.d) <= lim) return 0;
+    // Flying over the middle of a branch (a jump or a glide): stay on it,
+    // even where the main road runs close by, instead of being handed back
+    // to the main road in mid-air.
+    if (o.grounded === false && trk.over === 0 && trk.s > 14 && trk.s < p.length - 14) return this._push(o, trk, lim, bounce, p);
     const m = this.project(o.pos.x, o.pos.z, p.mainHint(trk.s), _tmpTrk);
     if (Math.abs(m.d) < m.wd - radius * 0.3) {
       o.path = this;
@@ -698,7 +713,13 @@ export class Shortcut extends Path {
       if (reach - w * 1.2 < t.wd + 1 && reach + w * 1.2 > t.wd - 1) {
         const span = Math.ceil((w * 2) / m.ds) + 1;
         const sideIdx = t.d > 0 ? 1 : 0;
-        for (let k = -span; k <= span; k++) m.gap[sideIdx][m.I(t.idx + k)] = this.id + 1;
+        for (let k = -span; k <= span; k++) {
+          const j = m.I(t.idx + k);
+          if (!m.gap[sideIdx][j]) m.gap[sideIdx][j] = this.id + 1;
+          // One opening can serve two branches (one's exit next to another's entrance).
+          const own = (m.gapOwners[sideIdx][j] = m.gapOwners[sideIdx][j] || []);
+          if (!own.includes(this.id)) own.push(this.id);
+        }
       }
     }
     // Keep a little wall at the very end of the overlap so the branch is not wide open.
@@ -727,6 +748,7 @@ export const SURFACES = {
 
 const _fr = {};
 const _tmpTrk = {};
+const _bestTrk = {};
 let _segDist = 0;
 function segProj(ax, az, bx, bz, x, z) {
   const vx = bx - ax, vz = bz - az;

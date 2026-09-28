@@ -388,11 +388,13 @@ export class Kart {
       this.spinTime -= dt;
       vf *= Math.exp(-2.4 * dt);
       vl *= Math.exp(-3 * dt);
-    } else if (c.brake) {
+    } else if (c.brake && !this.gliding) {
       if (vf > 1) vf -= 36 * dt * trac;
       else vf = Math.max(vf - 14 * dt * trac, -9);
     } else if (c.throttle > 0) {
-      const tgt = top * c.throttle * (patch ? patch.speed : 1);
+      // Gliding is quick, and diving (BRAKE in the air) quicker still.
+      const glideK = this.gliding ? (c.brake ? 1.18 : 1.06) : 1;
+      const tgt = top * c.throttle * (patch ? patch.speed : 1) * glideK;
       if (vf < tgt) {
         vf += (tgt - vf) * (1 - Math.exp(-this.accelK * trac * dt)) + 2.5 * trac * dt;
         if (vf > tgt) vf = tgt;
@@ -452,9 +454,11 @@ export class Kart {
     const prevPath = this.path;
     const vn = tr.resolve(this, 1.15, 0.3);
     const trk = this.trk;
+    let switched = false;
     if (this.path !== prevPath) {
       if (this.path !== tr) this.emit('shortcut', this.path);
       this.seg = trk.idx;
+      switched = true;
     }
     if (vn > 0) {
       this.wallT = 0.6;
@@ -482,7 +486,8 @@ export class Kart {
         if (-Math.sign(trk.d) * rel > 0) this.yaw -= rel * Math.min(1, dt * 3);
       }
     }
-    this.offroad = this.path.offroadAll || Math.abs(trk.d) > trk.ed - 0.3;
+    // Only the ground slows you: flying over grass or a gap is not off-road.
+    this.offroad = this.grounded && (this.path.offroadAll || Math.abs(trk.d) > trk.ed - 0.3);
 
     // Vertical motion
     const overVoid = this.path.voids.length > 0 && this.path.isVoid(trk.s);
@@ -490,7 +495,12 @@ export class Kart {
     const rampH = this.path.rampHeight(trk.s, trk.d);
     const ramp = rampH > 0 ? this.path.rampAt(trk.s, trk.d) : null;
     if (this.grounded) {
-      if (groundY < this.pos.y - 0.5) {
+      if (switched && !overVoid && Math.abs(groundY - this.pos.y) < 1.5) {
+        // Where a branch meets the main road their surfaces can differ by a
+        // step. Just settle onto the new one; never turn the step into a launch.
+        this.pos.y = groundY;
+        this.vy = 0;
+      } else if (groundY < this.pos.y - 0.5) {
         this.grounded = false;
         if (this.lastRampH > 0.4) {
           this.vy += 5.5;
@@ -505,7 +515,8 @@ export class Kart {
           this.emit('ramp');
         }
       } else {
-        this.vy = clamp((groundY - this.pos.y) / dt, -25, 25);
+        // Upward speed follows the slope, but a sudden step can't fling us.
+        this.vy = clamp((groundY - this.pos.y) / dt, -25, 14);
         this.pos.y = groundY;
       }
     }
@@ -513,8 +524,10 @@ export class Kart {
     this.lastRamp = ramp;
     if (!this.grounded) {
       if (this.gliding) {
-        this.vy -= GRAVITY * this.gravityK * 0.28 * dt;
-        if (this.vy < -5) this.vy = -5;
+        // Hold BRAKE to fold the wings and dive, to land where you want.
+        this.diving = !!c.brake;
+        this.vy -= GRAVITY * this.gravityK * (this.diving ? 1.15 : 0.28) * dt;
+        if (!this.diving && this.vy < -5) this.vy = -5;
       } else this.vy -= GRAVITY * this.gravityK * dt;
       this.pos.y += this.vy * dt;
       this.airTime += dt;
@@ -607,7 +620,13 @@ export class Kart {
   _land() {
     const hard = this.airTime > 0.3;
     this.grounded = true;
+    // Touching down from a glide gives a kick, so gliding never costs places.
+    if (this.gliding && this.airTime > 0.6) {
+      this.startBoost(0.7, 4);
+      this.emit('glideLand');
+    }
     this.gliding = false;
+    this.diving = false;
     if (hard) {
       this.squash = Math.min(1, this.airTime * 1.4);
       this.emit('land', this.airTime);
