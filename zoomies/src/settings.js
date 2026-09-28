@@ -9,6 +9,7 @@ export const DEFAULTS = {
   tiltSens: 0.5,
   invertTilt: false,
   quality: 'auto',
+  vehicle: 'classic', // quick races, Grand Prix, time trials and online: classic kart or bike
   music: true,
   musicVol: 0.7,
   sfx: true,

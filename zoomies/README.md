@@ -33,7 +33,8 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - 7 chapters, 35 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel.
   - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team.
   - Events pay coins by finishing place and gems, plus a first-clear bonus. Each event also has 3 stars to earn.
-  - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt), 4 upgrades per kart with 5 levels each, paint jobs and new racers.
+  - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt) and 4 motorbikes (Zoom Bike, Zip Scooter, Hog Wild and the Vortex), 4 upgrades per vehicle with 5 levels each, paint jobs and new racers.
+  - Bikes turn sharper and grip harder in drifts, lean into corners and pop a wheelie when boosting. Pick **Kart** or **Bike** on the racer screen for quick races, cups and online.
   - Progress is saved on the phone. Settings has a reset.
 - **Modes:**
   - Career.

@@ -30,6 +30,15 @@ const std = (front, rear, x = 0.82) => [
   { x: -x - 0.04, y: rear.r, z: rear.z, r: rear.r, w: rear.w, front: false },
 ];
 
+// Motorbikes: one wheel in front and one behind, in line. Each is listed
+// twice (a hair apart) so every vehicle has the same four wheel slots.
+const inline = (front, rear) => [
+  { x: 0.001, y: front.r, z: front.z, r: front.r, w: front.w, front: true },
+  { x: -0.001, y: front.r, z: front.z, r: front.r, w: front.w, front: true },
+  { x: 0.001, y: rear.r, z: rear.z, r: rear.r, w: rear.w, front: false },
+  { x: -0.001, y: rear.r, z: rear.z, r: rear.r, w: rear.w, front: false },
+];
+
 export const BODIES = {
   buggy: {
     id: 'buggy', name: 'Rust Bucket', price: 0,
@@ -60,6 +69,30 @@ export const BODIES = {
     blurb: 'Monster wheels. Shrugs off bumps, grass and anyone who gets close.',
     stats: { speed: 0.3, accel: 0.4, handling: -0.4, weight: 1.6 }, offroad: 0.72,
     wheels: std({ r: 0.54, z: 0.95, w: 0.44 }, { r: 0.58, z: -0.9, w: 0.5 }, 1.02), seat: 0.32,
+  },
+  bike: {
+    id: 'bike', name: 'Zoom Bike', price: 1100, kind: 'bike',
+    blurb: 'Two wheels, all attitude. Turns sharper and pulls away quicker, but gets bumped around.',
+    stats: { speed: 0, accel: 0.4, handling: 0.9, weight: -0.9 },
+    wheels: inline({ r: 0.36, z: 0.95, w: 0.26 }, { r: 0.38, z: -0.78, w: 0.3 }), seat: 0.12,
+  },
+  scooter: {
+    id: 'scooter', name: 'Zip Scooter', price: 1500, kind: 'bike',
+    blurb: 'Tiny wheels, huge grin. Zips off the line and darts through gaps.',
+    stats: { speed: -0.5, accel: 1.3, handling: 1.4, weight: -1.1 },
+    wheels: inline({ r: 0.26, z: 0.78, w: 0.22 }, { r: 0.27, z: -0.72, w: 0.24 }), seat: 0.14,
+  },
+  sportbike: {
+    id: 'sportbike', name: 'Vortex', price: 3400, kind: 'bike',
+    blurb: 'A racing bike wrapped in fairings. Scary fast, and it leans right over in the corners.',
+    stats: { speed: 1.2, accel: 0.5, handling: 1, weight: -0.5 },
+    wheels: inline({ r: 0.36, z: 1.0, w: 0.26 }, { r: 0.38, z: -0.82, w: 0.34 }), seat: 0.14,
+  },
+  chopper: {
+    id: 'chopper', name: 'Hog Wild', price: 3000, kind: 'bike',
+    blurb: 'Long forks and lots of chrome. Heavy for a bike and happy on grass.',
+    stats: { speed: 0.7, accel: 0, handling: 0.1, weight: 0.4 }, offroad: 0.68,
+    wheels: inline({ r: 0.42, z: 1.25, w: 0.26 }, { r: 0.44, z: -0.95, w: 0.4 }), seat: 0,
   },
   bolt: {
     id: 'bolt', name: 'Starbolt', price: 5200,
@@ -114,6 +147,18 @@ function cockpit(B, y = 0, z = 0, seatCol = SEAT) {
   B.add(box(0.78, 0.6, 0.16), seatCol, [0, 0.98 + y, -0.62 + z], [-0.18, 0, 0], 1, 'fabric');
   B.add(torus(0.2, 0.045, 8, 20), DARK, [0, 1.02 + y, 0.42 + z], [-0.9, 0, 0], 1, 'rubber');
   B.add(cyl(0.04, 0.04, 0.5, 6), DARK, [0, 0.86 + y, 0.6 + z], [0.9, 0, 0], 1, 'metal');
+}
+
+
+// Rider's legs and the handlebar where the driver's hands are.
+function bikeRider(B, seatY, bar = 1.04, barZ = 0.36, trim = METAL) {
+  for (const s of [-1, 1]) {
+    B.add(capsule(0.1, 0.42), DARK, [s * 0.2, seatY + 0.02, 0.05], [1.25, 0, 0], 1, 'fabric');
+    B.add(capsule(0.09, 0.36), DARK, [s * 0.22, seatY - 0.28, 0.32], [0.25, 0, 0], 1, 'fabric');
+    B.add(box(0.14, 0.1, 0.26), '#1d1a22', [s * 0.22, seatY - 0.5, 0.38], [0, 0, 0], 1, 'rubber');
+  }
+  B.add(cyl(0.035, 0.035, 0.78, 8), trim, [0, bar, barZ], [0, 0, PI2], 1, 'chrome');
+  for (const s of [-1, 1]) B.add(capsule(0.045, 0.14, 3, 8), DARK, [s * 0.4, bar, barZ], [0, 0, PI2], 1, 'rubber');
 }
 
 const BUILD = {
@@ -266,6 +311,75 @@ const BUILD = {
     B.add(box(0.95, 0.5, 0.55), METAL, [0, 0.85 + Y, -1.0], [0, 0, 0], 1, [0.35, 0.5, 0]);
     cockpit(B, Y * 0.85, 0);
     headlights(B, [-0.42, 0.42], 0.8 + Y, 1.32, 0.12);
+  },
+
+  // Zoom Bike: the all-round motorbike.
+  bike(B, body, trim) {
+    // frame, tank and seat
+    B.add(cyl(0.06, 0.06, 1.5, 8), METAL, [0, 0.62, 0.05], [PI2 - 0.12, 0, 0], 1, 'metal');
+    B.add(capsule(0.24, 0.42), body, [0, 0.86, 0.22], [PI2 - 0.2, 0, 0], [1, 0.8, 1]);
+    B.add(capsule(0.16, 0.5), '#1d1a22', [0, 0.78, -0.32], [PI2 + 0.05, 0, 0], [1.2, 0.6, 1], 'fabric');
+    // engine block and exhaust
+    B.add(box(0.36, 0.34, 0.5), '#5a6275', [0, 0.46, 0.02], [0, 0, 0], 1, [0.35, 0.6, 0]);
+    B.add(cyl(0.07, 0.07, 0.9, 10), '#d0d6e2', [0.22, 0.42, -0.5], [PI2 + 0.15, 0, 0], 1, 'chrome');
+    B.add(cyl(0.05, 0.05, 0.1, 10), '#ff7a2a', [0.22, 0.36, -0.96], [PI2, 0, 0], 1, 'glow');
+    // front fork and fairing
+    for (const s of [-1, 1]) B.add(cyl(0.035, 0.035, 0.85, 8), '#d0d6e2', [s * 0.12, 0.72, 0.72], [-0.35, 0, 0], 1, 'chrome');
+    B.add(capsule(0.2, 0.3), body, [0, 0.98, 0.62], [PI2 - 0.9, 0, 0], [1.3, 0.9, 1]);
+    B.add(box(0.36, 0.2, 0.03), '#bfe9ff', [0, 1.16, 0.6], [-0.6, 0, 0], 1, 'gloss');
+    headlights(B, [0], 0.92, 0.82, 0.11);
+    // fenders and tail
+    B.add(torus(0.4, 0.05, 6, 14, Math.PI * 0.8), trim, [0, 0.4, 0.95], [0, PI2, 0.3], 1, 'plastic');
+    B.add(box(0.3, 0.06, 0.55), body, [0, 0.86, -0.72], [0.25, 0, 0]);
+    B.add(box(0.22, 0.08, 0.05), '#ff2a3a', [0, 0.84, -1.0], [0, 0, 0], 1, 'glow');
+    bikeRider(B, 0.78, 1.04, 0.36, METAL);
+  },
+
+  // Zip Scooter: step-through, tiny wheels, big front shield.
+  scooter(B, body, trim) {
+    B.add(box(0.44, 0.08, 1.1), DARK, [0, 0.3, 0.05], [0, 0, 0], 1, 'rubber');
+    B.add(capsule(0.3, 0.5), body, [0, 0.58, -0.55], [PI2, 0, 0], [1.1, 0.9, 1]);
+    B.add(capsule(0.15, 0.46), '#1d1a22', [0, 0.84, -0.42], [PI2, 0, 0], [1.3, 0.55, 1], 'fabric');
+    B.add(box(0.5, 0.8, 0.12), body, [0, 0.68, 0.62], [-0.2, 0, 0]);
+    B.add(box(0.52, 0.06, 0.14), trim, [0, 1.08, 0.56], [-0.2, 0, 0]);
+    B.add(cyl(0.035, 0.035, 0.7, 8), '#d0d6e2', [0, 0.72, 0.8], [-0.3, 0, 0], 1, 'chrome');
+    headlights(B, [0], 1.0, 0.72, 0.1);
+    B.add(box(0.28, 0.1, 0.05), '#ff2a3a', [0, 0.62, -0.88], [0, 0, 0], 1, 'glow');
+    B.add(box(0.34, 0.24, 0.3), trim, [0, 0.9, -0.82], [0, 0, 0], 1, 'plastic');
+    bikeRider(B, 0.82, 1.04, 0.36, METAL);
+  },
+
+  // Vortex: a low racing bike, all fairing.
+  sportbike(B, body, trim) {
+    B.add(capsule(0.3, 1.1), body, [0, 0.66, 0.08], [PI2 - 0.08, 0, 0], [0.9, 0.85, 1]);
+    B.add(capsule(0.22, 0.4), body, [0, 0.9, 0.62], [PI2 - 0.5, 0, 0], [1.2, 0.85, 1]);
+    B.add(box(0.34, 0.26, 0.03), '#bfe9ff', [0, 1.1, 0.72], [-0.9, 0, 0], 1, 'gloss');
+    for (const s of [-1, 1]) B.add(box(0.03, 0.34, 0.9), trim, [s * 0.27, 0.62, 0.1]);
+    B.add(capsule(0.14, 0.4), '#1d1a22', [0, 0.84, -0.4], [PI2, 0, 0], [1.2, 0.55, 1], 'fabric');
+    B.add(box(0.3, 0.14, 0.5), body, [0, 0.9, -0.82], [0.3, 0, 0]);
+    B.add(cyl(0.08, 0.06, 0.6, 10), '#d0d6e2', [0.16, 0.54, -0.82], [PI2 + 0.3, 0, 0], 1, 'chrome');
+    B.add(box(0.2, 0.06, 0.05), '#ff2a3a', [0, 0.92, -1.08], [0, 0, 0], 1, 'glow');
+    for (const s of [-1, 1]) B.add(cyl(0.035, 0.035, 0.7, 8), '#d0d6e2', [s * 0.12, 0.66, 0.84], [-0.4, 0, 0], 1, 'chrome');
+    headlights(B, [-0.1, 0.1], 0.86, 0.86, 0.08);
+    bikeRider(B, 0.8, 1.0, 0.4, trim);
+  },
+
+  // Hog Wild: long forks, low seat, lots of chrome.
+  chopper(B, body, trim) {
+    B.add(cyl(0.06, 0.06, 1.8, 8), '#d0d6e2', [0, 0.55, 0.05], [PI2 - 0.05, 0, 0], 1, 'chrome');
+    B.add(capsule(0.26, 0.35), body, [0, 0.86, 0.36], [PI2 - 0.25, 0, 0], [1, 0.8, 1]);
+    B.add(capsule(0.17, 0.4), '#3a2418', [0, 0.66, -0.3], [PI2, 0, 0], [1.3, 0.6, 1], 'fabric');
+    B.add(box(0.44, 0.4, 0.5), '#5a6275', [0, 0.42, 0.1], [0, 0, 0], 1, [0.35, 0.6, 0]);
+    for (const s of [-1, 1]) {
+      B.add(cyl(0.08, 0.08, 1.1, 10), '#d0d6e2', [s * 0.24, 0.42, -0.5], [PI2 + 0.1, 0, 0], 1, 'chrome');
+      B.add(cyl(0.04, 0.04, 1.2, 8), '#d0d6e2', [s * 0.13, 0.78, 1.0], [-0.65, 0, 0], 1, 'chrome');
+    }
+    B.add(cyl(0.035, 0.035, 0.9, 8), '#d0d6e2', [0, 1.22, 0.62], [0, 0, PI2], 1, 'chrome');
+    for (const s of [-1, 1]) B.add(cyl(0.035, 0.035, 0.3, 8), '#d0d6e2', [s * 0.42, 1.1, 0.5], [0.4, 0, 0], 1, 'chrome');
+    headlights(B, [0], 0.98, 1.1, 0.14);
+    B.add(torus(0.5, 0.06, 6, 14, Math.PI * 0.8), body, [0, 0.52, -0.95], [0, PI2, 0.4], 1, 'paint');
+    B.add(box(0.26, 0.08, 0.05), '#ff2a3a', [0, 0.7, -1.2], [0, 0, 0], 1, 'glow');
+    bikeRider(B, 0.66, 1.1, 0.5, METAL);
   },
 
   bolt(B, body, trim) {

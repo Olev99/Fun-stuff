@@ -245,7 +245,13 @@ export class UI {
     $('ci-tag').textContent = ch.tagline;
     $('ci-stats').innerHTML = STAT_NAMES.map(([k, n]) =>
       `<span>${n}</span><div class="bar">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= ch.stats[k] ? 'on' : ''}"></i>`).join('')}</div>`).join('');
-    if (this.app.showroom) this.app.showroom.setChar(ch);
+    this._syncVehicle();
+  }
+
+  _syncVehicle() {
+    const v = this.app.settings.vehicle === 'bike' ? 'bike' : 'classic';
+    document.querySelectorAll('#veh-seg [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+    if (this.app.showroom) this.app.showroom.setChar(charById(this.app.settings.char), { body: v });
   }
 
   // ---------------- Tracks ----------------
@@ -418,6 +424,14 @@ export class UI {
   _bindSettings() {
     const app = this.app;
     const s = () => app.settings;
+    $('veh-seg').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      s().vehicle = b.dataset.v;
+      saveSettings(s());
+      this._syncVehicle();
+    });
     $('set-steer').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;

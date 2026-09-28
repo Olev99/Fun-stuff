@@ -251,7 +251,7 @@ export function addHat(B, ch, hatId) {
 // Validate a look sent by another phone.
 export function cleanLook(l) {
   if (!l || typeof l !== 'object') return null;
-  return { hat: hatById(l.hat).id, trail: trailById(l.trail).id, horn: hornById(l.horn).id };
+  return { hat: hatById(l.hat).id, trail: trailById(l.trail).id, horn: hornById(l.horn).id, body: l.body === 'bike' ? 'bike' : 'classic' };
 }
 
 export function lookOf(c) {

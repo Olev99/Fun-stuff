@@ -62,10 +62,16 @@ export class Kart {
     this.turnRate = 1.8 + st.handling * 0.12;
     this.driftTurn = 2.35 + st.handling * 0.1;
     this.weight = 0.8 + st.weight * 0.1;
+    // Motorbikes steer sharper and hold a tighter drift line.
+    this.isBike = this.bodyDef.kind === 'bike';
+    if (this.isBike) {
+      this.turnRate *= 1.1;
+      this.driftTurn *= 1.06;
+    }
     const mods = race.mods || {};
     const trackGrip = Math.min(race.trackDef.grip ?? 1, mods.grip ?? 1);
     this.grip = 9 * trackGrip * (st.grip ?? 1);
-    this.driftGrip = 2.6 * trackGrip * (st.grip ?? 1);
+    this.driftGrip = 2.6 * trackGrip * (st.grip ?? 1) * (this.isBike ? 1.15 : 1);
     // How well the tyres put power down (snow and ice tracks are below 1).
     this.traction = Math.min(race.trackDef.traction ?? 1, mods.traction ?? 1);
     // Low gravity on the moon: longer, floatier jumps.
@@ -671,8 +677,17 @@ export class Kart {
     const rollT = this.grounded ? -Math.atan(slopeRel) : 0;
     const b = this.body;
     b.rotation.order = 'YXZ';
-    b.rotation.x = damp(b.rotation.x, pitchT, 12, dt);
-    b.rotation.z = damp(b.rotation.z, rollT + (this.drifting ? this.driftDir * 0.06 : 0), 10, dt);
+    if (this.isBike) {
+      // Bikes lean into the turn (more in a drift) and pop a wheelie on a straight-line boost.
+      const sp = clamp(this.speed / 14, 0, 1);
+      const lean = -(this.steerS * 0.34 + (this.drifting ? this.driftDir * 0.26 : 0)) * sp;
+      const wheelie = this.grounded && (this.boostTime > 0 || this.rocketTime > 0) && Math.abs(this.steerS) < 0.35 ? -0.2 : 0;
+      b.rotation.x = damp(b.rotation.x, pitchT + wheelie, 8, dt);
+      b.rotation.z = damp(b.rotation.z, rollT + lean, 9, dt);
+    } else {
+      b.rotation.x = damp(b.rotation.x, pitchT, 12, dt);
+      b.rotation.z = damp(b.rotation.z, rollT + (this.drifting ? this.driftDir * 0.06 : 0), 10, dt);
+    }
     b.rotation.y = this.visualYaw + this.spinAngle + trick;
     this.squash = Math.max(0, this.squash - dt * 4);
     const bob = this.grounded && this.speed > 2 ? Math.sin(time * 38 + this.index) * 0.012 * Math.min(1, this.speed / 20) : 0;

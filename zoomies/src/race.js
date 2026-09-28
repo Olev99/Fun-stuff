@@ -176,7 +176,7 @@ export class Race {
       const isPlayer = this.mode === 'mp' ? i === this.mySlot : this.mode !== 'demo' && id === opts.player;
       const lo = (opts.loadouts && opts.loadouts[i]) || (isPlayer && opts.playerLoadout) || {};
       const look = (opts.looks && opts.looks[i]) || (isPlayer && opts.look) || null;
-      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body, upgrades: lo.upgrades, paint: lo.paint, look });
+      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body || (look && look.body), upgrades: lo.upgrades, paint: lo.paint, look });
       k.nick = (opts.nicks && opts.nicks[i]) || null;
       const slot = tr.gridSlot(i);
       k.placeAt(slot.s, this.mode === 'tt' ? 0 : slot.d);

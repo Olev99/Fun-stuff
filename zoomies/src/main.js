@@ -322,13 +322,18 @@ class App {
     const s = this.settings;
     if (mode === 'gp') {
       const cup = CUPS.find((c) => c.id === s.cup) || CUPS[0];
-      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: s.char };
+      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: s.char, extra: { playerLoadout: this.menuLoadout() } };
       for (const c of CHARACTERS) this.gp.points[c.id] = 0;
       this.startGPRace();
     } else {
       this.gp = null;
-      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: s.char, speedClass: s.speedClass });
+      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: s.char, speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
     }
+  }
+
+  // Kart or bike, as picked on the racer screen (quick races, Grand Prix, time trials, online).
+  menuLoadout() {
+    return { body: this.settings.vehicle === 'bike' ? 'bike' : 'classic' };
   }
 
   startGPRace() {
@@ -352,7 +357,9 @@ class App {
     const grid = cfg.grid || this.makeGrid(cfg.player, cfg.order);
     // Career races: per-racer karts (bodies and upgrades) for the computer racers.
     const byId = cfg.loadoutsById;
-    const loadouts = byId && cfg.mode !== 'tt' ? grid.map((id) => (id === cfg.player ? cfg.playerLoadout : byId[id]) || null) : null;
+    let loadouts = byId && cfg.mode !== 'tt' ? grid.map((id) => (id === cfg.player ? cfg.playerLoadout : byId[id]) || null) : null;
+    // Outside the career, some computer racers ride bikes.
+    if (!byId && cfg.mode !== 'tt') loadouts = grid.map((id) => (id === cfg.player ? cfg.playerLoadout || null : Math.random() < 0.35 ? { body: 'bike' } : null));
     this.race = new Race(this, {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
@@ -567,7 +574,7 @@ class App {
     this.dailyRun = d;
     const player = this.career.racer || this.settings.char;
     this.startRace({
-      mode: 'quick', trackId: d.track, reverse: d.rev, player, speedClass: d.cls, difficulty: d.diff, mods: d.mod,
+      mode: 'quick', trackId: d.track, reverse: d.rev, player, speedClass: d.cls, difficulty: d.diff, mods: d.mod, playerLoadout: this.menuLoadout(),
       dailyEv: d,
     });
   }
@@ -854,7 +861,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.host(this.settings.char, this.settings.name, lookOf(this.career));
+      await ses.host(this.settings.char, this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
     } catch (e) {
       ses.close();
       this.ui.lobby('start', `Could not create a room: ${(e && e.message) || e}. Check your internet connection.`);
@@ -876,7 +883,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.join(code, this.settings.char, this.settings.name, lookOf(this.career));
+      await ses.join(code, this.settings.char, this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
     } catch (e) {
       ses.close();
       this.ui.lobby('start', (e && e.message) || 'Could not connect.');
