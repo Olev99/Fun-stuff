@@ -69,6 +69,18 @@ export class HUD {
     if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
   }
 
+  // The podium banner. top: up to 3 result rows, or null to hide it.
+  podium(top, me = null) {
+    const el = $('podium-ui');
+    if (!top) { el.hidden = true; return; }
+    const name = (r) => (r.isPlayer ? 'You' : r.nick || r.ch.name);
+    const medals = ['🥇', '🥈', '🥉'];
+    $('pod-title').textContent = top[0].isPlayer ? '🏆 You win!' : `🏆 ${name(top[0])} wins!`;
+    $('pod-names').innerHTML = top.map((r, i) => `<span class="${r.isPlayer ? 'me' : ''}">${medals[i]} ${name(r).replace(/[<>&]/g, '')}</span>`).join('');
+    $('pod-me').textContent = me && me.place > 3 ? `You finished ${me.place}${ordinal(me.place).toLowerCase()}` : '';
+    el.hidden = false;
+  }
+
   // How to drive, for whatever you're driving with.
   controlsHint() {
     const inp = this.app.input;

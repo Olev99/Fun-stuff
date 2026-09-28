@@ -659,9 +659,17 @@ export class Kart {
     b.scale.set(1 + this.squash * 0.12, 1 - this.squash * 0.18, 1 + this.squash * 0.08);
     b.position.y = bob + (this.offroad && this.grounded ? Math.sin(time * 55) * 0.025 : 0);
 
-    // Driver lean
-    this.driverPivot.rotation.z = damp(this.driverPivot.rotation.z, this.steerS * 0.22 + (this.drifting ? this.driftDir * 0.12 : 0), 10, dt);
-    this.driverPivot.rotation.x = damp(this.driverPivot.rotation.x, this.boostTime > 0 ? -0.12 : 0, 6, dt);
+    // On the podium the winners bounce and wave; first place most of all.
+    if (this.cheer) {
+      const c = this.cheer;
+      b.position.y = Math.abs(Math.sin(time * (4 + c) + this.index)) * 0.12 * c;
+      this.driverPivot.rotation.z = Math.sin(time * (5 + c) + this.index) * 0.12 * c;
+      this.driverPivot.rotation.x = -0.1;
+    } else {
+      // Driver lean
+      this.driverPivot.rotation.z = damp(this.driverPivot.rotation.z, this.steerS * 0.22 + (this.drifting ? this.driftDir * 0.12 : 0), 10, dt);
+      this.driverPivot.rotation.x = damp(this.driverPivot.rotation.x, this.boostTime > 0 ? -0.12 : 0, 6, dt);
+    }
 
     // Wheels
     this.wheelSpin += (this.fwdSpeed / 0.38) * dt;
@@ -712,7 +720,8 @@ export class Kart {
     const sc = root.scale.x * clamp(1 - h * 0.08, 0.4, 1);
     this.shadow.scale.set(sc, 1, sc);
     this.shadow.visible = !(this.path.voids.length && this.path.isVoid(this.trk.s));
-    this.root.visible = !(this.respawnT > 0.3 && Math.floor(time * 20) % 2 === 0);
+    this.root.visible = !this.podiumHidden && !(this.respawnT > 0.3 && Math.floor(time * 20) % 2 === 0);
+    this.shadow.visible = this.shadow.visible && !this.podiumHidden && !this.cheer;
   }
 
   // Particle effects

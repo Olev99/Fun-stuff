@@ -310,6 +310,14 @@ export class Audio {
         [0, 4, 7, 12].forEach((st, i) => this._tone('square', mtof(76 + st), 0, 0.16, 0.11, i * 0.08));
         this._tone('triangle', mtof(88), 0, 0.5, 0.12, 0.34);
         break;
+      case 'podium': {
+        // A little victory fanfare.
+        const mel = [[67, 0, 0.14], [72, 0.15, 0.14], [76, 0.3, 0.14], [79, 0.45, 0.3], [76, 0.8, 0.14], [79, 0.95, 0.6]];
+        for (const [n, at, d] of mel) { this._tone('square', mtof(n), 0, d, 0.1, at); this._tone('triangle', mtof(n - 12), 0, d, 0.08, at); }
+        [[60, 64, 67], [65, 69, 72], [67, 71, 74], [72, 76, 79]].forEach((ch, i) => ch.forEach((n) => this._tone('triangle', mtof(n), 0, i === 3 ? 1.2 : 0.3, 0.05, i * 0.4)));
+        this._noise(0.5, 0.15, 'highpass', 4000, 8000, 0.95, this.sfx, 0.7);
+        break;
+      }
       case 'crank':
         for (let i = 0; i < 6; i++) this._noise(0.04, 0.3, 'bandpass', 2600, 1800, i * 0.09, this.sfx, 4);
         this._tone('triangle', 300, 120, 0.3, 0.12, 0.62);

@@ -9,7 +9,7 @@ import { ItemSystem } from './items.js';
 import { FX } from './particles.js';
 import { charById } from './characters.js';
 import { wheelGeometry } from './karts.js';
-import { clamp, damp, dampAngle, pbrMat } from './util.js';
+import { clamp, damp, dampAngle, pbrMat, GeoBuilder, ordinal } from './util.js';
 import { SkidMarks } from './skids.js';
 import * as TX from './textures.js';
 
@@ -248,7 +248,7 @@ export class Race {
       if (this.state === 'countdown') this._trackRocket(inp);
     }
 
-    const locked = this.state === 'intro' || this.state === 'countdown' || this.state === 'wait';
+    const locked = this.state === 'intro' || this.state === 'countdown' || this.state === 'wait' || this.state === 'podium';
     if (!locked) {
       this.raceTime += dt;
       this.netClock += dt;
@@ -260,7 +260,8 @@ export class Race {
     const h = dt / steps;
     for (let s = 0; s < steps; s++) this._physics(h, locked);
 
-    for (const k of this.karts) if (k.remote) this._updateRemote(k, dt);
+    if (this.state === 'podium') this._podiumTick(dt);
+    else for (const k of this.karts) if (k.remote) this._updateRemote(k, dt);
     if (this.ghostRec && this.state === 'race' && this.player) this.ghostRec.sample(this.raceTime, this.player);
     this._slipstream(dt);
     this._styleChecks(dt);
@@ -281,7 +282,7 @@ export class Race {
     this._updateCamera(dt);
     this.tags.update(this.camera, this.app.w / this.app.uiZoom, this.app.h / this.app.uiZoom);
     this.world.update(dt, this.camera, this.player ? this.player.pos : this.karts[this.demoTarget % this.karts.length].pos);
-    this._netSend(dt);
+    if (this.state !== 'podium') this._netSend(dt);
 
     const a = this.app.audio;
     if (this.player && this.mode !== 'demo') {
@@ -716,8 +717,8 @@ export class Race {
       k.root.updateMatrixWorld(true);
       for (let w = 0; w < 4; w++) {
         const m = k.wheels[w].spin.matrixWorld;
-        hi.setMatrixAt(k.wheelBase + w, k.lodFar ? Z : m);
-        lo.setMatrixAt(k.wheelBase + w, k.lodFar ? m : Z);
+        hi.setMatrixAt(k.wheelBase + w, k.lodFar || k.podiumHidden ? Z : m);
+        lo.setMatrixAt(k.wheelBase + w, k.lodFar && !k.podiumHidden ? m : Z);
       }
     }
     hi.instanceMatrix.needsUpdate = true;
@@ -1121,6 +1122,103 @@ export class Race {
     this.fov = 68 + sf * 7 + (k.boostTime > 0 ? 7 : 0) + (k.rocketTime > 0 ? 6 : 0);
   }
 
+  // ---------------- podium ceremony ----------------
+  // The top three on gold, silver and bronze steps just past the start line,
+  // with confetti, a fanfare and a sweeping camera. top: result rows in order
+  // (anything with ch, and slot for online races). done() runs when the
+  // ceremony ends or is skipped; the podium keeps turning behind the results.
+  startPodium(top, meRow, done) {
+    this.podiumDone = done;
+    this.setState('podium');
+    this.lookBack = false;
+    const tr = this.track;
+    const fr = tr.frame((tr.length + 30) % tr.length, {});
+    const y0 = tr.heightAtFrame(fr, 0);
+    const steps = [[0, 1.7, '#ffc83a'], [-3.3, 1.15, '#cfd8e6'], [3.3, 0.7, '#d9844a']];
+    const B = new GeoBuilder('paint');
+    // Seven-segment digits for the step fronts: a b c d e f g.
+    const SEG = { 1: 'bc', 2: 'abged', 3: 'abgcd' };
+    const seg = (d, y, n) => {
+      const w = 0.5, t = 0.1, z = 1.53;
+      const bars = { a: [0, w, 1], b: [w / 2, w / 2, 0], c: [w / 2, -w / 2, 0], d: [0, -w, 1], e: [-w / 2, -w / 2, 0], f: [-w / 2, w / 2, 0], g: [0, 0, 1] };
+      for (const ch of SEG[n]) {
+        const [x, yy, hz] = bars[ch];
+        B.add(new THREE.BoxGeometry(hz ? w : t, hz ? t : w, 0.06), '#ffffff', [d + x, y + yy, z], [0, 0, 0], 1, 'glow');
+      }
+    };
+    steps.forEach(([d, h, col], i) => {
+      B.add(new THREE.BoxGeometry(3, h, 3), col, [d, h / 2, 0]);
+      B.add(new THREE.BoxGeometry(3.1, 0.16, 3.1), '#fff3dc', [d, h - 0.08, 0], [0, 0, 0], 1, 'plastic');
+      B.add(new THREE.BoxGeometry(3.04, 0.2, 3.04), '#2a2438', [d, 0.1, 0], [0, 0, 0], 1, 'plastic');
+      seg(d, h * 0.5 + 0.05, i + 1);
+    });
+    B.add(new THREE.CylinderGeometry(6.2, 6.6, 0.18, 40), '#2a2438', [0, 0.09, 0], [0, 0, 0], 1, 'plastic');
+    this.podiumMat = pbrMat({});
+    const mesh = new THREE.Mesh(B.build(), this.podiumMat);
+    mesh.castShadow = mesh.receiveShadow = !!this.quality.shadows;
+    const yaw = Math.atan2(-fr.tx, -fr.tz); // karts face back down the road, towards the camera
+    mesh.position.set(fr.x, y0, fr.z);
+    mesh.rotation.y = yaw; // local +x is the track's right, +z faces the camera
+    this.scene.add(mesh);
+    this.podiumMesh = mesh;
+    this.podiumAt = { x: fr.x, y: y0, z: fr.z, yaw, rx: fr.rx, rz: fr.rz };
+    const onPodium = new Set();
+    top.slice(0, 3).forEach((row, i) => {
+      const k = (row.slot !== undefined && this.karts[row.slot] && this.karts[row.slot].ch.id === row.ch.id ? this.karts[row.slot] : null) || this.karts.find((q) => q.ch.id === row.ch.id);
+      if (!k) return;
+      const [d, h] = steps[i];
+      k.pos.set(fr.x + fr.rx * d, y0 + h, fr.z + fr.rz * d);
+      k.vel.set(0, 0, 0);
+      k.yaw = yaw;
+      k.drifting = false; k.boostTime = 0; k.starTime = 0; k.rocketTime = 0; k.spinTime = 0; k.shrinkTime = 0; k.ghostTime = 0; k.respawnT = 0; k.shield = 0;
+      k.grounded = true;
+      k.cheer = 3 - i;
+      onPodium.add(k);
+    });
+    for (const k of this.karts) k.podiumHidden = !onPodium.has(k);
+    this.podiumT = 0;
+    this.podiumConfetti = 0;
+    this.camYaw = yaw;
+    this.fx.burst(fr.x, y0 + 4, fr.z, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff', '#ffffff'], 90, 12, 0.5, 2.2, 6, false);
+    this.app.audio.play('podium');
+    this.app.hud.podium(top.slice(0, 3), meRow);
+  }
+
+  _podiumTick(dt) {
+    this.podiumT += dt;
+    this.podiumConfetti -= dt;
+    const P = this.podiumAt;
+    if (this.podiumConfetti <= 0) {
+      this.podiumConfetti = 0.22;
+      const d = (Math.random() - 0.5) * 12;
+      const back = 2 + Math.random() * 3;
+      this.fx.burst(P.x + P.rx * d - Math.sin(P.yaw) * back, P.y + 8 + Math.random() * 3, P.z + P.rz * d - Math.cos(P.yaw) * back, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff', '#ffffff'], 14, 4, 0.45, 2.6, 3, false);
+    }
+    if (this.podiumDone && this.podiumT > 7) this.endPodium();
+  }
+
+  endPodium() {
+    if (!this.podiumDone) return;
+    const cb = this.podiumDone;
+    this.podiumDone = null;
+    this.app.hud.podium(null);
+    cb();
+  }
+
+  _podiumCam(dt) {
+    const P = this.podiumAt;
+    const t = this.stateTime;
+    // Swing in from wide and high, then sway gently in front of the podium.
+    const a = P.yaw + Math.sin(t * 0.35) * 0.5;
+    const r = 8.6 + Math.max(0, 5 - t * 2.5);
+    const want = this._v.set(P.x + Math.sin(a) * r, P.y + 2.9 + Math.max(0, 3 - t * 1.5), P.z + Math.cos(a) * r);
+    if (t < 0.05) this.camPos.copy(want);
+    else this.camPos.lerp(want, 1 - Math.exp(-3 * dt));
+    this.camera.position.copy(this.camPos);
+    this.camera.lookAt(P.x, P.y + 1.9, P.z);
+    this.fov = damp(this.fov, 50, 3, dt);
+  }
+
   _orbitCam(dt, k) {
     const a = this.stateTime * 0.35 + k.yaw + Math.PI * 0.75;
     const want = this._v.set(k.pos.x + Math.sin(a) * 8.5, k.pos.y + 3.2, k.pos.z + Math.cos(a) * 8.5);
@@ -1156,6 +1254,7 @@ export class Race {
   _updateCamera(dt) {
     if (this.mode === 'demo') this._demoCam(dt);
     else if (this.state === 'intro' || this.state === 'wait') this._introCam();
+    else if (this.state === 'podium') this._podiumCam(dt);
     else if (this.state === 'finished' || this.state === 'done') this._orbitCam(dt, this.player);
     else this._chase(dt, this.stateTime < 0.02 && this.state === 'countdown');
     // Radial speed blur while boosting (post-processing).
@@ -1197,6 +1296,7 @@ export class Race {
     for (const k of this.karts) k.mat.dispose();
     this.shadowTex.dispose();
     this.skids.dispose();
+    if (this.podiumMesh) { this.podiumMesh.geometry.dispose(); this.podiumMat.dispose(); }
     this.scene.clear();
     if (this.session && this.session.race === this) this.session.race = null;
   }

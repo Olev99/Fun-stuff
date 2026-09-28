@@ -122,6 +122,7 @@ class App {
     for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, kick, { capture: true, passive: true });
     document.addEventListener('dblclick', (e) => e.preventDefault());
     addEventListener('keydown', (e) => this.onKey(e));
+    $('podium-ui').addEventListener('click', () => { if (this.race) this.race.endPodium(); });
     this.canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
     this.canvas.addEventListener('webglcontextrestored', () => location.reload());
 
@@ -167,6 +168,10 @@ class App {
   // back or pauses, P pauses.
   onKey(e) {
     if (e.repeat || e.target.tagName === 'INPUT') return;
+    if (!$('podium-ui').hidden && ['Enter', 'NumpadEnter', 'Space', 'Escape'].includes(e.code)) {
+      if (this.race) this.race.endPodium();
+      return;
+    }
     const inRace = this.race && this.race.mode !== 'demo';
     const scr = document.querySelector('#ui > .screen:not([hidden])');
     if (inRace && (e.code === 'KeyP' || e.code === 'Escape') && (!scr || scr.id === 'scr-pause')) {
@@ -252,6 +257,7 @@ class App {
 
   // ---------------- views ----------------
   disposeRace() {
+    this.hud.podium(null);
     if (this.race) {
       this.race.dispose();
       this.race = null;
@@ -445,7 +451,16 @@ class App {
   }
 
   // ---------------- results ----------------
-  onRaceComplete(race, rows) {
+  onRaceComplete(race, rows, afterPodium = false) {
+    // Races (not time trials or Grand Prix legs) end on the podium first.
+    if (!afterPodium && race.mode !== 'tt' && race.mode !== 'demo' && !this.gp && race.state !== 'podium') {
+      this.audio.stopEngine();
+      this.menuOpen = false;
+      this.hud.show(false);
+      this.applyControls();
+      race.startPodium(rows, rows.find((r) => r.isPlayer), () => this.onRaceComplete(race, rows, true));
+      return;
+    }
     this.audio.stopEngine();
     this.menuOpen = false;
     this.applyControls();
@@ -587,12 +602,18 @@ class App {
     });
   }
 
-  showGPFinal() {
+  showGPFinal(afterPodium = false) {
     const gp = this.gp;
     const table = CHARACTERS.map((c) => ({ ch: c, pts: gp.points[c.id], isPlayer: c.id === gp.player }))
       .sort((a, b) => b.pts - a.pts || (a.isPlayer ? -1 : 1));
     table.forEach((r, i) => (r.place = i + 1));
     const me = table.find((r) => r.isPlayer);
+    // The cup's final standings get a podium ceremony first.
+    if (!afterPodium && this.race && this.race.mode !== 'demo' && this.race.state !== 'podium') {
+      this.ui.hideAll();
+      this.race.startPodium(table, me, () => this.showGPFinal(true));
+      return;
+    }
     if (gp.careerEv) {
       this.onCareerCupFinal(table, me);
       return;
