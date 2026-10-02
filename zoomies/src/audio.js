@@ -237,6 +237,25 @@ export class Audio {
         this._tone('sine', 120, 60, 0.18, 0.3);
         this._noise(0.12, 0.15, 'lowpass', 800, 200);
         break;
+      case 'splash':
+        this._noise(0.55, 0.32, 'lowpass', 2600, 300, 0, this.sfx, 0.9);
+        this._noise(0.3, 0.16, 'bandpass', 4200, 1800, 0.03, this.sfx, 2);
+        this._tone('sine', 190, 70, 0.22, 0.18);
+        break;
+      case 'takeoff':
+        this._noise(0.9, 0.22, 'bandpass', 500, 2400, 0, this.sfx, 2.5);
+        this._tone('sawtooth', 160, 420, 0.7, 0.07);
+        this._tone('triangle', 660, 1320, 0.25, 0.1, 0.2);
+        break;
+      case 'transform':
+        this._tone('square', 520, 260, 0.12, 0.08);
+        this._tone('square', 390, 780, 0.14, 0.08, 0.1);
+        this._noise(0.25, 0.14, 'lowpass', 1400, 300, 0, this.sfx, 0.8);
+        break;
+      case 'ring':
+        this._tone('triangle', 1046, 1568, 0.16, 0.12);
+        this._tone('sine', 2093, 2093, 0.2, 0.06, 0.06);
+        break;
       case 'trick':
         this._tone('triangle', 660, 1320, 0.18, 0.18);
         this._tone('triangle', 990, 1980, 0.18, 0.12, 0.08);

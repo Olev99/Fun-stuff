@@ -10,7 +10,8 @@ import { WheelHost, WheelPad } from './wheel.js';
 import { Sync } from './sync.js';
 import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
-import { awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
+import { BODIES, bodyLocked } from './karts.js';
+import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
 import { CHARACTERS } from './characters.js';
@@ -331,9 +332,12 @@ class App {
     }
   }
 
-  // Kart or bike, as picked on the racer screen (quick races, Grand Prix, time trials, online).
+  // The ride picked on the racer screen (quick races, Grand Prix, time trials,
+  // online), if it is unlocked; otherwise the Zoom Classic.
   menuLoadout() {
-    return { body: this.settings.vehicle === 'bike' ? 'bike' : 'classic' };
+    const id = this.settings.vehicle;
+    const lvl = levelOf((this.career && this.career.xp) || 0).level;
+    return { body: BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic' };
   }
 
   startGPRace() {

@@ -497,6 +497,119 @@ export const TRACKS = [
         wpts: [[135, -51, 0.1], [101, -42, 0.2], [68, -34, 0.2], [35, -25, 0.3]], gems: [{ at: 0.5, n: 4 }] },
     ],
   },
+  // ---- Adventures: one long lap in three legs, driving, boating and flying ----
+  {
+    id: 'odyssey', laps: 1, name: 'Jungle Odyssey', size: 'Epic', theme: 'jungle', width: 17, terrain: true,
+    blurb: 'Temple road, river rapids and a waterfall, then take off and fly home over the sea.',
+    music: { key: 6, bpm: 150, seed: 211, scale: 'dorian' },
+    points: [
+      [0, 0, 0], [0, 110, 0], [-10, 220, 1], [20, 320, 2], [90, 380, 3, 1.1], [180, 390, 4], [240, 340, 6, 0.9], [230, 260, 7],
+      [270, 190, 8], [350, 160, 8, 1.1], [430, 185, 9], [478, 250, 11], [455, 330, 13, 0.85], [480, 410, 15], [560, 450, 16],
+      [650, 430, 15], [710, 370, 13], [720, 290, 11, 1.1],
+      // river: rapids, the waterfall, a lagoon and a narrow canyon
+      [740, 210, 10, 1.25], [800, 150, 10, 1.2], [850, 70, 10, 1.1], [840, -20, 10], [800, -80, 10], [772, -128, 10], [764, -145, 1.2],
+      [745, -215, 1, 1.5], [720, -300, 1, 1.7], [650, -360, 1, 1.8], [560, -360, 1, 1.6], [480, -330, 1, 1.1], [410, -300, 1, 0.9],
+      [340, -340, 1], [270, -320, 1, 1.1],
+      // up the sea cliff, then the sky lane out over the sea and back to the runway
+      [200, -360, 5], [170, -430, 12, 0.9], [120, -490, 19], [75, -525, 24],
+      [20, -600, 32, 1.6], [-20, -700, 40, 1.7], [-10, -800, 46, 1.7], [-80, -880, 50, 1.7], [-200, -890, 54, 1.7], [-300, -820, 52, 1.7],
+      [-340, -700, 46, 1.7], [-330, -580, 40, 1.7], [-300, -460, 34, 1.7], [-250, -350, 26, 1.6], [-180, -270, 16, 1.4], [-110, -200, 7, 1.3],
+      [-60, -140, 1.5, 1.2], [-25, -80, 0, 1.1], [-5, -30, 0],
+    ],
+    zones: [{ type: 'water', p0: 17, p1: 32 }, { type: 'sky', p0: 36, p1: 49 }],
+    legs: [{ p: 0, name: 'Temple Road' }, { p: 17, name: 'Rapids Run' }, { p: 32, name: 'Sky High' }],
+    items: [{ p: 3 }, { p: 10 }, { p: 15 }, { p: 19 }, { p: 25, off: 25 }, { p: 30 }, { p: 38 }, { p: 44 }],
+    boosts: [
+      { p: 8, d: 0 }, { p: 13, off: 20, d: 3 }, { p: 20, d: -3 }, { p: 21, off: 30, d: 3 }, { p: 29, off: 20, d: 0 },
+      { p: 37, d: 0 }, { p: 38, d: -5 }, { p: 39, d: 5 }, { p: 40, d: 0 }, { p: 41, d: -6 }, { p: 42, d: 6 },
+      { p: 43, d: 0 }, { p: 44, d: -5 }, { p: 45, d: 5 }, { p: 46, d: 0 },
+    ],
+    ramps: [
+      { p: 5, off: 10, len: 8, h: 1.9 },
+      { p: 23, off: -9, len: 9, h: 1.4, dir: 1 },
+      { p: 36, off: -10, len: 10, h: 2.4, dir: 1 },
+      { p: 49, len: 10, h: 2.4, dir: -1 },
+    ],
+    gems: [
+      { p: 1, d: -3, n: 5 }, { p: 6, off: 20, d: 3, n: 5 }, { p: 11, d: 0, n: 5 }, { p: 16, d: -3, n: 5 },
+      { p: 19, off: 30, d: 3, n: 5 }, { p: 26, d: -4, n: 6 }, { p: 31, d: 0, n: 5 },
+      { p: 34, d: 2, n: 5 }, { p: 39, off: 40, d: 0, n: 6 }, { p: 42, off: 40, d: 0, n: 6 }, { p: 47, d: 0, n: 5 },
+    ],
+    obstacles: [
+      { p: 7, type: 'boulder', amp: 6, speed: 0.8 }, { p: 12, off: 20, type: 'boulder', amp: 5, speed: 1 },
+      { p: 21, off: -20, type: 'log', amp: 7, speed: 0.7 }, { p: 27, type: 'log', amp: 11, speed: 0.6 }, { p: 28, off: 30, type: 'croc', amp: 9, speed: 0.9 },
+      { p: 31, off: 20, type: 'croc', amp: 5, speed: 1.2 }, { p: 34, off: 20, type: 'boulder', amp: 5, speed: 0.9 },
+      { p: 40, off: 30, type: 'storm', amp: 9, speed: 0.6 }, { p: 43, off: 30, type: 'storm', amp: 9, speed: 0.7 },
+    ],
+    patches: [{ p: 9, off: 15, len: 18, d: 0, w: 10, type: 'mud' }, { p: 33, len: 14, d: 3, w: 8, type: 'mud' }],
+    lakes: [{ x: -170, z: -770, rx: 300, rz: 215 }],
+    shortcuts: [
+      { name: 'Lost Temple', lead: 30, fromP: 12, fromOff: 25, toP: 16, toOff: 20, surface: 'dirt', width: 10, deco: 'ruins', crates: true,
+        wpts: [[510, 350, 14], [570, 338, 14.5], [630, 342, 14.5], [682, 350, 13.5]], gems: [{ at: 0.5, n: 5 }],
+        obstacles: [{ at: 0.6, type: 'boulder', amp: 3, speed: 1 }] },
+      { name: 'Hidden Grotto', lead: 30, fromP: 18, fromOff: -10, toP: 22, toOff: -5, width: 10, deco: 'cave',
+        wpts: [[748, 150, 10], [758, 70, 10], [770, -10, 10], [785, -60, 10]], zones: [{ type: 'water', at: 0, len: 1 }],
+        gems: [{ at: 0.4, n: 5 }], boosts: [{ at: 0.55 }] },
+      { name: 'Storm Gap', lead: 40, fromP: 39, fromOff: 10, toP: 42, toOff: -20, width: 10,
+        wpts: [[-60, -805, 48], [-130, -815, 50], [-200, -812, 51], [-255, -800, 52]], zones: [{ type: 'sky', at: 0, len: 1 }],
+        gems: [{ at: 0.35, n: 6 }], obstacles: [{ at: 0.55, type: 'storm', amp: 3, speed: 0.9 }] },
+    ],
+  },
+  {
+    id: 'hopper', laps: 1, name: 'Island Hopper', size: 'Epic', theme: 'beach', scale: 1.48, width: 17, terrain: true,
+    blurb: 'Race boats through the harbour canals, climb the volcano and fly home across the bay.',
+    music: { key: 2, bpm: 152, seed: 223, scale: 'major' },
+    points: [
+      [0, 0, 0], [0, 90, 0], [10, 170, 0, 1.1],
+      // harbour canals out to the open bay
+      [50, 250, 0, 1.3], [130, 300, 0, 1.4], [230, 290, 0, 1.2], [300, 230, 0, 1.0], [380, 200, 0, 0.9], [460, 230, 0, 1.0],
+      [520, 300, 0, 1.3], [600, 340, 0, 1.6], [700, 320, 0, 1.8], [770, 250, 0, 1.6], [790, 160, 0, 1.3], [760, 80, 0, 1.1],
+      // up and round the volcano
+      [700, 30, 2], [620, 20, 5], [560, -30, 9, 0.9], [580, -110, 13], [650, -150, 17], [700, -220, 21, 0.9], [650, -290, 25],
+      [560, -300, 29], [500, -280, 32, 0.9], [450, -250, 34], [400, -230, 35],
+      // take off over the bay and swing round to the airstrip
+      [320, -250, 42, 1.6], [230, -320, 48, 1.7], [130, -400, 52, 1.7], [10, -430, 50, 1.7], [-100, -390, 45, 1.7],
+      [-160, -300, 38, 1.7], [-170, -200, 28, 1.6], [-130, -120, 16, 1.4], [-75, -70, 5, 1.2], [-28, -28, 0, 1.1],
+    ],
+    zones: [{ type: 'water', p0: 2, p1: 14 }, { type: 'sky', p0: 25, p1: 34 }],
+    legs: [{ p: 0, name: 'Harbour Canals' }, { p: 14, name: 'Volcano Climb' }, { p: 25, name: 'Bay Flight' }],
+    volcano: { x: 600, z: -210, r: 84, top: 17, h: 40 },
+    items: [{ p: 1 }, { p: 6 }, { p: 11 }, { p: 16 }, { p: 21 }, { p: 27 }, { p: 31 }],
+    boosts: [
+      { p: 4, d: 0 }, { p: 9, off: 10, d: -3 }, { p: 12, d: 3 }, { p: 18, d: 0 }, { p: 23, d: 2 },
+      { p: 26, d: 0 }, { p: 27, d: -5 }, { p: 28, d: 5 }, { p: 29, d: 0 }, { p: 30, d: -6 }, { p: 31, d: 5 }, { p: 32, d: 0 }, { p: 33, d: -3 },
+    ],
+    ramps: [
+      { p: 11, off: 20, len: 8, h: 1.5 },
+      { p: 16, off: 25, len: 8, h: 1.8 },
+      { p: 25, off: -10, len: 10, h: 2.4, dir: 1 },
+      { p: 34, len: 10, h: 2.4, dir: -1 },
+    ],
+    gems: [
+      { p: 1, d: 3, n: 5 }, { p: 5, d: -3, n: 5 }, { p: 10, off: 30, d: 0, n: 6 }, { p: 13, d: 3, n: 5 },
+      { p: 17, d: 0, n: 5 }, { p: 20, off: 20, d: -3, n: 5 }, { p: 24, d: 0, n: 5 },
+      { p: 28, off: 40, d: 0, n: 6 }, { p: 31, off: 30, d: 0, n: 6 },
+    ],
+    obstacles: [
+      { p: 5, off: 20, type: 'barrel', amp: 6, speed: 0.8 }, { p: 10, off: 30, type: 'barrel', amp: 10, speed: 0.6 },
+      { p: 12, off: 30, type: 'barrel', amp: 8, speed: 0.9 }, { p: 15, off: 20, type: 'crab', amp: 6, speed: 1.1 },
+      { p: 19, off: 10, type: 'boulder', amp: 6, speed: 0.9 }, { p: 22, type: 'fireball', amp: 6, speed: 1 },
+      { p: 28, off: 30, type: 'balloon', amp: 8, speed: 0.5 }, { p: 31, off: 20, type: 'storm', amp: 8, speed: 0.7 },
+    ],
+    patches: [{ p: 15, len: 16, d: 0, w: 10, type: 'sand' }],
+    lakes: [{ x: 100, z: -330, rx: 250, rz: 150 }],
+    shortcuts: [
+      { name: "Smugglers' Canal", lead: 25, fromP: 9, fromOff: 10, toP: 13, toOff: -10, width: 9,
+        wpts: [[580, 280, 0], [650, 250, 0], [720, 200, 0]], zones: [{ type: 'water', at: 0, len: 1 }],
+        gems: [{ at: 0.45, n: 5 }], boosts: [{ at: 0.6 }] },
+      { name: 'Lava Tube', lead: 25, fromP: 18, fromOff: 10, toP: 21, toOff: -10, surface: 'road', width: 10, deco: 'lavaTube', crates: true,
+        wpts: [[595, -160, 15], [615, -215, 19], [635, -260, 23]], gems: [{ at: 0.5, n: 5 }],
+        obstacles: [{ at: 0.6, type: 'fireball', amp: 3, speed: 1.2 }] },
+      { name: 'Jet Stream', lead: 40, fromP: 28, fromOff: 10, toP: 31, toOff: -15, width: 10,
+        wpts: [[60, -395, 51], [-30, -370, 48], [-110, -330, 42]], zones: [{ type: 'sky', at: 0, len: 1 }],
+        boosts: [{ at: 0.3 }, { at: 0.65 }], gems: [{ at: 0.48, n: 5 }] },
+    ],
+  },
 ];
 
 export const CUPS = [

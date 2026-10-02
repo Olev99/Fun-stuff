@@ -340,7 +340,10 @@ export class World {
     this.r = rng(track.def.id.length * 977 + (track.reverse ? 5 : 0));
     const k = track.def.scale ?? 1;
     this.lakes = (track.def.lakes || []).map((l) => ({ x: l.x * k, z: l.z * k, rx: l.rx * k, rz: l.rz * k, lava: !!l.lava }));
-    this.lenScale = clamp(track.length / 1100, 0.8, 2.2);
+    this.lenScale = clamp(track.length / 1100, 0.8, 3);
+    // Big landmarks nothing else may grow inside.
+    const v = track.def.volcano;
+    this.blockers = v ? [{ x: v.x * k, z: v.z * k, r: v.r * k * 1.05 }] : [];
     this._build();
   }
 
@@ -521,11 +524,13 @@ export class World {
     const D = new Float32Array(W * H).fill(1e9);
     const mark = (p) => {
       for (let i = 0; i < p.count; i++) {
+        // Under a sky lane the hills may rise, but stay well below it.
+        const v = p.zoneT[i] === 2 ? Math.max(0, (p.py[i] - 12) * 1.3) : 0;
         const cr = (p.wd[i] + 2) / cell;
         const cx = (p.px[i] - x0) / cell, cz = (p.pz[i] - z0) / cell;
         for (let gz = Math.max(0, Math.floor(cz - cr)); gz <= Math.min(H - 1, Math.ceil(cz + cr)); gz++) {
           for (let gx = Math.max(0, Math.floor(cx - cr)); gx <= Math.min(W - 1, Math.ceil(cx + cr)); gx++) {
-            if ((gx - cx) ** 2 + (gz - cz) ** 2 <= cr * cr) D[gz * W + gx] = 0;
+            if ((gx - cx) ** 2 + (gz - cz) ** 2 <= cr * cr) D[gz * W + gx] = Math.min(D[gz * W + gx], v);
           }
         }
       }
@@ -624,6 +629,7 @@ export class World {
       const dx = (x - l.x) / (l.rx + margin), dz = (z - l.z) / (l.rz + margin);
       if (dx * dx + dz * dz < 1) return true;
     }
+    for (const b of this.blockers) if ((x - b.x) ** 2 + (z - b.z) ** 2 < (b.r + margin) ** 2) return true;
     return false;
   }
 
@@ -712,34 +718,43 @@ export class World {
     const tr = this.track;
     const shadows = !!this.quality.shadows;
     const mats = (this.mats = this._roadMaterials(th));
-    const road = new THREE.Mesh(tr.strip((i) => -tr.hw[i], (i) => tr.hw[i], { vScale: 1 / 16, across: 2 }), mats.roadMat);
-    road.receiveShadow = shadows;
-    this.group.add(road);
-    for (const side of [-1, 1]) {
-      const a = (i) => side * tr.hw[i], b = (i) => side * tr.ed[i];
-      const geo = side < 0 ? tr.strip(b, a, { vScale: 1 / 3, lift: 0.015 }) : tr.strip(a, b, { vScale: 1 / 3, lift: 0.015 });
-      const m = new THREE.Mesh(geo, mats.curbMat);
-      m.receiveShadow = shadows;
-      this.group.add(m);
-      const c = (i) => side * tr.ed[i], d = (i) => side * tr.wd[i];
-      const geo2 = side < 0 ? tr.strip(d, c, { vScale: 1 / 14, uWorld: 14 }) : tr.strip(c, d, { vScale: 1 / 14, uWorld: 14 });
-      const m2 = new THREE.Mesh(geo2, mats.shMat);
-      m2.receiveShadow = shadows;
-      this.group.add(m2);
+    // Water and sky stretches of an adventure track get a river or a sky
+    // lane instead of tarmac (see _buildZone).
+    const zt = tr.zoneT;
+    for (const [i0, i1] of tr.runs((i) => zt[i] === 0)) {
+      const o = { i0, i1 };
+      const road = new THREE.Mesh(tr.strip((i) => -tr.hw[i], (i) => tr.hw[i], { vScale: 1 / 16, across: 2, ...o }), mats.roadMat);
+      road.receiveShadow = shadows;
+      this.group.add(road);
+      for (const side of [-1, 1]) {
+        const a = (i) => side * tr.hw[i], b = (i) => side * tr.ed[i];
+        const geo = side < 0 ? tr.strip(b, a, { vScale: 1 / 3, lift: 0.015, ...o }) : tr.strip(a, b, { vScale: 1 / 3, lift: 0.015, ...o });
+        const m = new THREE.Mesh(geo, mats.curbMat);
+        m.receiveShadow = shadows;
+        this.group.add(m);
+        const c = (i) => side * tr.ed[i], d = (i) => side * tr.wd[i];
+        const geo2 = side < 0 ? tr.strip(d, c, { vScale: 1 / 14, uWorld: 14, ...o }) : tr.strip(c, d, { vScale: 1 / 14, uWorld: 14, ...o });
+        const m2 = new THREE.Mesh(geo2, mats.shMat);
+        m2.receiveShadow = shadows;
+        this.group.add(m2);
+      }
     }
+    this._buildZones(tr);
     // Walls, with gaps where shortcuts branch off.
     for (const side of [-1, 1]) {
       const gap = tr.gap[side > 0 ? 1 : 0];
-      for (const [a, b] of tr.runs((i) => !gap[i])) this._walls(tr, side, a, b, mats, tr.wallH, th.floating);
+      for (const [a, b] of tr.runs((i) => !gap[i] && zt[i] === 0)) this._walls(tr, side, a, b, mats, tr.wallH, th.floating);
+      for (const [a, b] of tr.runs((i) => !gap[i] && zt[i] === 1)) this._walls(tr, side, a, b, this._bankMats(), 1.5, th.floating);
+      if (tr.def.terrain && !th.floating) this._berms(tr, side, (i) => !gap[i] && zt[i] !== 2 && !tr.bridge[i], (i) => (zt[i] === 1 ? 1.5 : tr.wallH));
     }
     // Bridge undersides and support pillars.
     const underMat = stdMat({ color: th.wallSide || '#aaaaaa', roughness: 0.9 });
-    const pred = th.floating ? () => true : (i) => tr.bridge[i] === 1;
+    const pred = th.floating ? (i) => zt[i] !== 2 : (i) => tr.bridge[i] === 1 && zt[i] !== 2;
     for (const [a, b] of tr.runs(pred)) this._underside(tr, a, b, underMat);
     if (!th.floating) {
       const B = new GeoBuilder();
       for (let i = 0; i < tr.count; i += 7) {
-        if (!tr.bridge[i]) continue;
+        if (!tr.bridge[i] || zt[i]) continue;
         for (const side of [-1, 1]) {
           const d = side * (tr.wd[i] - 1);
           const x = tr.px[i] + tr.rx[i] * d, z = tr.pz[i] + tr.rz[i] * d;
@@ -754,6 +769,236 @@ export class World {
         pm.receiveShadow = shadows;
         this.group.add(pm);
       }
+    }
+  }
+
+  // Grassy slopes from the top of the walls down to the ground, so raised
+  // roads and rivers sit on hillsides instead of sheer walls.
+  _berms(path, side, pred, wallH) {
+    const n = path.count;
+    const W = new Float32Array(n), top = new Float32Array(n);
+    const tr = this.track;
+    for (let i = 0; i < n; i++) {
+      if (!pred(i)) continue;
+      const d0 = side * (path.wd[i] + 0.7);
+      top[i] = path.yAt(i, side * path.wd[i]) + wallH(i);
+      const x0 = path.px[i] + path.rx[i] * d0, z0 = path.pz[i] + path.rz[i] * d0;
+      const drop = top[i] - this.groundAt(x0, z0);
+      if (drop < 1.2) continue;
+      let w = clamp(drop * 2.6, 4, 44);
+      // Don't bury another road next to this one.
+      for (let k = 0; k < 4 && w > 2; k++) {
+        const d1 = side * (path.wd[i] + 0.7 + w);
+        const cl = tr.clearance(path.px[i] + path.rx[i] * d1, path.pz[i] + path.rz[i] * d1);
+        if (cl > w * 0.8 || cl > 8) break;
+        w *= 0.55;
+      }
+      W[i] = w;
+    }
+    const Ws = path._smooth(W, 3);
+    for (const [i0, i1] of path.runs((i) => pred(i) && Ws[i] > 1.5)) {
+      const pos = [], uv = [], idx = [];
+      for (let r = i0; r <= i1; r++) {
+        const i = path.I(r);
+        const w = Math.max(Ws[i], 1);
+        const d0 = side * (path.wd[i] + 0.7), d1 = side * (path.wd[i] + 0.7 + w);
+        const x0 = path.px[i] + path.rx[i] * d0, z0 = path.pz[i] + path.rz[i] * d0;
+        const x1 = path.px[i] + path.rx[i] * d1, z1 = path.pz[i] + path.rz[i] * d1;
+        const yT = top[i] || path.yAt(i, side * path.wd[i]) + wallH(i);
+        const yM = this.groundAt((x0 + x1) / 2, (z0 + z1) / 2), y1 = this.groundAt(x1, z1) - 0.05;
+        // three points across: a rounded shoulder, then down to the ground
+        const xm = (x0 + x1) / 2, zm = (z0 + z1) / 2;
+        const ym = Math.max(yM, y1 + (yT - y1) * 0.62);
+        pos.push(x0, yT - 0.02, z0, xm, ym, zm, x1, y1, z1);
+        uv.push(x0 / 14, z0 / 14, xm / 14, zm / 14, x1 / 14, z1 / 14);
+      }
+      const rings = i1 - i0 + 1;
+      for (let r = 0; r < rings - 1; r++) {
+        for (let a = 0; a < 2; a++) {
+          const A = r * 3 + a, B = A + 1, C = A + 3, D = C + 1;
+          if (side > 0) idx.push(A, C, B, B, C, D);
+          else idx.push(A, B, C, B, D, C);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const nm = g.attributes.normal;
+      // make sure the slope faces up
+      let up = 0;
+      for (let k = 0; k < nm.count; k++) up += nm.getY(k);
+      if (up < 0) {
+        for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }
+        g.setIndex(idx);
+        g.computeVertexNormals();
+      }
+      const m = new THREE.Mesh(g, this.bermMat || (this.bermMat = this._bermMat()));
+      m.receiveShadow = !!this.quality.shadows;
+      this.group.add(m);
+    }
+  }
+
+  _bermMat() {
+    const tint = new THREE.Color(this.theme.groundTint[1] || '#ffffff');
+    const m = stdMat({ map: this.groundTex, color: tint, roughness: 0.95 });
+    this._detail(m, this.groundTex, { bump: 1.6, rough: [0.8, 1] }, 0.6);
+    return m;
+  }
+
+  // Mossy stone embankments along rivers.
+  _bankMats() {
+    if (this._banks) return this._banks;
+    const tex = this._tex(TX.wallTexture('mossstone'));
+    const wallMat = stdMat({ map: tex, roughness: 0.85 });
+    this._detail(wallMat, tex, { bump: 2, rough: [0.7, 1] }, 0.7);
+    const sideMat = stdMat({ color: '#5f7a45', roughness: 0.95 });
+    return (this._banks = { wallMat, sideMat });
+  }
+
+  // Rivers (water zones) and sky lanes (sky zones) on a path.
+  _buildZone(path) {
+    const zt = path.zoneT;
+    if (!path.zones.length) return;
+    const th = this.theme;
+    const shadows = !!this.quality.shadows;
+    // Water: one strip across the whole channel, a hair below the road so
+    // slipways meet it cleanly.
+    const near = (i, k) => zt[i] === k || zt[path.I(i - 1)] === k || zt[path.I(i + 1)] === k;
+    const riverMat = this.riverMat || (this.riverMat = this._waterMat(th.lake || th.water || ['#1b7fb8', '#5fd2e8'], { scale: 1.4 }));
+    for (const [i0, i1] of path.runs((i) => near(i, 1))) {
+      const m = new THREE.Mesh(path.strip((i) => -path.wd[i] - 0.4, (i) => path.wd[i] + 0.4, { vScale: 1 / 16, across: 4, lift: -0.04, i0, i1 }), riverMat);
+      m.receiveShadow = shadows;
+      this.group.add(m);
+    }
+    // Waterfalls: white water over the drop and a foam pool at the bottom.
+    const drops = [];
+    for (let i = 0; i < path.count - 1; i++) {
+      const j = path.I(i + 1);
+      if (zt[i] === 1 && path.py[i] - path.py[j] > 0.25) drops.push(i);
+    }
+    if (drops.length) {
+      const foam = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false, fog: true });
+      for (const [a, b] of path.runs((i) => drops.includes(i))) {
+        const m = new THREE.Mesh(path.strip((i) => -path.wd[i], (i) => path.wd[i], { vScale: 1 / 4, across: 6, lift: 0.08, i0: a - 1, i1: b + 1 }), foam);
+        m.renderOrder = 2;
+        this.group.add(m);
+        const base = path.I(b + 3);
+        const pool = new THREE.Mesh(path.strip((i) => -path.wd[i], (i) => path.wd[i], { across: 6, lift: 0.05, i0: b + 1, i1: b + 9 }),
+          new THREE.MeshBasicMaterial({ color: '#e8fbff', transparent: true, opacity: 0.35, depthWrite: false, fog: true }));
+        pool.renderOrder = 2;
+        this.group.add(pool);
+        // Rocks either side of the lip, and drifting mist below.
+        const B = new GeoBuilder('stone');
+        const lip = path.I(a);
+        for (const side of [-1, 1]) {
+          for (let n = 0; n < 3; n++) {
+            const d = side * (path.wd[lip] + 1.5 + n * 2.2);
+            B.add(new THREE.DodecahedronGeometry(2.2 - n * 0.4, 0), '#6f6a60', [path.px[lip] + path.rx[lip] * d, path.py[lip] - 1 + n * 0.8, path.pz[lip] + path.rz[lip] * d], [n, n * 2, 0]);
+          }
+        }
+        this.group.add(new THREE.Mesh(B.build(), pbrMat()));
+        const mx = path.px[base], my = path.py[base], mz = path.pz[base], w = path.wd[base];
+        const rx = path.rx[base], rz = path.rz[base];
+        this.animated.push((dt) => {
+          if (!this.fxSys || Math.random() > dt * 30) return;
+          const c = this.camPos;
+          if (c && (c.x - mx) ** 2 + (c.z - mz) ** 2 > 180 * 180) return;
+          const d = (Math.random() * 2 - 1) * w;
+          this.fxSys.soft.emit(mx + rx * d, my + 0.3, mz + rz * d, (Math.random() - 0.5) * 2, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 2, '#ffffff', 1.2, 3.5, 1.4, -0.4, 1, 0.35);
+        });
+      }
+    }
+    // A rock face under the end of the road where a sky lane takes off or lands.
+    for (const z of path.zones) {
+      if (z.kind !== 2) continue;
+      for (const [s, dir] of [[z.s0, -1], [z.s0 + z.len, 1]]) {
+        const fr = path.frame(s + dir * 1, {});
+        const y0 = path.heightAtFrame(fr, 0);
+        if (y0 < 2.5) continue;
+        const W = fr.wd + 14;
+        const pts = [];
+        for (const d of [-W, W]) {
+          const x = fr.x + fr.rx * d, zz = fr.z + fr.rz * d;
+          pts.push([x, y0 + 0.2, zz], [x, this.groundAt(x, zz) - 1.5, zz]);
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute([...pts[0], ...pts[1], ...pts[2], ...pts[1], ...pts[3], ...pts[2]], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, y0 / 6, 0, 0, W / 3, y0 / 6, 0, 0, W / 3, 0, W / 3, y0 / 6], 2));
+        g.computeVertexNormals();
+        const bm = this._bankMats();
+        const cliff = bm.cliff || (bm.cliff = (() => { const c = bm.wallMat.clone(); c.side = THREE.DoubleSide; return c; })());
+        this.group.add(new THREE.Mesh(g, cliff));
+      }
+    }
+    // Sky: fluffy cloud banks mark the edges of the lane.
+    const sky = path.runs((i) => zt[i] === 2);
+    if (sky.length) {
+      const spots = [];
+      const r = this.r;
+      for (const [i0, i1] of sky) {
+        const step = Math.max(1, Math.round(8 / path.ds));
+        for (let r0 = i0; r0 <= i1; r0 += step) {
+          const i = path.I(r0);
+          // No clouds down at runway height.
+          if (path.py[i] < 12 || path.zoneDepth(i * path.ds) < 20) continue;
+          for (const side of [-1, 1]) {
+            if (path.gap[side > 0 ? 1 : 0][i]) continue;
+            const d = side * (path.wd[i] + 2.5 + r() * 3);
+            const sc = 2.2 + r() * 2.6;
+            spots.push({
+              x: path.px[i] + path.rx[i] * d, z: path.pz[i] + path.rz[i] * d,
+              y: path.py[i] - 1.5 + r() * 4, s: sc, sy: sc * (0.55 + r() * 0.2), rot: r() * 6,
+            });
+          }
+        }
+      }
+      const geo = new THREE.IcosahedronGeometry(1, 1);
+      const mat = stdMat({ color: '#ffffff', roughness: 1, emissive: new THREE.Color('#dfe8ff'), emissiveIntensity: 0.35 });
+      const im = new THREE.InstancedMesh(geo, mat, spots.length);
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sv = new THREE.Vector3();
+      spots.forEach((p, n) => {
+        q.setFromAxisAngle(v.set(0, 1, 0), p.rot);
+        m4.compose(v.set(p.x, p.y, p.z), q, sv.set(p.s, p.sy, p.s * 1.3));
+        im.setMatrixAt(n, m4);
+      });
+      im.frustumCulled = false;
+      this.group.add(im);
+    }
+  }
+
+  _buildZones(tr) {
+    this._buildZone(tr);
+    for (const sc of tr.shortcuts) this._buildZone(sc);
+    // Boost rings in the sky (boost pads there are rings to fly through).
+    const rings = [];
+    for (const p of [tr, ...tr.shortcuts]) {
+      for (const b of p.boosts) {
+        const s = b.s + b.len / 2;
+        if (p.zoneAt(s) !== 2) continue;
+        const fr = p.frame(s, {});
+        rings.push({ x: fr.x + fr.rx * b.d, y: p.heightAtFrame(fr, b.d) + 1.4 + Math.min(1.6, p.zoneDepth(s) * 0.04), z: fr.z + fr.rz * b.d, yaw: Math.atan2(fr.tx, fr.tz) });
+      }
+    }
+    if (rings.length) {
+      const geo = new THREE.TorusGeometry(3.1, 0.32, 10, 36);
+      const mat = stdMat({ color: '#ffd23f', roughness: 0.3, metalness: 0.4, emissive: new THREE.Color('#ffb020'), emissiveIntensity: 1.3 });
+      const inner = new THREE.MeshBasicMaterial({ color: hdr('#fff3b0', 1.2), transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+      const disc = new THREE.CircleGeometry(2.9, 28);
+      this.ringMeshes = [];
+      for (const rr of rings) {
+        const g = new THREE.Group();
+        g.position.set(rr.x, rr.y, rr.z);
+        g.rotation.y = rr.yaw;
+        g.add(new THREE.Mesh(geo, mat));
+        const dm = new THREE.Mesh(disc, inner);
+        dm.renderOrder = 2;
+        g.add(dm);
+        this.group.add(g);
+        this.ringMeshes.push(g);
+      }
+      this.animated.push((dt, t) => { for (const g of this.ringMeshes) g.children[0].rotation.z = t * 0.8; });
     }
   }
 
@@ -785,7 +1030,7 @@ export class World {
       surf.polygonOffsetUnits = -2;
       const shoulder = stdMat({ map: this.groundTex, color: '#eeeeee', roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
       const e0 = Math.max(0, sc.entryEnd - 3), e1 = Math.min(sc.count - 1, sc.exitStart + 2);
-      const pred = (i) => i >= e0 && i <= e1 && !sc.isVoid(i * sc.ds) && !sc.isVoid((i + 1) * sc.ds);
+      const pred = (i) => i >= e0 && i <= e1 && !sc.isVoid(i * sc.ds) && !sc.isVoid((i + 1) * sc.ds) && !sc.zoneT[i];
       for (const [a, b] of sc.runs(pred)) {
         const m = new THREE.Mesh(sc.strip((i) => -sc.hw[i], (i) => sc.hw[i], { vScale: 1 / 14, lift: 0.02, i0: a, i1: b }), surf);
         m.receiveShadow = shadows;
@@ -798,12 +1043,48 @@ export class World {
           this.group.add(m2);
         }
       }
-      const wpred = (i) => !sc.overlap[i] && !sc.isVoid(i * sc.ds);
-      for (const side of [-1, 1]) for (const [a, b] of sc.runs(wpred)) this._walls(sc, side, a, b, mats, sc.wallH, th.floating);
+      // The mouths: where the branch peels away from the main road, the part
+      // of it outside the main road's wall line has no main road under it.
+      // Pave that (and give it its outer wall) so you never drive over thin air.
+      const mt = {}, xw = new Float32Array(sc.count), dir = new Int8Array(sc.count), outW = [new Uint8Array(sc.count), new Uint8Array(sc.count)];
+      const main = this.track;
+      for (let i = 0; i < sc.count; i++) {
+        if (!sc.overlap[i]) continue;
+        main.project(sc.px[i], sc.pz[i], -1, mt);
+        const sm = Math.sign(mt.d) || sc.side;
+        let k = sc.rx[i] * mt.rx + sc.rz[i] * mt.rz;
+        if (Math.abs(k) < 0.35) k = k < 0 ? -0.35 : 0.35;
+        xw[i] = (sm * mt.wd - mt.d) / k;
+        dir[i] = Math.sign(sm * k);
+        for (const side of [-1, 1]) if (sm * (mt.d + side * sc.wd[i] * k) > mt.wd + 1) outW[side > 0 ? 1 : 0][i] = 1;
+      }
+      const mouth = (i) => sc.overlap[i] && (i < e0 || i > e1) && !sc.zoneT[i] && !sc.isVoid(i * sc.ds);
+      const span = (i, lim) => (dir[i] > 0 ? [clamp(xw[i], -lim, lim), lim] : [-lim, clamp(xw[i], -lim, lim)]);
+      for (const [a, b] of sc.runs(mouth)) {
+        const o = { vScale: 1 / 14, lift: 0.025, i0: a, i1: b };
+        const m = new THREE.Mesh(sc.strip((i) => span(i, sc.hw[i])[0], (i) => span(i, sc.hw[i])[1], o), surf);
+        m.receiveShadow = shadows;
+        this.group.add(m);
+        // grass beyond the paving on the outer side
+        const sh0 = (i) => (dir[i] > 0 ? clamp(Math.max(xw[i], sc.hw[i]), sc.hw[i], sc.wd[i]) : -sc.wd[i]);
+        const sh1 = (i) => (dir[i] > 0 ? sc.wd[i] : clamp(Math.min(xw[i], -sc.hw[i]), -sc.wd[i], -sc.hw[i]));
+        const m2 = new THREE.Mesh(sc.strip(sh0, sh1, { ...o, uWorld: 14 }), shoulder);
+        m2.receiveShadow = shadows;
+        this.group.add(m2);
+      }
+      const wpredS = (side) => (i) => (!sc.overlap[i] || outW[side > 0 ? 1 : 0][i]) && !sc.isVoid(i * sc.ds) && !sc.zoneT[i];
+      const wpred = (i) => !sc.overlap[i] && !sc.isVoid(i * sc.ds) && !sc.zoneT[i];
+      for (const side of [-1, 1]) for (const [a, b] of sc.runs(wpredS(side))) this._walls(sc, side, a, b, mats, sc.wallH, th.floating);
+      const bpred = (i) => !sc.overlap[i] && sc.zoneT[i] === 1;
+      for (const side of [-1, 1]) for (const [a, b] of sc.runs(bpred)) this._walls(sc, side, a, b, this._bankMats(), 1.5, th.floating);
+      if (this.track.def.terrain && !th.floating) {
+        for (const side of [-1, 1]) this._berms(sc, side, (i) => !sc.overlap[i] && !sc.isVoid(i * sc.ds) && sc.zoneT[i] !== 2, (i) => (sc.zoneT[i] === 1 ? 1.5 : sc.wallH));
+      }
       if (th.floating) for (const [a, b] of sc.runs(wpred)) this._underside(sc, a, b, stdMat({ color: th.wallSide, roughness: 0.9 }));
       this._shortcutDeco(sc);
       // Boost pads on shortcuts
       for (const b of sc.boosts) {
+        if (sc.zoneAt(b.s + b.len / 2) === 2) continue;
         const geo = sc.patch(b.s, b.s + b.len, -b.w / 2, b.w / 2, { lift: 0.06 });
         this._padMesh(geo);
       }
@@ -857,9 +1138,9 @@ export class World {
       const m = new THREE.Mesh(B.build(), vc);
       m.castShadow = shadows;
       g.add(m);
-    } else if (deco === 'cave' || deco === 'iceArch' || deco === 'crypt' || deco === 'ruins' || deco === 'log') {
+    } else if (deco === 'cave' || deco === 'iceArch' || deco === 'crypt' || deco === 'ruins' || deco === 'log' || deco === 'lavaTube') {
       const ice = deco === 'iceArch';
-      const CAVE = { cave: ['#b8643a', '#8a4527', '#ffd23f'], crypt: ['#3a3448', '#2a2438', '#9dff8a'], ruins: ['#8a8268', '#6a6450', '#ffcf5a'], log: ['#8a5a36', '#6a4424', '#ffb347'], iceArch: ['#bfe6ff', '#e8f7ff', '#9ff6ff'] }[deco];
+      const CAVE = { cave: ['#b8643a', '#8a4527', '#ffd23f'], crypt: ['#3a3448', '#2a2438', '#9dff8a'], ruins: ['#8a8268', '#6a6450', '#ffcf5a'], log: ['#8a5a36', '#6a4424', '#ffb347'], iceArch: ['#bfe6ff', '#e8f7ff', '#9ff6ff'], lavaTube: ['#3a2a28', '#2a1c1a', '#ff6a1a'] }[deco];
       const s0 = sc.length * (ice ? 0.3 : 0.18), s1 = sc.length * (ice ? 0.7 : 0.82);
       const segsA = 9;
       const pos = [], col = [];
@@ -1038,7 +1319,10 @@ export class World {
   _buildRampsAndPads() {
     this._buildPatches();
     const paths = [this.track, ...this.track.shortcuts];
-    for (const b of this.track.boosts) this._padMesh(this.track.patch(b.s, b.s + b.len, b.d - b.w / 2, b.d + b.w / 2, { lift: 0.05 }));
+    for (const b of this.track.boosts) {
+      if (this.track.zoneAt(b.s + b.len / 2) === 2) continue;
+      this._padMesh(this.track.patch(b.s, b.s + b.len, b.d - b.w / 2, b.d + b.w / 2, { lift: 0.05 }));
+    }
     const rampTex = this._tex(TX.curbTexture('#ffd23f', '#1d1537'));
     const rampMat = stdMat({ map: rampTex, roughness: 0.45 });
     const glideTex = this._tex(TX.curbTexture('#36a9ff', '#ffffff'));
@@ -1263,6 +1547,7 @@ export class World {
       this._pagoda();
       this._torii(5);
     }
+    if (this.track.def.volcano) this._volcano(this.track.def.volcano);
     const gq = this.quality.grass ?? 1;
     if (this.fx.grass && gq > 0) {
       const spots = this._grassSpots(Math.round(3200 * gq * this.lenScale), 26);
@@ -1289,6 +1574,8 @@ export class World {
     const grid = new Uint8Array(W * H);
     const mark = (p) => {
       for (let i = 0; i < p.count; i++) {
+        // Grass grows under sky lanes high above the ground.
+        if (p.zoneT[i] === 2 && p.py[i] > 12) continue;
         const R = p.wd[i] + 1.2;
         const cx = (p.px[i] - x0) / cell, cz = (p.pz[i] - z0) / cell, cr = R / cell;
         for (let gz = Math.max(0, Math.floor(cz - cr)); gz <= Math.min(H - 1, Math.ceil(cz + cr)); gz++) {
@@ -1541,6 +1828,42 @@ export class World {
     this.group.add(arch);
   }
 
+  // A volcano landmark for adventure tracks: green slopes, bare rock, a
+  // glowing crater, smoke and embers. The road can spiral round it.
+  _volcano(v) {
+    const k = this.track.def.scale ?? 1;
+    const x = v.x * k, z = v.z * k, R = v.r * k, rt = v.top * k, h = v.h;
+    const prof = [
+      [R * 1.1, -1.5], [R, 0.3], [R * 0.78, h * 0.28], [R * 0.5, h * 0.62], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
+    ].map(([a, b]) => new THREE.Vector2(a, b));
+    const geo = new THREE.LatheGeometry(prof, 56);
+    const pos = geo.attributes.position;
+    const col = new Float32Array(pos.count * 3);
+    const green = new THREE.Color('#4f9a4a'), rock = new THREE.Color('#7a6a5e'), rim = new THREE.Color('#3a302c'), c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i) / h;
+      c.copy(green).lerp(rock, smooth(0.22, 0.5, y)).lerp(rim, smooth(0.8, 0.96, y));
+      const n = 0.9 + 0.2 * Math.abs(Math.sin(pos.getX(i) * 0.21 + pos.getZ(i) * 0.17));
+      col[i * 3] = c.r * n; col[i * 3 + 1] = c.g * n; col[i * 3 + 2] = c.b * n;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, stdMat({ vertexColors: true, roughness: 0.95, flatShading: true }));
+    m.position.set(x, 0, z);
+    m.receiveShadow = !!this.quality.shadows;
+    this.group.add(m);
+    const lava = new THREE.Mesh(new THREE.CircleGeometry(rt * 0.86, 28), glowMat('#ff6a1a', 2.2));
+    lava.rotation.x = -Math.PI / 2;
+    lava.position.set(x, h - 3.3, z);
+    this.group.add(lava);
+    this.animated.push((dt) => {
+      const fx = this.fxSys;
+      if (!fx) return;
+      if (Math.random() < dt * 7) fx.soft.emit(x + (Math.random() - 0.5) * rt, h, z + (Math.random() - 0.5) * rt, (Math.random() - 0.5) * 2, 4 + Math.random() * 3, (Math.random() - 0.5) * 2, '#6a6070', 4, 14, 5, -0.6, 0.3, 0.5);
+      if (Math.random() < dt * 9) fx.glow.emit(x + (Math.random() - 0.5) * rt, h - 2, z + (Math.random() - 0.5) * rt, (Math.random() - 0.5) * 6, 10 + Math.random() * 8, (Math.random() - 0.5) * 6, Math.random() < 0.5 ? '#ff6a1a' : '#ffd23f', 0.8, 0.2, 1.6, 9, 0.2);
+    });
+  }
+
   _lighthouse() {
     const spots = this._scatter(1, 20, 60, 30);
     if (!spots.length) return;
@@ -1783,6 +2106,7 @@ export class World {
     if (this.grass) this.grass.update(dt);
     for (const m of this.waterMats) m.uniforms.time.value = this.time;
     if (this.padTex) this.padTex.offset.y = (this.padTex.offset.y - dt * 1.6) % 1;
+    this.camPos = camera.position;
     for (const f of this.animated) f(dt, this.time);
     if (this.clouds) this.clouds.rotation.y += dt * 0.002;
     if (focus && this.sun.castShadow) {

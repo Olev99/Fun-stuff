@@ -103,6 +103,17 @@ export const BODIES = {
 };
 export const BODY_LIST = Object.values(BODIES);
 
+// Quick races, cups, time trials and online: these rides are free, the rest
+// unlock by buying them in the Career Garage or by reaching a player level.
+export const FREE_BODIES = ['buggy', 'classic', 'tub', 'bike', 'scooter'];
+export const BODY_LEVEL = { comet: 4, chopper: 6, stomper: 8, sportbike: 11, bolt: 15 };
+export function bodyLocked(id, career, level = 1) {
+  if (FREE_BODIES.includes(id) || (career && career.bodies && career.bodies.includes(id)) || level >= (BODY_LEVEL[id] ?? 99)) return null;
+  const b = bodyById(id);
+  return `Level ${BODY_LEVEL[id]} or buy it in the Career Garage (🪙 ${b.price.toLocaleString('en-US')})`;
+}
+export const bodyIcon = (b) => (b.id === 'scooter' ? '🛵' : b.kind === 'bike' ? '🏍️' : b.id === 'stomper' ? '🛻' : '🏎️');
+
 // Garage upgrades, 5 levels each. Costs are per level.
 export const UPGRADES = {
   engine: { id: 'engine', name: 'Engine', icon: '🔧', blurb: 'Higher top speed.', costs: [180, 360, 620, 950, 1400] },
@@ -466,6 +477,58 @@ export function kartGeometry(ch, { body = 'classic', lo = false, paint = null, h
   const g = { chassis, driver: driverGeometry(ch, lo, hat) };
   g.chassis.userData.shared = true;
   g.driver.userData.shared = true;
+  _cache.set(key, g);
+  return g;
+}
+
+// ---------------- boat and plane kits ----------------
+// On water every vehicle drops into a little speedboat hull, in the sky it
+// sprouts wings, a tail and a propeller. Bikes get a slimmer jet-ski hull
+// and shorter wings. { hull, wings, prop } share one material with the kart.
+export function zoneGeometry(ch, { paint = null, bike = false } = {}) {
+  const body = paint || ch.color, trim = ch.accent;
+  const key = `zone|${body}|${trim}|${bike ? 1 : 0}`;
+  if (_cache.has(key)) return _cache.get(key);
+  const wx = bike ? 0.62 : 1;
+  // Hull: a rounded tub riding low in the water with a white stripe, a
+  // pointed bow and an outboard motor.
+  const H = new GeoBuilder('gloss');
+  H.add(capsule(0.56, 2.5, 6, 18), body, [0, 0.06, 0.05], [PI2, 0, 0], [2.05 * wx, 0.72, 1], 'paint');
+  H.add(capsule(0.57, 2.52, 6, 18), '#ffffff', [0, 0.16, 0.05], [PI2, 0, 0], [2.07 * wx, 0.18, 1.005]);
+  H.add(capsule(0.575, 2.54, 6, 18), trim, [0, 0.31, 0.05], [PI2, 0, 0], [2.08 * wx, 0.12, 1.01], 'paint');
+  H.add(cone(0.42, 0.9, 14), body, [0, 0.12, 2.0], [PI2, 0, 0], [1.4 * wx, 1, 0.75], 'paint');
+  H.add(box(0.05, 0.36, 0.9), '#ffffff', [0, -0.18, 1.55], [0.35, 0, 0]);
+  // outboard motor: a rounded cowl on a slim leg
+  H.add(capsule(0.24, 0.28, 4, 12), trim, [0, 0.78, -2.02], [PI2, 0, 0], [1, 1.25, 1], 'paint');
+  H.add(box(0.3, 0.06, 0.5), '#ffffff', [0, 0.95, -2.02]);
+  H.add(box(0.1, 0.42, 0.18), DARK, [0, 0.42, -2.1], [0.15, 0, 0], 1, 'plastic');
+  for (const s of [-1, 1]) H.add(sphere(0.12, 10, 8), '#ff5a5f', [s * 0.92 * wx, 0.34, 1.35], [0, 0, 0], 1, 'glow');
+  const hull = H.build();
+  // Wings: a slightly swept main wing with white tips, a tail plane and fin,
+  // and a nose cowling. The propeller is separate so it can spin.
+  const W = new GeoBuilder('paint');
+  const span = bike ? 4.2 : 5.4;
+  for (const s of [-1, 1]) {
+    W.add(box(span / 2, 0.09, 1.05), trim, [s * span / 4, 0.58, 0.15], [0, s * 0.06, s * 0.07]);
+    W.add(capsule(0.05, 0.9, 3, 8), '#ffffff', [s * span / 2 * 0.98, 0.58 + span * 0.035, 0.15], [PI2, 0, 0], [1, 1, 1], 'gloss');
+    W.add(box(0.5, 0.1, 1.07), '#ffffff', [s * span * 0.4, 0.59 + span * 0.028, 0.15], [0, s * 0.06, s * 0.07]);
+    W.add(sphere(0.1, 8, 6), s < 0 ? '#ff3a4a' : '#3aff7a', [s * span / 2, 0.6 + span * 0.035, 0.15], [0, 0, 0], 1, 'glow');
+    W.add(cyl(0.04, 0.04, 0.55, 6), METAL, [s * 0.9, 0.35, 0.2], [0, 0, s * 0.5], 1, 'metal');
+  }
+  W.add(cyl(0.09, 0.05, 1.3, 8), body, [0, 0.95, -1.55], [PI2, 0, 0]);
+  W.add(box(bike ? 1.4 : 1.9, 0.07, 0.5), trim, [0, 1.0, -2.05]);
+  W.add(box(0.07, 0.72, 0.55), body, [0, 1.36, -2.08], [-0.2, 0, 0]);
+  W.add(box(0.08, 0.2, 0.3), '#ffffff', [0, 1.62, -2.18], [-0.2, 0, 0]);
+  W.add(cyl(0.36, 0.3, 0.3, 14), DARK, [0, 0.62, 1.72], [PI2, 0, 0], 1, 'metal');
+  W.add(cone(0.16, 0.34, 12), '#ffffff', [0, 0.62, 2.03], [PI2, 0, 0], 1, 'chrome');
+  const wings = W.build();
+  const P = new GeoBuilder('plastic');
+  P.add(box(0.14, 1.5, 0.05), '#f4f4f4', [0, 0, 0]);
+  P.add(box(0.15, 0.2, 0.06), '#ff5a5f', [0, 0.68, 0]);
+  P.add(box(0.15, 0.2, 0.06), '#ff5a5f', [0, -0.68, 0]);
+  const prop = P.build();
+  const g = { hull, wings, prop };
+  for (const x of Object.values(g)) x.userData.shared = true;
   _cache.set(key, g);
   return g;
 }

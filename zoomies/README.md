@@ -5,7 +5,10 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 ## What's in it
 
 - **8 original racers:** Mochi the cat, Pip the penguin, Bruno the bear, Rexi the dino, Volt the robot, Ember the fox, Zorp the alien and Hopper the frog. Each has its own speed, acceleration, handling and weight.
-- **18 tracks in 3 sizes and 14 themes,** each also playable in reverse. Every track hides secret shortcuts: jumps, glides, tunnels and boost-only cuts. Medium and Long tracks have two each.
+- **20 tracks in 4 sizes and 14 themes,** each also playable in reverse. Every track hides secret shortcuts: jumps, glides, tunnels and boost-only cuts. Medium and Long tracks have two each.
+- **Epic adventures:** two long one-lap tracks in three legs where every vehicle changes on the way. On water it turns into a speedboat (a hull pops out, it rocks on the swell and slides through bends); in the sky it sprouts wings and a propeller and you fly through gold boost rings past storm clouds, then land on a runway. The HUD counts legs instead of laps, and each leg gets its own banner.
+  - **Jungle Odyssey:** temple road, river rapids with a waterfall jump, a lagoon of crocodiles and floating logs, then up a sea cliff and fly home over the sea. Secrets: the Lost Temple ruins, a Hidden Grotto river channel and the Storm Gap sky lane.
+  - **Island Hopper:** race boats through the harbour canals and out across the bay, climb round a smoking volcano, then fly back to the airstrip. Secrets: Smugglers' Canal, a Lava Tube right through the volcano and the Jet Stream sky lane.
 
   | Track | Size | Theme | Secret shortcuts |
   | --- | --- | --- | --- |
@@ -28,7 +31,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   | Obsidian Rush | Long | Black-glass highway, lava lakes | **Magma Chute** and **Glass Bridge** (jump the gap) |
   | Moonbase Loop | Long | Low gravity, craters, hairpins, Earth overhead | **Crater Hop** (floaty jump) and **Rover Tracks** |
 
-- **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels and moon rovers. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
+- **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels, moon rovers, and on the adventures floating logs, crocodiles and storm clouds. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
 - **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer.
   - 7 chapters, 35 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel.
   - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team.
@@ -120,7 +123,8 @@ How it works:
 
 - **Rocket start:** press and hold DRIFT right after the "2" disappears.
 - **Slipstream:** tuck in close behind another kart for a second and you get a free boost.
-- **Look back:** hold your finger on the minimap (or Q / C on a keyboard) to see behind you.
+- **Look back:** hold the 👀 BACK button (or the minimap, or Q / C on a keyboard) to see behind you.
+- **Your ride:** on the racer screen, tap the vehicle button to pick a kart or bike for quick races, cups, time trials and online. Five are free (Rust Bucket, Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter). The rest unlock when you buy them in the Career Garage, or when you reach a player level (Comet 4, Hog Wild 6, Stomper 8, Vortex 11, Starbolt 15). Locked rides still show in the showroom so you can see what you're working towards.
 - **Hitting walls:** steer away and the kart swings back into the race direction. If you're ever pinned, the drone lifts you back onto the road after a few seconds, and the pause menu has **Stuck? Back on the road** to do it at once.
 - **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.

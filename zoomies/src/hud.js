@@ -161,6 +161,23 @@ export class HUD {
     c.strokeStyle = '#fff7e8';
     c.lineWidth = 8;
     c.stroke();
+    // Rivers in blue, sky lanes as dashed sky-blue.
+    for (const [kind, col, dash] of [[1, '#3fb8f0', []], [2, '#8fd0ff', [7, 5]]]) {
+      for (const [a, b] of tr.runs((i) => tr.zoneT[i] === kind)) {
+        c.beginPath();
+        for (let r = a; r <= b; r++) {
+          const k = tr.I(r);
+          const [x, y] = this.mapT(tr.px[k], tr.pz[k]);
+          if (r === a) c.moveTo(x, y);
+          else c.lineTo(x, y);
+        }
+        c.strokeStyle = col;
+        c.lineWidth = 8;
+        c.setLineDash(dash);
+        c.stroke();
+        c.setLineDash([]);
+      }
+    }
     const [sx0, sy0] = this.mapT(tr.px[0], tr.pz[0]);
     c.fillStyle = '#ffd23f';
     c.beginPath();
@@ -213,8 +230,15 @@ export class HUD {
     const p = race.player;
     if (!p) return;
     const laps = race.laps;
-    const lap = Math.max(1, Math.min(laps, p.laps + 1));
-    this._set('lap', lap, (v) => { this.lap.innerHTML = `LAP <b>${v}</b>/${laps}`; });
+    const legs = race.track.legs;
+    if (legs.length && laps === 1) {
+      // One-lap adventures count legs instead of laps.
+      const leg = Math.min(legs.length, (p.leg || 0) + 1);
+      this._set('lap', `g${leg}`, () => { this.lap.innerHTML = `LEG <b>${leg}</b>/${legs.length}`; });
+    } else {
+      const lap = Math.max(1, Math.min(laps, p.laps + 1));
+      this._set('lap', lap, (v) => { this.lap.innerHTML = `LAP <b>${v}</b>/${laps}`; });
+    }
     this._set('pos', p.place, (v) => {
       this.pos.innerHTML = `${v}<sup>${ordinal(v)}</sup>`;
       this.pos.className = (v === 1 ? 'p1' : v === 2 ? 'p2' : v === 3 ? 'p3' : 'pn') + ' bump';

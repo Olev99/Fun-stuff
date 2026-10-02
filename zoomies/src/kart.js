@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp } from './util.js';
-import { kartGeometry, kartStats, bodyById } from './karts.js';
+import { kartGeometry, kartStats, bodyById, zoneGeometry } from './karts.js';
 import { PATCHES } from './track.js';
 import { pbrMat, GeoBuilder } from './util.js';
 import { trailById } from './cosmetics.js';
@@ -144,6 +144,9 @@ export class Kart {
     this.progAt = 0;
     this.wallStall = 0;
     this.visualYaw = 0;
+    // Vehicle mode on adventure tracks: 0 wheels, 1 boat, 2 plane.
+    this.mode = 0;
+    this.morph = 1;
     this.spinAngle = 0;
     this.wheelSpin = 0;
     this.events = [];
@@ -190,6 +193,19 @@ export class Kart {
     this.body.add(this.shieldMesh);
     this.shadow = new THREE.Mesh(sh._shadowGeo, sh._shadowMat);
     this.shadow.renderOrder = 1;
+    if (this.track.hasZones) {
+      const zg = zoneGeometry(this.ch, { paint: this.paint, bike: this.isBike });
+      this.hull = new THREE.Mesh(zg.hull, this.mat);
+      this.wings = new THREE.Mesh(zg.wings, this.mat);
+      this.prop = new THREE.Mesh(zg.prop, this.mat);
+      this.prop.position.set(0, 0.62, 2.08);
+      this.wings.add(this.prop);
+      for (const m of [this.hull, this.wings]) {
+        m.visible = false;
+        m.castShadow = cast;
+        this.body.add(m);
+      }
+    }
   }
 
   // Swap to the cheaper model when far from the camera (also used for its
@@ -218,6 +234,8 @@ export class Kart {
     if (this.rocketTime > 0) top *= 1.5;
     if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) top *= this.stats.offroad ?? 0.5;
     if (this.boostTime > 0) top *= 1.32;
+    // Planes are the quickest way around; boats hold their speed well.
+    if (this.mode === 2) top *= 1.08;
     return top;
   }
 
@@ -412,6 +430,8 @@ export class Kart {
       vf = damp(vf, 0, 0.8, dt);
     }
     if ((this.boostTime > 0 || this.rocketTime > 0) && vf < top * 0.97) vf = damp(vf, top, 4, dt);
+    // Planes never stall: BRAKE is an air brake down to a cruising minimum.
+    if (this.mode === 2 && vf < 15) vf = damp(vf, 15, spinning ? 0.8 : 2.5, dt);
 
     // Steering
     // Arcade karts can still pivot at a crawl (e.g. nose against a wall).
@@ -448,7 +468,9 @@ export class Kart {
     vf = vx * fx + vz * fz;
     vl = vx * rxk + vz * rzk;
     const gm = this.path.gripMul * (patch ? patch.grip : 1) * (this.slipTime > 0 ? 0.12 : 1);
-    const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm;
+    // Boats slide through turns, planes float round them.
+    const zg = this.mode === 1 ? (this.drifting ? 0.85 : 0.5) : this.mode === 2 ? (this.drifting ? 0.9 : 0.6) : 1;
+    const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm * zg;
     vl *= Math.exp(-grip * dt);
     vx = fx * vf + rxk * vl;
     vz = fz * vf + rzk * vl;
@@ -467,7 +489,10 @@ export class Kart {
       this.seg = trk.idx;
       switched = true;
     }
-    if (vn > 0) {
+    if (vn > 0 && this.mode === 2) {
+      // The cloud banks at the edge of a sky lane just ease you back in.
+      this.wallT = 0.3;
+    } else if (vn > 0) {
       this.wallT = 0.6;
       if (vn > 4) {
         const k = clamp(1 - vn * 0.012, 0.72, 0.97);
@@ -496,12 +521,29 @@ export class Kart {
     // Only the ground slows you: flying over grass or a gap is not off-road.
     this.offroad = this.grounded && (this.path.offroadAll || Math.abs(trk.d) > trk.ed - 0.3);
 
+    // Water turns us into a boat, the sky into a plane.
+    const zone = this.path.zones.length ? this.path.zoneAt(trk.s) : 0;
+    if (zone !== this.mode) this._transform(zone);
+    if (this.mode === 2) this.offroad = false;
+
     // Vertical motion
     const overVoid = this.path.voids.length > 0 && this.path.isVoid(trk.s);
     const groundY = overVoid ? -80 : trk.y;
     const rampH = this.path.rampHeight(trk.s, trk.d);
     const ramp = rampH > 0 ? this.path.rampAt(trk.s, trk.d) : null;
-    if (this.grounded) {
+    if (this.mode === 2) {
+      // Flying: settle onto the sky lane (it swoops up and down by itself),
+      // cruising a little above it away from the take-off and landing.
+      const lift = Math.min(1.6, this.path.zoneDepth(trk.s) * 0.04);
+      const y0 = this.pos.y;
+      this.pos.y = damp(this.pos.y, trk.y + lift, 3.2, dt);
+      this.vy = (this.pos.y - y0) / Math.max(dt, 1e-3);
+      this.grounded = true;
+      this.gliding = false;
+      this.diving = false;
+      this.rampAir = false;
+      this.airTime = 0;
+    } else if (this.grounded) {
       if (switched && !overVoid && Math.abs(groundY - this.pos.y) < 1.5) {
         // Where a branch meets the main road their surfaces can differ by a
         // step. Just settle onto the new one; never turn the step into a launch.
@@ -529,7 +571,7 @@ export class Kart {
     }
     this.lastRampH = rampH;
     this.lastRamp = ramp;
-    if (!this.grounded) {
+    if (!this.grounded && this.mode !== 2) {
       if (this.gliding) {
         // Hold BRAKE to fold the wings and dive, to land where you want.
         this.diving = !!c.brake;
@@ -589,6 +631,18 @@ export class Kart {
     const itemEdge = c.item && !this.prevItem;
     this.prevItem = c.item;
     if (itemEdge) this.emit('useItem');
+  }
+
+  _transform(zone) {
+    const from = this.mode;
+    this.mode = zone;
+    this.morph = 0;
+    if (zone === 2) {
+      // A trick off the take-off ramp pays out as we lift off.
+      if (this.trickDone) { this.startBoost(0.9, 5); this.trickDone = false; }
+      this.gliding = false;
+    }
+    this.emit('transform', zone);
   }
 
   // Pinned against something for a while: the drone lifts us back onto
@@ -677,7 +731,22 @@ export class Kart {
     const rollT = this.grounded ? -Math.atan(slopeRel) : 0;
     const b = this.body;
     b.rotation.order = 'YXZ';
-    if (this.isBike) {
+    // Remote karts work out their vehicle from where they are.
+    if (this.remote && this.track.hasZones) {
+      const z = this.path.zones.length ? this.path.zoneAt(trk.s) : 0;
+      if (z !== this.mode) { this.mode = z; this.morph = 0; }
+    }
+    if (this.mode === 2) {
+      // Planes bank hard into turns and nose up and down with the lane.
+      const bank = -(this.steerS * 0.55 + (this.drifting ? this.driftDir * 0.35 : 0));
+      b.rotation.x = damp(b.rotation.x, clamp(-this.vy * 0.05, -0.4, 0.4) + Math.sin(time * 1.7 + this.index) * 0.03, 5, dt);
+      b.rotation.z = damp(b.rotation.z, bank + Math.sin(time * 1.3 + this.index * 2) * 0.05, 5, dt);
+    } else if (this.mode === 1) {
+      // Boats rock on the waves and lean out of turns.
+      const w = Math.min(1, this.speed / 10);
+      b.rotation.x = damp(b.rotation.x, pitchT - 0.06 * w + Math.sin(time * 2.6 + this.index) * 0.035, 6, dt);
+      b.rotation.z = damp(b.rotation.z, -this.steerS * 0.12 + (this.drifting ? this.driftDir * 0.1 : 0) + Math.sin(time * 2.1 + this.index * 1.7) * 0.05, 6, dt);
+    } else if (this.isBike) {
       // Bikes lean into the turn (more in a drift) and pop a wheelie on a straight-line boost.
       const sp = clamp(this.speed / 14, 0, 1);
       const lean = -(this.steerS * 0.34 + (this.drifting ? this.driftDir * 0.26 : 0)) * sp;
@@ -693,6 +762,7 @@ export class Kart {
     const bob = this.grounded && this.speed > 2 ? Math.sin(time * 38 + this.index) * 0.012 * Math.min(1, this.speed / 20) : 0;
     b.scale.set(1 + this.squash * 0.12, 1 - this.squash * 0.18, 1 + this.squash * 0.08);
     b.position.y = bob + (this.offroad && this.grounded ? Math.sin(time * 55) * 0.025 : 0);
+    if (this.hull) this._zoneVisual(dt, time);
 
     // On the podium the winners bounce and wave; first place most of all.
     if (this.cheer) {
@@ -706,7 +776,11 @@ export class Kart {
       this.driverPivot.rotation.x = damp(this.driverPivot.rotation.x, this.boostTime > 0 ? -0.12 : 0, 6, dt);
     }
 
-    // Wheels
+    // Wheels (tucked away on water and in the air)
+    if (this.hull) {
+      const wk = this.mode === 0 ? this._pop : 1 - Math.min(1, this.morph * 2);
+      for (const w of this.wheels) w.pivot.scale.setScalar(Math.max(0.001, wk));
+    }
     this.wheelSpin += (this.fwdSpeed / 0.38) * dt;
     const steerA = -this.steerS * 0.42;
     for (const w of this.wheels) {
@@ -754,9 +828,28 @@ export class Kart {
     this.shadow.rotation.y = this.yaw;
     const sc = root.scale.x * clamp(1 - h * 0.08, 0.4, 1);
     this.shadow.scale.set(sc, 1, sc);
-    this.shadow.visible = !(this.path.voids.length && this.path.isVoid(this.trk.s));
+    this.shadow.visible = !(this.path.voids.length && this.path.isVoid(this.trk.s)) && this.mode === 0;
     this.root.visible = !this.podiumHidden && !(this.respawnT > 0.3 && Math.floor(time * 20) % 2 === 0);
     this.shadow.visible = this.shadow.visible && !this.podiumHidden && !this.cheer;
+  }
+
+  // Boat hull / wings pop in with a springy overshoot after a transform.
+  _zoneVisual(dt, time) {
+    this.morph = Math.min(1, this.morph + dt * 2.4);
+    const t = this.morph;
+    const pop = (this._pop = t >= 1 ? 1 : 1 - Math.exp(-6 * t) * Math.cos(t * 11));
+    const b = this.body;
+    this.hull.visible = this.mode === 1;
+    this.wings.visible = this.mode === 2;
+    if (this.mode === 1) {
+      this.hull.scale.set(pop, pop, pop);
+      // Bob on the swell; sit down into the water when slow, up on the plane at speed.
+      b.position.y += Math.sin(time * 2.8 + this.index) * 0.07 - 0.12 + Math.min(1, this.speed / 25) * 0.1;
+    } else if (this.mode === 2) {
+      this.wings.scale.set(pop, Math.max(0.01, pop), pop);
+      this.prop.rotation.z += dt * (20 + this.speed * 1.5);
+      b.position.y += Math.sin(time * 2 + this.index) * 0.12;
+    }
   }
 
   // Particle effects
@@ -801,8 +894,31 @@ export class Kart {
         fx.glow.emit(v[0], v[1], v[2], (Math.random() - 0.5), 0.6, (Math.random() - 0.5), col, 0.35, 0.06, 0.7, -0.5, 1);
       }
     }
+    // Boat wake: spray off the stern corners and the bow.
+    if (this.mode === 1 && this.grounded) {
+      const k = Math.min(1, this.speed / 22);
+      if (Math.random() < 0.15 + k * 0.4) {
+        const sx = Math.random() < 0.5 ? -0.95 : 0.95;
+        local(sx, 0.05, -2, v);
+        fx.soft.emit(v[0], v[1], v[2], sx * rx * 3 - fxs * 1.5, 1 + Math.random() * 1.6 * k, sx * rz * 3 - fzs * 1.5,
+          '#f2fbff', 0.35, 0.9, 0.45, 8, 2, 0.45);
+      }
+      if (k > 0.5 && Math.random() < k * 0.4) {
+        const sx = Math.random() < 0.5 ? -0.8 : 0.8;
+        local(sx, 0.2, 1.9, v);
+        fx.soft.emit(v[0], v[1], v[2], sx * rx * 4, 1.6 + Math.random() * 1.6, sx * rz * 4, '#e6f7ff', 0.3, 0.8, 0.35, 10, 2, 0.45);
+      }
+    }
+    // Plane: wingtip trails.
+    if (this.mode === 2 && this.speed > 15 && Math.random() < 0.8) {
+      const span = this.isBike ? 2.1 : 2.7;
+      for (const sx of [-span, span]) {
+        local(sx, 0.75, 0.1, v);
+        fx.glow.emit(v[0], v[1], v[2], -fxs * 2, 0, -fzs * 2, '#ffffff', 0.22, 0.05, 0.6, 0, 1);
+      }
+    }
     // Dust when off-road
-    if (this.offroad && this.grounded && this.speed > 8 && Math.random() < 0.7) {
+    if (this.offroad && this.grounded && this.mode === 0 && this.speed > 8 && Math.random() < 0.7) {
       const sx = Math.random() < 0.5 ? -0.85 : 0.85;
       local(sx, 0.2, -0.9, v);
       fx.soft.emit(v[0], v[1], v[2], (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3,

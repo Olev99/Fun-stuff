@@ -97,6 +97,7 @@ export class Race {
     this.camRoll = 0;
     this.shadowTex = TX.blobShadowTexture();
     this.fx = new FX(this.scene);
+    this.world.fxSys = this.fx;
     this.dust = this.world.theme.dust || '#cccccc';
 
     // Multiplayer
@@ -454,8 +455,23 @@ export class Race {
           if (k.isPlayer) hud.toast('SURPRISE!');
           break;
         case 'land':
+          if (k.mode === 1) {
+            if (near) a.play('splash');
+            this.fx.burst(k.pos.x, k.pos.y + 0.2, k.pos.z, ['#ffffff', '#cfefff'], 16, 7, 0.9, 0.7, 10, false);
+            break;
+          }
           if (k.isPlayer) a.play('land');
           this.fx.burst(k.pos.x, k.pos.y + 0.2, k.pos.z, [this.dust], 8, 4, 1.2, 0.5, 2, false);
+          break;
+        case 'transform':
+          // A puff of smoke hides the swap to boat, plane or wheels.
+          this.fx.burst(k.pos.x, k.pos.y + 0.8, k.pos.z, data === 1 ? ['#ffffff', '#bfe9ff'] : ['#ffffff', '#fff2c4'], 14, 5, 1.1, 0.5, 1, false);
+          if (near) a.play(data === 1 ? 'splash' : data === 2 ? 'takeoff' : 'transform');
+          if (k.isPlayer) {
+            hud.toast(data === 1 ? 'BOAT MODE!' : data === 2 ? 'TAKE OFF!' : 'WHEELS DOWN!');
+            if (data === 2 && !this._flyHinted) { this._flyHinted = true; hud.hint('Fly through the rings for a boost!', 2.2); }
+            if (data === 1 && !this._boatHinted) { this._boatHinted = true; hud.hint('Boats slide: drift early into the bends!', 2.2); }
+          }
           break;
         case 'driftBoost':
           if (k.isPlayer) this.style(['', 'SPARK BOOST', 'BLAZE BOOST', 'NOVA BOOST'][data], [0, 5, 12, 25][data], `t${data}`);
@@ -522,7 +538,9 @@ export class Race {
         if (!k._padCool || this.time - k._padCool > 0.5) {
           k._padCool = this.time;
           k.startBoost(1.0, 10);
-          if (k.isPlayer) this.app.audio.play('boost');
+          // In the sky the boost pads are rings to fly through.
+          if (k.isPlayer) this.app.audio.play(k.mode === 2 ? 'ring' : 'boost');
+          if (k.isPlayer && k.mode === 2) this.style('RING', 5, 'gold');
         }
       }
     }
@@ -530,6 +548,22 @@ export class Race {
 
   _checkLap(k) {
     if (k.finished) return;
+    // Adventure tracks: a banner as each leg starts; the last one gets the final-lap music.
+    const legs = this.track.legs;
+    if (legs.length && this.laps === 1 && k.laps === 0) {
+      let li = 0;
+      for (let n = 1; n < legs.length; n++) if (k.mainPos >= legs[n].s) li = n;
+      if (li > (k.leg || 0)) {
+        k.leg = li;
+        if (k.isPlayer && this.mode !== 'demo') {
+          const last = li === legs.length - 1;
+          this.app.hud.banner(`${last ? 'FINAL LEG' : `LEG ${li + 1}`}: ${legs[li].name.toUpperCase()}`, last ? 'final' : 'lap');
+          this.app.audio.play(last ? 'finalLap' : 'lap');
+          if (last) this.app.audio.finalLap();
+          this._ghostLeg(k);
+        }
+      }
+    }
     if (k.laps > k.maxLap) {
       k.maxLap = k.laps;
       if (k.laps >= 1) {
@@ -589,9 +623,19 @@ export class Race {
   // Time trial: how far ahead of or behind your ghost you are at each lap.
   _ghostSplit(k) {
     const sp = this.ghost && this.ghost.g.splits;
-    if (!sp || !sp[k.laps - 1]) return;
-    const d = this.raceTime - sp[k.laps - 1];
+    const at = this.track.legs.length && this.laps === 1 && sp ? sp.length - 1 : k.laps - 1;
+    if (!sp || !sp[at]) return;
+    const d = this.raceTime - sp[at];
     this.app.hud.split(d);
+  }
+
+  // Time trial splits at each leg of a one-lap adventure.
+  _ghostLeg(k) {
+    const sp = this.ghost && this.ghost.g.splits;
+    k.legTimes = k.legTimes || [];
+    k.legTimes[k.leg - 1] = this.raceTime;
+    if (!sp || !sp[k.leg - 1]) return;
+    this.app.hud.split(this.raceTime - sp[k.leg - 1]);
   }
 
   _cleanLap() {
@@ -605,7 +649,9 @@ export class Race {
     if (this.ghostRec) {
       this._ghostSplit(k);
       let acc = 0;
-      const splits = k.lapTimes.map((t) => +(acc += t).toFixed(3));
+      const splits = k.legTimes && this.track.legs.length && this.laps === 1
+        ? [...k.legTimes.map((t) => +t.toFixed(3)), +k.finishTime.toFixed(3)]
+        : k.lapTimes.map((t) => +(acc += t).toFixed(3));
       this.newGhost = this.ghostRec.save(this.ghostKey, k.finishTime, splits, k);
     }
     this.setState('finished');
@@ -736,7 +782,7 @@ export class Race {
     const sk = this.skids;
     for (const k of this.karts) {
       const spd = k.speed;
-      const on = k.grounded && !k.offroad && k.respawnT <= 0 && spd > 8 && (k.drifting || (k.ctl.brake && k.fwdSpeed > 12));
+      const on = k.grounded && !k.offroad && !k.mode && k.respawnT <= 0 && spd > 8 && (k.drifting || (k.ctl.brake && k.fwdSpeed > 12));
       for (let w = 2; w < 4; w++) {
         const key = k.index * 4 + w;
         if (!on) { sk.lift(key); continue; }
@@ -1078,10 +1124,12 @@ export class Race {
     }
     if (k.drifting) tgt += k.driftDir * -0.12;
     this.camYaw = snap ? tgt : dampAngle(this.camYaw, tgt, 5.5, dt);
-    const distT = 5.9 + sf * 0.9 + (k.boostTime > 0 || k.rocketTime > 0 ? 0.9 : 0) + (k.gliding ? 1.5 : 0) + far;
+    const plane = k.mode === 2 ? 1 : 0;
+    const distT = 5.9 + sf * 0.9 + (k.boostTime > 0 || k.rocketTime > 0 ? 0.9 : 0) + (k.gliding ? 1.5 : 0) + plane * 1.6 + far;
     this.camDist = snap || !this.camDist ? distT : damp(this.camDist, distT, 3, dt);
     let dist = this.camDist;
-    let height = 2.5 + far * 0.3 + (k.gliding ? 0.8 : 0);
+    this.camPlane = damp(this.camPlane || 0, plane, 2, dt);
+    let height = 2.5 + far * 0.3 + (k.gliding ? 0.8 : 0) + this.camPlane * 0.9;
     // Looking back flips the camera around the kart.
     const back = this.lookBack && k === this.player ? Math.PI : 0;
     const fx = Math.sin(this.camYaw + back), fz = Math.cos(this.camYaw + back);
@@ -1123,7 +1171,7 @@ export class Race {
     }
     this.camera.lookAt(this.camLook);
     // Lean the camera slightly into turns and drifts.
-    const rollT = k.drifting ? -k.driftDir * 0.035 : -(k.steerS || 0) * 0.015 * sf;
+    const rollT = (k.drifting ? -k.driftDir * 0.035 : -(k.steerS || 0) * 0.015 * sf) * (1 + this.camPlane * 2.5);
     this.camRoll = snap ? rollT : damp(this.camRoll, rollT, 4, dt);
     this.camera.rotateZ(this.camRoll);
     this.fov = 68 + sf * 7 + (k.boostTime > 0 ? 7 : 0) + (k.rocketTime > 0 ? 6 : 0);

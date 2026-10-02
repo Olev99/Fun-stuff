@@ -2,9 +2,10 @@ import { CHARACTERS, charById } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
 import { Track } from './track.js';
 import { THEMES } from './world.js';
-import { fmtTime, ordinal } from './util.js';
+import { fmtTime, ordinal, clamp } from './util.js';
 import { saveSettings } from './settings.js';
 import { cleanNick } from './nametags.js';
+import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
 const $ = (id) => document.getElementById(id);
@@ -231,6 +232,7 @@ export class UI {
       }
     }
     app.showShowroom();
+    $('veh-pop').hidden = true;
     this.pickChar(app.settings.char);
     this.show('char');
   }
@@ -248,10 +250,50 @@ export class UI {
     this._syncVehicle();
   }
 
-  _syncVehicle() {
-    const v = this.app.settings.vehicle === 'bike' ? 'bike' : 'classic';
-    document.querySelectorAll('#veh-seg [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
-    if (this.app.showroom) this.app.showroom.setChar(charById(this.app.settings.char), { body: v });
+  // The ride for quick races, cups, time trials and online (see app.menuLoadout).
+  _syncVehicle(preview = null) {
+    const id = this.app.menuLoadout().body;
+    const b = bodyById(id);
+    $('veh-ic').textContent = bodyIcon(b);
+    $('veh-nm').textContent = b.name;
+    document.querySelectorAll('#vp-grid .vcard').forEach((c) => c.classList.toggle('sel', c.dataset.id === id));
+    if (this.app.showroom) this.app.showroom.setChar(charById(this.app.settings.char), { body: preview || id });
+  }
+
+  _vehiclePicker(open) {
+    const app = this.app;
+    const pop = $('veh-pop');
+    pop.hidden = !open;
+    if (!open) { this._syncVehicle(); return; }
+    const lvl = levelOf((app.career && app.career.xp) || 0).level;
+    const grid = $('vp-grid');
+    grid.innerHTML = '';
+    const note = $('vp-note');
+    note.className = '';
+    note.textContent = 'Five rides are free. Unlock the rest in the Career Garage or by levelling up.';
+    const bar = (v) => `<i><b style="width:${Math.round(clamp((3 + v * 1.4) / 5, 0.1, 1) * 100)}%"></b></i>`;
+    for (const b of BODY_LIST) {
+      const lock = bodyLocked(b.id, app.career, lvl);
+      const el = document.createElement('button');
+      el.className = 'vcard' + (lock ? ' locked' : '');
+      el.dataset.id = b.id;
+      el.innerHTML = `${FREE_BODIES.includes(b.id) ? '<span class="vf">FREE</span>' : ''}<span class="vi">${bodyIcon(b)}</span>${b.name}<span class="vs">${bar(b.stats.speed)}${bar(b.stats.accel)}${bar(b.stats.handling)}</span>`;
+      el.addEventListener('click', () => {
+        if (lock) {
+          app.audio.play('wall', 5);
+          note.className = 'warn';
+          note.textContent = `${b.name} is locked: ${lock}.`;
+          this._syncVehicle(b.id);
+          return;
+        }
+        app.audio.play('select');
+        app.settings.vehicle = b.id;
+        saveSettings(app.settings);
+        this._vehiclePicker(false);
+      });
+      grid.appendChild(el);
+    }
+    this._syncVehicle();
   }
 
   // ---------------- Tracks ----------------
@@ -406,7 +448,7 @@ export class UI {
       const nFound = ((app.records.found || {})[def.id] || []).length;
       const tx = document.createElement('div');
       tx.className = 'tx';
-      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.laps || 3} laps${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}` : ''}</span><span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span><span class="tb">${def.blurb}</span>`;
+      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.legs ? `1 lap · ${def.legs.length} legs · 🚗⛵✈️` : `${def.laps || 3} laps`}${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}` : ''}</span><span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span><span class="tb">${def.blurb}</span>`;
       b.appendChild(tx);
       b.addEventListener('click', () => {
         app.audio.play('select');
@@ -424,13 +466,9 @@ export class UI {
   _bindSettings() {
     const app = this.app;
     const s = () => app.settings;
-    $('veh-seg').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-v]');
-      if (!b) return;
+    $('veh-btn').addEventListener('click', () => {
       app.audio.play('select');
-      s().vehicle = b.dataset.v;
-      saveSettings(s());
-      this._syncVehicle();
+      this._vehiclePicker($('veh-pop').hidden);
     });
     $('set-steer').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');

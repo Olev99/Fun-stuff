@@ -62,6 +62,10 @@ const OBSTACLES = {
   barrel: { r: 1.3, hit: 'spin', col: '#3a6ab0', col2: '#ffcf2a', y: 1.2 },
   rover: { r: 1.6, hit: 'bump', col: '#e8ecf4', col2: '#6fd8ff', y: 0.2 },
   lantern: { r: 1.3, hit: 'bump', col: '#e8303a', col2: '#ffd23f', y: 2, bounce: 0.7 },
+  // River and sky hazards for the adventure tracks.
+  log: { r: 1.5, hit: 'bump', col: '#7a4f2e', col2: '#c8955a', y: 0.15, bob: 0.12 },
+  croc: { r: 1.4, hit: 'spin', col: '#3f8a3a', col2: '#b8e07a', y: 0.05, bob: 0.08 },
+  storm: { r: 2.3, hit: 'spin', col: '#4a4f66', col2: '#fff27a', y: 1.9, bob: 0.4, sparks: true },
 };
 
 let _geo = null;
@@ -200,6 +204,35 @@ function geos() {
         b.add(new THREE.CylinderGeometry(0.55, 0.5, 0.3, 14), o.col2, [0, -1.4, 0], [0, 0, 0], 1, 'metal');
         b.add(new THREE.TorusGeometry(1.17, 0.09, 4, 24), '#ffc86a', [0, 0.35, 0], [Math.PI / 2, 0, 0], 1, 'glow');
         b.add(new THREE.CylinderGeometry(0.06, 0.12, 0.8, 6), o.col2, [0, -1.95, 0], [0, 0, 0], 1, 'fabric');
+        break;
+      case 'log':
+        b.add(new THREE.CylinderGeometry(0.55, 0.6, 3.4, 12), o.col, [0, 0, 0], [Math.PI / 2, 0, 0], 1, 'wood');
+        for (const z of [-1.71, 1.71]) b.add(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 12), o.col2, [0, 0, z], [Math.PI / 2, 0, 0], 1, 'wood');
+        b.add(new THREE.CylinderGeometry(0.12, 0.08, 0.7, 6), o.col, [0.35, 0.45, 0.4], [0, 0, -0.7], 1, 'wood');
+        b.add(new THREE.SphereGeometry(0.22, 8, 6), '#6ab84f', [0.62, 0.7, 0.4], [0, 0, 0], [1, 0.6, 1], 'plastic');
+        break;
+      case 'croc':
+        b.add(new THREE.CapsuleGeometry(0.62, 2.2, 4, 12), o.col, [0, 0.1, -0.2], [Math.PI / 2, 0, 0], [1, 0.62, 1], 'gloss');
+        b.add(new THREE.BoxGeometry(0.8, 0.32, 1.5), o.col, [0, 0.12, 1.7], [0, 0, 0], 1, 'gloss');
+        b.add(new THREE.BoxGeometry(0.76, 0.14, 1.4), o.col2, [0, -0.02, 1.72], [0, 0, 0], 1, 'gloss');
+        for (const x of [-0.24, 0.24]) {
+          b.add(new THREE.SphereGeometry(0.2, 10, 8), '#ffffff', [x, 0.42, 1.05], [0, 0, 0], 1, 'gloss');
+          b.add(new THREE.SphereGeometry(0.1, 8, 6), '#1d1537', [x, 0.48, 1.18], [0, 0, 0], 1, 'gloss');
+        }
+        for (let z = -1.2; z <= 0.8; z += 0.5) b.add(new THREE.ConeGeometry(0.14, 0.3, 5), '#2c6a2a', [0, 0.45, z], [0, 0, 0], 1, 'gloss');
+        b.add(new THREE.ConeGeometry(0.3, 1.4, 6), o.col, [0, 0.05, -2.3], [-Math.PI / 2, 0, 0], [1, 0.5, 1], 'gloss');
+        for (const x of [-0.2, 0.2]) for (const z of [1.3, 1.7, 2.1]) b.add(new THREE.ConeGeometry(0.05, 0.14, 4), '#ffffff', [x * 1.8, -0.05, z], [Math.PI, 0, 0]);
+        break;
+      case 'storm':
+        for (const [x, y, z, r] of [[0, 0.3, 0, 1.5], [-1.2, 0, 0.2, 1.1], [1.2, 0.05, -0.2, 1.15], [0.4, 0.8, 0.3, 1.0], [-0.5, 0.7, -0.4, 0.9]]) {
+          b.add(new THREE.IcosahedronGeometry(r, 1), x ? '#5a5f78' : o.col, [x, y, z], [0, 0, 0], 1, 'fabric');
+        }
+        b.add(new THREE.BoxGeometry(0.25, 1.2, 0.12), o.col2, [0.2, -1.4, 0], [0, 0, 0.35], 1, 'glowHot');
+        b.add(new THREE.BoxGeometry(0.22, 1.1, 0.12), o.col2, [-0.05, -2.3, 0], [0, 0, -0.45], 1, 'glowHot');
+        b.add(new THREE.SphereGeometry(0.16, 8, 6), '#ffffff', [-0.5, 0.2, 1.35], [0, 0, 0], 1, 'plastic');
+        b.add(new THREE.SphereGeometry(0.16, 8, 6), '#ffffff', [0.5, 0.2, 1.35], [0, 0, 0], 1, 'plastic');
+        b.add(new THREE.BoxGeometry(0.34, 0.07, 0.05), '#1d1537', [-0.5, 0.42, 1.44], [0, 0, -0.4]);
+        b.add(new THREE.BoxGeometry(0.34, 0.07, 0.05), '#1d1537', [0.5, 0.42, 1.44], [0, 0, 0.4]);
         break;
       case 'balloon':
         b.add(new THREE.SphereGeometry(1.3, 24, 16), '#ffffff', [0, 0.4, 0], [0, 0, 0], [1, 1.2, 1]);
@@ -666,12 +699,19 @@ export class ItemSystem {
         y = p.heightAtFrame(fr, d) - 1 + Math.max(0, Math.sin(t * 1.6)) * 7;
       }
       if (o.def.bounce) y += Math.abs(Math.sin(t * 3)) * o.def.bounce;
+      if (o.def.bob) y += Math.sin(time * 2.2 + o.ph) * o.def.bob;
+      // Sky hazards float at flying height.
+      if (p.zones.length && p.zoneAt(o.s) === 2) y += 1.2;
       o.pos.set(fr.x + fr.rx * d, y, fr.z + fr.rz * d);
       o.d = d;
       o.mesh.rotation.y = Math.atan2(fr.tx, fr.tz) + (o.type === 'crab' ? Math.PI / 2 : 0);
       if (o.type === 'hay' || o.type === 'snowball' || o.type === 'boulder' || o.type === 'tumbleweed' || o.type === 'barrel') o.mesh.rotation.x = -Math.cos(t) * t * 0.9;
       if (o.type === 'rover') o.mesh.rotation.y += Math.cos(t) > 0 ? Math.PI / 2 : -Math.PI / 2;
       if (o.type === 'fireball') o.mesh.rotation.x = t * 3;
+      if (o.type === 'log') o.mesh.rotation.z = Math.sin(time * 1.3 + o.ph) * 0.2;
+      if (o.type === 'croc') o.mesh.rotation.y += Math.cos(t) > 0 ? Math.PI / 2 : -Math.PI / 2;
+      if (o.type === 'storm') o.mesh.rotation.z = Math.sin(time * 1.1 + o.ph) * 0.12;
+      if (o.def.sparks && Math.random() < 0.35) fx.glow.emit(o.pos.x + (Math.random() - 0.5) * 3, o.pos.y - 1.5, o.pos.z + (Math.random() - 0.5) * 3, 0, -4 - Math.random() * 3, 0, Math.random() < 0.5 ? '#9fe8ff' : '#fff27a', 0.5, 0.1, 0.35, 0, 1);
       if (o.def.glow && Math.random() < 0.5) fx.glow.emit(o.pos.x, o.pos.y, o.pos.z, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, (Math.random() - 0.5) * 2, o.def.col2, 0.8, 0.1, 0.4, -2, 1);
       for (const k of karts) {
         if (k.remote && authority) continue;

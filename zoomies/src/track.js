@@ -50,17 +50,25 @@ export class Path {
       grade[i] = (py[b] - py[a]) / (span * this.ds);
     }
 
+    // The sample nearest each control point (searched forwards, so a
+    // road that crosses itself still finds the right pass).
+    const cp = (this.cpIdx = []);
+    let from = 0;
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k];
+      let best = from, bd = Infinity;
+      const end = k === 0 ? Math.min(count, 8) : count;
+      for (let i = k === 0 ? 0 : from; i < end; i++) {
+        const d = (px[i] - p.x) ** 2 + (pz[i] - p.z) ** 2 + (py[i] - p.y) ** 2 * 0.01;
+        if (d < bd) { bd = d; best = i; }
+        if (d > bd + 1e4 && bd < 25) break;
+      }
+      cp.push(best);
+      from = best;
+    }
     // Width multipliers per control point -> per sample.
     const mult = new Float32Array(count).fill(1);
     if (opts.widths && opts.widths.some((w) => w !== 1)) {
-      const cp = pts.map((p) => {
-        let best = 0, bd = Infinity;
-        for (let i = 0; i < count; i++) {
-          const d = (px[i] - p.x) ** 2 + (pz[i] - p.z) ** 2;
-          if (d < bd) { bd = d; best = i; }
-        }
-        return best;
-      });
       const K = pts.length;
       const last = closed ? K : K - 1;
       for (let k = 0; k < last; k++) {
@@ -133,6 +141,43 @@ export class Path {
     this.gap = [new Uint8Array(count), new Uint8Array(count)]; // [left(-1), right(+1)] -> shortcut id + 1
     this.gapOwners = [new Array(count), new Array(count)]; // every shortcut id using each opening
     this.noWall = [new Uint8Array(count), new Uint8Array(count)];
+    // Vehicle zones: stretches where every kart turns into a boat (water) or
+    // a plane (sky). zoneT holds the zone per sample (0 road, 1 water, 2 sky).
+    this.zones = [];
+    this.zoneT = new Uint8Array(count);
+  }
+
+  // 0 on the road, 1 on water, 2 in the sky.
+  zoneAt(s) {
+    if (!this.zones.length) return 0;
+    for (const z of this.zones) {
+      let u = s - z.s0;
+      if (this.closed && u < 0) u += this.length;
+      if (u >= 0 && u <= z.len) return z.kind;
+    }
+    return 0;
+  }
+
+  // How far s is inside its zone (metres to the nearest zone edge), or 0.
+  zoneDepth(s) {
+    for (const z of this.zones) {
+      let u = s - z.s0;
+      if (this.closed && u < 0) u += this.length;
+      if (u >= 0 && u <= z.len) return Math.min(u, z.len - u);
+    }
+    return 0;
+  }
+
+  _setZones(list) {
+    this.zones = list.filter((z) => z.len > 0);
+    for (let i = 0; i < this.count; i++) this.zoneT[i] = this.zoneAt(i * this.ds);
+    if (!this.zones.length) return;
+    // Rivers and sky lanes are flat across (no banking) and have no grass
+    // shoulder to slow you down.
+    const k = new Float32Array(this.count);
+    for (let i = 0; i < this.count; i++) k[i] = this.zoneT[i] ? 0 : 1;
+    const ks = this._smooth(k, 4);
+    for (let i = 0; i < this.count; i++) this.slope[i] *= ks[i];
   }
 
   isVoid(s) {
@@ -398,6 +443,22 @@ export class Track extends Path {
     this.f = f;
     this.sd = (d) => (reverse ? -d : d);
     const fr = {};
+    // Features can sit at a lap fraction (`at`) or at a control point
+    // (`p`, plus `off` metres along the forward direction). Either way `at`
+    // is in forward lap fractions, and f() maps it onto this direction.
+    const K = raw.length;
+    const cpS = this.cpIdx.map((i) => i * this.ds);
+    const atP = (k, off = 0) => {
+      const fwd = reverse ? (k === 0 ? 0 : 1 - cpS[K - k] / len) : cpS[k] / len;
+      return (((fwd + off / len) % 1) + 1) % 1;
+    };
+    this.atP = atP;
+    const pos = (o) => (o.p !== undefined ? { ...o, at: atP(o.p, o.off) } : o);
+    // `dir` keeps a feature to one direction (1 forwards, -1 reversed).
+    const dirOk = (o) => !o.dir || o.dir === (reverse ? -1 : 1);
+    def = { ...def };
+    for (const key of ['ramps', 'boosts', 'patches', 'gems', 'obstacles']) if (def[key]) def[key] = def[key].filter(dirOk).map(pos);
+    if (def.items) def.items = def.items.map((a) => (typeof a === 'object' ? atP(a.p, a.off) : a));
     this.ramps = (def.ramps || []).map((r) => {
       const l = r.len ?? 8;
       const start = reverse ? (f(r.at) - l + len) % len : f(r.at);
@@ -413,6 +474,18 @@ export class Track extends Path {
     this.itemRows = (def.items || []).map((at) => f(at));
     this.gemLines = (def.gems || []).map((g) => ({ s: f(g.at), d: this.sd(g.d ?? 0), n: g.n ?? 5 }));
     this.obstacles = (def.obstacles || []).map((o) => ({ ...o, s: f(o.at) }));
+    this._setZones((def.zones || []).map((z) => {
+      const a = z.p0 !== undefined ? atP(z.p0, z.off0) : z.at;
+      const zl = z.p0 !== undefined ? (((atP(z.p1, z.off1) - a) % 1) + 1) % 1 : z.len;
+      const l = zl * len;
+      return { kind: z.type === 'sky' ? 2 : 1, type: z.type, name: z.name || '', s0: reverse ? (f(a) - l + len) % len : f(a), len: l };
+    }));
+    this.hasZones = this.zones.length > 0;
+    // Legs split a long one-lap adventure into named parts for the HUD.
+    const lg = (def.legs || []).map((g) => (g.p !== undefined ? { ...g, at: atP(g.p, g.off) } : g));
+    this.legs = reverse
+      ? lg.map((g, i) => ({ s: i === 0 ? 0 : (1 - lg[lg.length - i].at) * len, name: lg[lg.length - 1 - i].name }))
+      : lg.map((g) => ({ s: g.at * len, name: g.name }));
 
     // Bounds
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = 0;
@@ -452,12 +525,14 @@ export class Track extends Path {
   clearance(x, z) {
     let best = Infinity;
     for (let i = 0; i < this.count; i += 2) {
+      if (this.zoneT[i] === 2 && this.py[i] > 24) continue;
       const dx = x - this.px[i], dz = z - this.pz[i];
       const d = Math.sqrt(dx * dx + dz * dz) - this.wd[i];
       if (d < best) best = d;
     }
     for (const sc of this.shortcuts) {
       for (let i = 0; i < sc.count; i += 2) {
+        if (sc.zoneT[i] === 2 && sc.py[i] > 24) continue;
         const dx = x - sc.px[i], dz = z - sc.pz[i];
         const d = Math.sqrt(dx * dx + dz * dz) - sc.wd[i];
         if (d < best) best = d;
@@ -591,7 +666,10 @@ export class Shortcut extends Path {
     const L = main.length;
     const rev = main.reverse;
     const mapAt = (at) => (rev ? (1 - at + 1) % 1 : at);
-    let from = mapAt(def.from), to = mapAt(def.to);
+    // Ends can also be pinned to main-road control points (fromP/toP + offsets in metres).
+    const fromAt = def.fromP !== undefined ? main.atP(def.fromP, def.fromOff) : def.from;
+    const toAt = def.toP !== undefined ? main.atP(def.toP, def.toOff) : def.to;
+    let from = mapAt(fromAt), to = mapAt(toAt);
     let inner = (def.pts || []).map((p) => [mapAt(p[0]), rev ? -p[1] : p[1], p[2]]);
     const k = main.def.scale ?? 1;
     // World-space waypoints [x, z, y?] in track units (scaled like the main points).
@@ -689,6 +767,12 @@ export class Shortcut extends Path {
     }
     this.itemRows = (def.items || []).map((at) => flip(at) * this.length);
     this._link();
+    // A branch can be a river channel or a sky lane (fractions of the branch).
+    this._setZones((def.zones || []).map((z) => {
+      const a = rev ? 1 - z.at - z.len : z.at;
+      return { kind: z.type === 'sky' ? 2 : 1, type: z.type, name: z.name || '', s0: a * this.length, len: z.len * this.length };
+    }));
+    if (this.zones.length) main.hasZones = true;
   }
 
   toMain(s) {
