@@ -4,7 +4,8 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 
 ## What's in it
 
-- **8 original racers:** Mochi the cat, Pip the penguin, Bruno the bear, Rexi the dino, Volt the robot, Ember the fox, Zorp the alien and Hopper the frog. Each has its own speed, acceleration, handling and weight.
+- **20 racers of all shapes and sizes:** the 8 starters (Mochi the cat, Pip the penguin, Bruno the bear, Rexi the dino, Volt the robot, Ember the fox, Zorp the alien and Hopper the frog) are free. 12 more join through the Career, from tiny Fizz the bee and Gloop the slime to Nimbus the cloud, Pebble the rock golem and Boris the yeti, who sit almost twice as big in their karts. Each has its own speed, acceleration, handling and weight.
+  - New racers are hired in the Career Garage once you reach their level. Locked racers show a 🔒 Career badge on the racer screen.
 - **20 tracks in 4 sizes and 14 themes,** each also playable in reverse. Every track hides secret shortcuts: jumps, glides, tunnels and boost-only cuts. Medium and Long tracks have two each.
 - **Epic adventures:** two long one-lap tracks in three legs where every vehicle changes on the way. On water it turns into a speedboat (a hull pops out, it rocks on the swell and slides through bends); in the sky it sprouts wings and a propeller and you fly through gold boost rings past storm clouds, then land on a runway. The HUD counts legs instead of laps, and each leg gets its own banner.
   - **Jungle Odyssey:** temple road, river rapids with a waterfall jump, a lagoon of crocodiles and floating logs, then up a sea cliff and fly home over the sea. Secrets: the Lost Temple ruins, a Hidden Grotto river channel and the Storm Gap sky lane.
@@ -46,17 +47,25 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Quick Race.
   - Time Trial, with saved records.
   - Multiplayer.
-- **Player level and coins everywhere:** every race in every mode pays coins and XP, and online races pay extra. Levelling up pays a coin bonus, and every 5th level also gives a free prize capsule. The chip on the title screen shows your level, coins and daily streak.
+- **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Every 5th level gives a free prize capsule, and so does the daily reward. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
 - **Gumball machine (🍬 Prizes):**
-  - Spend coins, or the free turn you get every 5 levels, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary.
+  - Spend 600 coins, or a free capsule, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary.
   - Hats show on your racer everywhere, even to friends online. Trails colour your boost flames, and your horn honks when you overtake someone.
   - Duplicates pay coins back.
 - **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.
 - **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter.
 - **Driving:** drift boosts with mint, gold and hot pink sparks (spark, blaze and nova boosts), rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
-- **17 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Zap Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️ and Spook Mask 👻. The racers at the back get the catch-up items. Throwable items can be aimed: swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it.
+- **22 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Zap Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️, Spook Mask 👻, and the new ones:
+  - Pogo Spring 🦘: a huge hop over everything, with a trick and a landing boost.
+  - Mirror Swap 🪞: trade places with the racer just ahead.
+  - Frost Ray ❄️: an icy beam that sends the first racer in it sliding. It can be aimed ahead or behind.
+  - Thunder Drum 🥁: a shockwave that knocks nearby racers and knocks the items out of their hands.
+  - Gem Burst 💎: five gems at once.
+  - The racers at the back get the catch-up items.
+  - **Throwing behind:** when you hold an item that can be aimed, a **⤵️ THROW BACK** button appears next to ITEM. Tap it to throw or drop behind you. You can also swipe ITEM up or down, or hold BRAKE while tapping it.
+- **Prize orbs:** items come from spinning crystal orbs with a star inside, not boxes. Every regular shortcut has its own orbs as a reward for finding it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
 
 ## Playing on iPhone
@@ -124,7 +133,7 @@ How it works:
 - **Rocket start:** press and hold DRIFT right after the "2" disappears.
 - **Slipstream:** tuck in close behind another kart for a second and you get a free boost.
 - **Look back:** hold the 👀 BACK button (or the minimap, or Q / C on a keyboard) to see behind you.
-- **Your ride:** on the racer screen, tap the vehicle button to pick a kart or bike for quick races, cups, time trials and online. Five are free (Rust Bucket, Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter). The rest unlock when you buy them in the Career Garage, or when you reach a player level (Comet 4, Hog Wild 6, Stomper 8, Vortex 11, Starbolt 15). Locked rides still show in the showroom so you can see what you're working towards.
+- **Your ride:** on the racer screen, tap the vehicle button to pick a kart or bike for quick races, cups, time trials and online. Five are free (Rust Bucket, Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter). The rest unlock when you buy them in the Career Garage. Locked rides still show in the showroom so you can see what you're working towards.
 - **Hitting walls:** steer away and the kart swings back into the race direction. If you're ever pinned, the drone lifts you back onto the road after a few seconds, and the pause menu has **Stuck? Back on the road** to do it at once.
 - **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.

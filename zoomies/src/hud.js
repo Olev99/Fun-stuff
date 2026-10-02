@@ -275,6 +275,8 @@ export class HUD {
         this.itemSlot.className = p.item ? 'item-slot pop' : 'item-slot';
         this.btnItem.classList.toggle('has', !!p.item);
         this.btnItem.classList.toggle('aim', !!AIM_DEFAULT[p.item]);
+        const tb = this._tb || (this._tb = document.getElementById('btn-throwback'));
+        if (tb) tb.classList.toggle('show', !!AIM_DEFAULT[p.item]);
         this.itemCount.hidden = !(p.itemCount > 1);
         this.itemCount.textContent = `×${p.itemCount}`;
       });

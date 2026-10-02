@@ -20,19 +20,24 @@ export const ITEMS = {
   firework: { icon: '🎆', name: 'Firework' },
   twister: { icon: '🌪️', name: 'Twister' },
   ghost: { icon: '👻', name: 'Spook Mask' },
+  pogo: { icon: '🦘', name: 'Pogo Spring' },
+  mirror: { icon: '🪞', name: 'Mirror Swap' },
+  freeze: { icon: '❄️', name: 'Frost Ray' },
+  drum: { icon: '🥁', name: 'Thunder Drum' },
+  gems: { icon: '💎', name: 'Gem Burst' },
 };
 export const ITEM_ICONS = Object.values(ITEMS).map((i) => i.icon);
 
 // Which way each item goes when you just tap: +1 ahead, -1 behind. These are
 // the ones you can aim (swipe the ITEM button, or hold BRAKE to throw back).
-export const AIM_DEFAULT = { honey: -1, oil: -1, ball: 1, boomerang: 1, bomb: 1, firework: 1 };
+export const AIM_DEFAULT = { honey: -1, oil: -1, ball: 1, boomerang: 1, bomb: 1, firework: 1, freeze: 1 };
 
 // Odds depend on race position: leaders get defence, stragglers get catch-up.
 const TABLES = [
-  { honey: 24, ball: 20, bubble: 18, chili: 8, boomerang: 10, oil: 12, horn: 8 },
-  { honey: 12, ball: 14, bee: 10, chili: 14, bubble: 6, chili3: 6, boomerang: 10, magnet: 5, oil: 8, bomb: 8, firework: 7, horn: 4 },
-  { chili: 10, chili3: 14, bee: 14, rainbow: 8, ball: 6, storm: 4, bubble: 4, magnet: 8, warp: 6, boomerang: 4, bomb: 8, firework: 6, twister: 6, ghost: 6 },
-  { chili3: 20, rainbow: 16, rocket: 16, bee: 12, storm: 8, warp: 8, magnet: 4, twister: 8, ghost: 8 },
+  { honey: 22, ball: 18, bubble: 16, chili: 8, boomerang: 9, oil: 11, horn: 7, drum: 6, freeze: 6 },
+  { honey: 11, ball: 12, bee: 9, chili: 12, bubble: 6, chili3: 6, boomerang: 9, magnet: 5, oil: 7, bomb: 7, firework: 6, horn: 4, pogo: 6, freeze: 6, drum: 4, gems: 5 },
+  { chili: 9, chili3: 12, bee: 12, rainbow: 7, ball: 5, storm: 4, bubble: 4, magnet: 7, warp: 6, boomerang: 4, bomb: 7, firework: 5, twister: 5, ghost: 5, pogo: 5, mirror: 6, gems: 6 },
+  { chili3: 18, rainbow: 14, rocket: 14, bee: 10, storm: 7, warp: 7, magnet: 4, twister: 7, ghost: 7, mirror: 10, gems: 4 },
 ];
 
 function weighted(table) {
@@ -299,11 +304,19 @@ export class ItemSystem {
       }
     }
     if (!this.boxes.length) return;
-    this.qTex = TX.itemBoxTexture();
-    const mat = new THREE.MeshBasicMaterial({ map: this.qTex, transparent: true, depthWrite: false, side: THREE.DoubleSide, color: new THREE.Color(1.35, 1.35, 1.35) });
-    this.boxMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 1.7, 1.7), mat, this.boxes.length);
+    // Prize orbs: a faceted crystal shell, a tilted ring and a spinning star core.
+    const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, color: new THREE.Color(1.3, 1.3, 1.3) });
+    const shell = new THREE.IcosahedronGeometry(1.05, 0);
+    const ring = new THREE.TorusGeometry(1.32, 0.07, 6, 28);
+    ring.rotateX(Math.PI / 2 - 0.35);
+    const B = new GeoBuilder();
+    B.add(shell, '#ffffff');
+    B.add(ring, '#ffffff');
+    this.boxMesh = new THREE.InstancedMesh(B.build(), mat, this.boxes.length);
     this.boxMesh.renderOrder = 2;
-    this.coreMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.42, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.2) }), this.boxes.length);
+    const star = new GeoBuilder();
+    for (const r of [[0, 0, 0], [0, Math.PI / 4, 0]]) star.add(new THREE.OctahedronGeometry(0.42, 0), '#ffffff', [0, 0, 0], r, [1, 1.35, 0.35]);
+    this.coreMesh = new THREE.InstancedMesh(star.build(), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.2) }), this.boxes.length);
     for (let i = 0; i < this.boxes.length; i++) {
       this.boxMesh.setColorAt(i, this._c.set('#ffffff'));
       this.coreMesh.setColorAt(i, this._c.set('#ffffff'));
@@ -354,7 +367,9 @@ export class ItemSystem {
 
   _buildCrates() {
     for (const sc of this.track.shortcuts) {
-      if (!sc.def.crates) continue;
+      // Crates hide every plain road shortcut's entrance (not jumps, glides, rivers or sky lanes).
+      const plain = !sc.voids.length && !sc.zones.length && !sc.ramps.some((r) => r.glide);
+      if (sc.def.crates === false || !(sc.def.crates || plain)) continue;
       const fr = {};
       const s = Math.min(sc.length - 4, (sc.entryEnd + 1) * sc.ds);
       sc.frame(s, fr);
@@ -463,6 +478,20 @@ export class ItemSystem {
       case 'storm':
         this.race.storm(kart);
         break;
+      case 'drum':
+        // A huge shockwave that also knocks the items out of everyone's hands.
+        this.blast(src.x, kart.pos.y, src.z, 14, 'bump', kart, true);
+        for (const o of this.race.karts) {
+          if (o === kart || o.remote || (o.pos.x - src.x) ** 2 + (o.pos.z - src.z) ** 2 > 196) continue;
+          if (o.item) { o.item = null; o.itemCount = 0; if (o.isPlayer) this.race.app.hud.toast('Your item got drummed away!'); }
+        }
+        break;
+      case 'freeze':
+        this.race.frostRay(kart, dir);
+        break;
+      case 'mirror':
+        this.race.mirrorSwap(kart);
+        break;
     }
     return it;
   }
@@ -477,6 +506,15 @@ export class ItemSystem {
       case 'rocket': kart.rocketTime = 4.2; kart.startBoost(0.4, 12); break;
       case 'warp': this.race.warp(kart); break;
       case 'ghost': kart.ghostTime = 5; kart.startBoost(0.4, 4); break;
+      case 'gems': kart.gems = Math.min(10, kart.gems + 5); kart.emit('gemBurst'); break;
+      case 'pogo':
+        // Boing! A huge hop over everything, with a trick window and a boost on landing.
+        if (kart.mode !== 2) {
+          kart.vy = 15; kart.grounded = false; kart.rampAir = true; kart.trickWindow = 0.9; kart.trickDone = false;
+        }
+        kart.invuln = Math.max(kart.invuln, 1.4);
+        kart.startBoost(0.5, 3);
+        break;
     }
   }
 

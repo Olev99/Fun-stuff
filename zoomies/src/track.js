@@ -730,8 +730,8 @@ export class Shortcut extends Path {
     main.frame(to * L, fr);
     add(to, side * Math.max(1, fr.hw - 3));
     const surf = SURFACES[def.surface] || SURFACES.road;
-    // With a lead-in the mouths flare out into a funnel that is easy to hit.
-    const widths = lead ? P.map((_, i) => (i === 0 || i === P.length - 1 ? 1.8 : i === 1 || i === P.length - 2 ? 1.5 : 1)) : undefined;
+    // With a lead-in the mouths flare out a little, but stay easy to miss.
+    const widths = lead ? P.map((_, i) => (i === 0 || i === P.length - 1 ? 1.45 : i === 1 || i === P.length - 2 ? 1.2 : 1)) : undefined;
     super(P, { closed: false, width: def.width ?? 10, curb: 0.6, shoulder: def.shoulder ?? 1.4, wallH: def.wallH ?? 1.1, bank: 0,
       offroad: !!surf.offroad, grip: surf.grip, widths });
     this.main = main;

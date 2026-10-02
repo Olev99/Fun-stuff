@@ -430,6 +430,7 @@ export class Race {
             const snd = {
               chili: 'boost', bubble: 'shield', rainbow: 'rainbow', honey: 'honey', ball: 'throw', bee: 'bee', boomerang: 'throw', rocket: 'boost',
               magnet: 'shield', warp: 'warp', bomb: 'throw', oil: 'honey', firework: 'firework', twister: 'twister', ghost: 'ghost',
+              pogo: 'trick', mirror: 'warp', freeze: 'shield', drum: 'boom', gems: 'itemReady',
             }[used];
             if (snd && (k.isPlayer || used !== 'chili')) a.play(snd);
             if (k.isPlayer && used === 'rocket') hud.toast('ROCKET RIDE!');
@@ -443,6 +444,10 @@ export class Race {
           break;
         case 'driftLevel':
           if (k.isPlayer) a.play('driftLevel', data);
+          break;
+        case 'gemBurst':
+          this.fx.burst(k.pos.x, k.pos.y + 1.2, k.pos.z, ['#46f0ff', '#ffffff', '#1c8cff'], 20, 7, 0.5, 0.6, 2);
+          if (k.isPlayer) hud.toast('+5 GEMS!');
           break;
         case 'driftStart':
           if (k.isPlayer) a.play('driftStart');
@@ -809,6 +814,42 @@ export class Race {
   }
 
   // Warp Swirl: jump forward along the main road.
+  // Frost Ray: an icy beam straight ahead (or behind); the first racer in it
+  // slides helplessly for a moment.
+  frostRay(k, dir = 1) {
+    const fx = Math.sin(k.yaw) * dir, fz = Math.cos(k.yaw) * dir;
+    let best = null, bd = 70;
+    for (const o of this.karts) {
+      if (o === k || o.finished) continue;
+      const dx = o.pos.x - k.pos.x, dz = o.pos.z - k.pos.z;
+      const along = dx * fx + dz * fz, side = Math.abs(dx * fz - dz * fx);
+      if (along > 1 && along < bd && side < 3.2 && Math.abs(o.pos.y - k.pos.y) < 4) { best = o; bd = along; }
+    }
+    for (let n = 0; n < 40; n++) {
+      const t = (n / 40) * bd;
+      this.fx.glow.emit(k.pos.x + fx * t, k.pos.y + 1, k.pos.z + fz * t, 0, 0.5, 0, n % 3 ? '#bfefff' : '#ffffff', 0.7, 0.2, 0.5, 0, 1);
+    }
+    if (!best) return;
+    if (best.remote) this.net.sendHit(best, 'bump');
+    else if (!best.slip(2.6)) best.hit('bump');
+    this.fx.burst(best.pos.x, best.pos.y + 1, best.pos.z, ['#bfefff', '#ffffff', '#7fd8ff'], 22, 8, 0.6, 0.6, 3);
+    if (best.isPlayer) this.app.hud.toast('FROZEN! Hold steady…');
+  }
+
+  // Mirror Swap: trade places with the racer just ahead.
+  mirrorSwap(k) {
+    const o = this.karts.find((x) => x.place === k.place - 1 && !x.finished && !x.remote);
+    if (!o) { k.startBoost(1.2, 8); return; }
+    const keys = ['yaw', 'path', 'seg', 'laps', 'maxLap', 'lastS', 'total', 'safeS', 'progAt', 'mode', 'grounded', 'vy', 'leg'];
+    const tmp = {};
+    for (const key of keys) { tmp[key] = k[key]; k[key] = o[key]; o[key] = tmp[key]; }
+    for (const v of ['pos', 'vel']) { const t = k[v].clone(); k[v].copy(o[v]); o[v].copy(t); }
+    const t = { ...k.trk }; Object.assign(k.trk, o.trk); Object.assign(o.trk, t);
+    k.invuln = Math.max(k.invuln, 1); o.invuln = Math.max(o.invuln, 1);
+    for (const x of [k, o]) this.fx.burst(x.pos.x, x.pos.y + 1, x.pos.z, ['#e8f4ff', '#c7a0ff', '#ffffff'], 24, 8, 0.6, 0.6, 1);
+    if (k.isPlayer || o.isPlayer) this.app.hud.toast(k.isPlayer ? `SWAPPED with ${o.ch.name}!` : `${k.ch.name} swapped places with you!`);
+  }
+
   warp(k) {
     const tr = this.track;
     const swirl = (x, y, z) => {

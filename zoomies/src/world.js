@@ -1056,7 +1056,12 @@ export class World {
         if (Math.abs(k) < 0.35) k = k < 0 ? -0.35 : 0.35;
         xw[i] = (sm * mt.wd - mt.d) / k;
         dir[i] = Math.sign(sm * k);
-        for (const side of [-1, 1]) if (sm * (mt.d + side * sc.wd[i] * k) > mt.wd + 1) outW[side > 0 ? 1 : 0][i] = 1;
+        // Outer wall only where that edge really lies off the main road.
+        for (const side of [-1, 1]) {
+          const ex = sc.px[i] + sc.rx[i] * side * sc.wd[i], ez = sc.pz[i] + sc.rz[i] * side * sc.wd[i];
+          const et = main.project(ex, ez, mt.idx, {});
+          if (Math.abs(et.d) > et.wd + 1.5 && Math.sign(et.d) === sm) outW[side > 0 ? 1 : 0][i] = 1;
+        }
       }
       const mouth = (i) => sc.overlap[i] && (i < e0 || i > e1) && !sc.zoneT[i] && !sc.isVoid(i * sc.ds);
       const span = (i, lim) => (dir[i] > 0 ? [clamp(xw[i], -lim, lim), lim] : [-lim, clamp(xw[i], -lim, lim)]);
@@ -1216,6 +1221,8 @@ export class World {
         for (const side of [-1, 1]) {
           const d = side * (W + 1.8 + r() * 2);
           const x = fr.x + fr.rx * d, z = fr.z + fr.rz * d;
+          // Never on a road (near the mouths the main road runs right alongside).
+          if (this.track.clearance(x, z) < 1.2) continue;
           if (deco === 'lavaRocks') B.add(new THREE.ConeGeometry(1.2 + r(), 3 + r() * 5, 5), r() < 0.5 ? '#2b2527' : '#3d3336', [x, base + 1, z], [r() * 0.3, r() * 6, r() * 0.3], 1, 'stone');
           else if (deco === 'cotton') B.add(new THREE.IcosahedronGeometry(1.6 + r(), 2), ['#ffc6e4', '#c8e8ff', '#fff0f8'][Math.floor(r() * 3)], [x, base + 0.6, z], [0, 0, 0], 1, 'fabric');
           else if (deco === 'bamboo') B.addRaw(translate(P.bamboo(), x, base - 0.2, z, 0.8 + r() * 0.4));

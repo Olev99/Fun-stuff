@@ -612,7 +612,7 @@ class App {
     if (pass) {
       const dr = completeDaily(this.career);
       if (dr) {
-        lines.push(`🔥 ${dr.streak}-day streak! Daily reward +${dr.coins} 🪙 · +${dr.xp} XP`);
+        lines.push(`🔥 ${dr.streak}-day streak! Daily reward: a free prize capsule 🍬 · +${dr.xp} XP`);
         sum.coins += dr.coins;
         sum.xp += dr.xp;
         sum.levelCoins += dr.levelCoins;

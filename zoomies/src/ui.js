@@ -246,7 +246,7 @@ export class UI {
       const ch = charById(c.dataset.id);
       const lock = charLocked(ch.id, lvl, app.career);
       c.classList.toggle('locked', !!lock);
-      c.querySelector('.lk').textContent = lock ? `🔒 Lv ${ch.lvl}` : ch.lvl ? 'NEW' : '';
+      c.querySelector('.lk').textContent = lock ? '🔒 Career' : ch.lvl ? 'NEW' : '';
     });
     this.pickChar(app.settings.char);
     this.show('char');
@@ -292,7 +292,7 @@ export class UI {
     grid.innerHTML = '';
     const note = $('vp-note');
     note.className = '';
-    note.textContent = 'Five rides are free. Unlock the rest in the Career Garage or by levelling up.';
+    note.textContent = 'Five rides are free. Buy the rest in the Career Garage, then use them everywhere.';
     const bar = (v) => `<i><b style="width:${Math.round(clamp((3 + v * 1.4) / 5, 0.1, 1) * 100)}%"></b></i>`;
     for (const b of BODY_LIST) {
       const lock = bodyLocked(b.id, app.career, lvl);

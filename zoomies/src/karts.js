@@ -104,13 +104,11 @@ export const BODIES = {
 export const BODY_LIST = Object.values(BODIES);
 
 // Quick races, cups, time trials and online: these rides are free, the rest
-// unlock by buying them in the Career Garage or by reaching a player level.
+// are unlocked by buying them in the Career Garage (with career coins).
 export const FREE_BODIES = ['buggy', 'classic', 'tub', 'bike', 'scooter'];
-export const BODY_LEVEL = { comet: 4, chopper: 6, stomper: 8, sportbike: 11, bolt: 15 };
-export function bodyLocked(id, career, level = 1) {
-  if (FREE_BODIES.includes(id) || (career && career.bodies && career.bodies.includes(id)) || level >= (BODY_LEVEL[id] ?? 99)) return null;
-  const b = bodyById(id);
-  return `Level ${BODY_LEVEL[id]} or buy it in the Career Garage (🪙 ${b.price.toLocaleString('en-US')})`;
+export function bodyLocked(id, career) {
+  if (FREE_BODIES.includes(id) || (career && career.bodies && career.bodies.includes(id))) return null;
+  return `buy it in the Career Garage (🪙 ${bodyById(id).price.toLocaleString('en-US')})`;
 }
 export const bodyIcon = (b) => (b.id === 'scooter' ? '🛵' : b.kind === 'bike' ? '🏍️' : b.id === 'stomper' ? '🛻' : '🏎️');
 

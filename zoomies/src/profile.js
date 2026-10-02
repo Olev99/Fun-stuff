@@ -4,7 +4,7 @@ import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
 
 // The player profile lives in the career save (one wallet for everything):
-// XP and levels from every race, coins in every mode, lifetime stats,
+// XP and levels from every race, coins from the career, lifetime stats,
 // achievements and the daily challenge streak.
 
 // ---------------- levels ----------------
@@ -49,10 +49,9 @@ function addToSet(c, k, v) {
 export function awardRace(c, info) {
   const place = info.place || 0;
   let coins = 0, xp = 0;
+  // Coins are only earned in the career (it passes them in); every other
+  // mode pays XP.
   if (info.coins !== undefined) coins = info.coins;
-  else if (info.mode === 'tt') coins = 15 + (info.record ? 25 : 0);
-  else coins = (PLACE_COINS[place - 1] || 6) + (info.gems || 0);
-  if (info.online) coins = Math.round(coins * 1.5);
   xp = (info.mode === 'tt' ? 50 : 40 + (PLACE_XP[place - 1] || 8)) + (info.style || 0) + (info.online ? 30 : 0) + (info.xpBonus || 0);
   // stats
   addStat(c, 'races');
@@ -70,7 +69,7 @@ export function awardRace(c, info) {
   return grant(c, coins, xp);
 }
 
-// Add coins and XP; handles level-ups (each pays out coins).
+// Add coins and XP; handles level-ups.
 export function grant(c, coins, xp) {
   const before = levelOf(c.xp || 0).level;
   c.xp = (c.xp || 0) + xp;
@@ -82,9 +81,10 @@ export function grant(c, coins, xp) {
     ups.push(L);
     if (L % 5 === 0) c.freeCaps = (c.freeCaps || 0) + 1;
   }
-  c.coins += coins + levelCoins;
-  c.earned = (c.earned || 0) + coins + levelCoins;
-  return { coins, xp, levelCoins, ups, level: after };
+  c.coins += coins;
+  c.earned = (c.earned || 0) + coins;
+  // Level-ups no longer pay coins (coins come from the career only).
+  return { coins, xp, levelCoins: 0, ups, level: after };
 }
 
 // ---------------- achievements ----------------
@@ -224,8 +224,9 @@ export function completeDaily(c) {
   dl.best = Math.max(dl.best || 0, dl.streak);
   dl.done = t;
   addStat(c, 'dailies');
-  const coins = dailyReward(dl.streak);
-  return { ...grant(c, coins, 150), streak: dl.streak };
+  // A daily pays XP (more with a streak) and a free prize capsule, not coins.
+  c.freeCaps = (c.freeCaps || 0) + 1;
+  return { ...grant(c, 0, 150 + dailyReward(dl.streak) / 2), streak: dl.streak, capsule: true };
 }
 
 export function dailyTrackName(d) {

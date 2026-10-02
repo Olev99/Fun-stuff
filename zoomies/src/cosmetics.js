@@ -10,7 +10,7 @@ export const RARITY = {
   legendary: { name: 'Legendary', weight: 2, refund: 300, color: '#ffd23f' },
 };
 
-export const CAPSULE_PRICE = 250;
+export const CAPSULE_PRICE = 600;
 
 const cone = (r, h, n = 16) => new THREE.ConeGeometry(r, h, n);
 const cyl = (r0, r1, h, n = 20) => new THREE.CylinderGeometry(r0, r1, h, n);
@@ -234,6 +234,7 @@ const ANCHOR = {
   volt: [1.95, -0.22, 1.05], ember: [2.04, -0.24, 1], zorp: [2.2, -0.22, 1.05], hopper: [2.03, -0.26, 1.08],
   yuzu: [2.04, -0.26, 1.02], lulu: [2.0, -0.22, 1.1], bao: [2.08, -0.22, 1.06], hoot: [2.06, -0.22, 1.04],
   bandit: [2.04, -0.22, 1], fizz: [2.04, -0.22, 1], ollie: [2.32, -0.28, 1.1], gus: [2.12, -0.22, 1.1],
+  gloop: [1.88, -0.24, 1], nimbus: [2.06, -0.26, 1.05], pebble: [2.08, -0.24, 1.1], boris: [2.14, -0.24, 1.15],
 };
 
 // Add a hat to a racer's driver model.

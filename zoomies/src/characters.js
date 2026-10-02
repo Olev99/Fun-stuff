@@ -22,13 +22,25 @@ export const CHARACTERS = [
   { id: 'fizz', name: 'Fizz', species: 'Bee', tagline: 'Zero to buzzing in half a second. Terrible at sitting still.', color: '#ffc21f', accent: '#1d1537', lvl: 8, price: 1500, stats: { speed: 2, accel: 5, handling: 3, weight: 2 } },
   { id: 'ollie', name: 'Ollie', species: 'Octopus', tagline: 'Eight arms: two for the wheel, six for waving at the crowd.', color: '#ff6f61', accent: '#39f5ff', lvl: 10, price: 1700, stats: { speed: 3, accel: 3, handling: 4, weight: 2 } },
   { id: 'gus', name: 'Gus', species: 'Walrus', tagline: 'Retired sea captain. Heavy, stubborn and very, very fast.', color: '#3f6fb0', accent: '#ffd23f', lvl: 12, price: 2000, stats: { speed: 5, accel: 2, handling: 1, weight: 4 } },
+  { id: 'gloop', name: 'Gloop', species: 'Slime', tagline: 'Squishes through gaps nobody else fits. Leaves a slightly sticky trail.', color: '#3fe0b0', accent: '#ff5ad8', lvl: 6, price: 1300, stats: { speed: 2, accel: 5, handling: 3, weight: 2 } },
+  { id: 'nimbus', name: 'Nimbus', species: 'Cloud Spirit', tagline: 'Light as air, quick as a breeze, blown sideways by every bump.', color: '#9fd8ff', accent: '#ffd23f', lvl: 9, price: 1600, stats: { speed: 3, accel: 4, handling: 4, weight: 1 } },
+  { id: 'pebble', name: 'Pebble', species: 'Rock Golem', tagline: 'Six tonnes of friendly boulder. Corners are more of a suggestion.', color: '#7a7f8a', accent: '#57d68a', lvl: 11, price: 1900, stats: { speed: 4, accel: 1, handling: 2, weight: 5 } },
+  { id: 'boris', name: 'Boris', species: 'Yeti', tagline: 'Big, fluffy and absolutely thrilled to be here.', color: '#5fa8ff', accent: '#ffffff', lvl: 13, price: 2200, stats: { speed: 4, accel: 2, handling: 2, weight: 4 } },
 ];
 
-// Racers still locked for a player in quick play: null if open, else why.
+// How big each racer sits in the kart: tiny bees and slimes, huge golems and yetis.
+const SIZE = {
+  pip: 0.8, hopper: 0.9, fizz: 0.68, lulu: 0.86, gloop: 0.82, nimbus: 0.84, mochi: 0.95, ember: 0.97, zorp: 0.95,
+  bruno: 1.12, rexi: 1.1, bao: 1.16, gus: 1.24, pebble: 1.42, boris: 1.4,
+};
+export const charSize = (id) => SIZE[id] || 1;
+
+// Racers still locked outside the career: null if open, else why. The newer
+// racers are hired in the Career Garage (from player level `lvl`).
 export function charLocked(id, level = 1, career = null) {
   const ch = charById(id);
-  if (!ch.lvl || level >= ch.lvl || (career && career.racers && career.racers.includes(id))) return null;
-  return `Reach level ${ch.lvl}, or hire ${ch.name} in the Career Garage`;
+  if (!ch.lvl || (career && career.racers && career.racers.includes(id))) return null;
+  return `Hire ${ch.name} in the Career Garage (from level ${ch.lvl}, 🪙 ${ch.price.toLocaleString('en-US')})`;
 }
 
 export function charById(id) {
@@ -333,12 +345,81 @@ function driver(ch, hat) {
       B.add(sphere(0.06, 8, 6), '#ffd23f', [0, H.y + 0.48, H.z + 0.33], [0, 0, 0], 1, 'metal');
       break;
     }
+    case 'gloop': {
+      // a wobbly slime: one big glossy blob with drips, a single eye and a sprout of droplets
+      const goo = '#3fe0b0';
+      B.mat = 'gloss';
+      B.add(sphere(0.55, 22, 16), goo, [0, 1.3, -0.24], [0, 0, 0], [1.05, 1.15, 1]);
+      for (const [x, y, z, r] of [[0.32, 0.86, 0.12, 0.13], [-0.3, 0.9, 0.08, 0.11], [0.12, 0.8, 0.26, 0.09], [-0.1, 0.84, 0.3, 0.08]]) B.add(sphere(r, 10, 8), goo, [x, y, z], [0, 0, 0], [1, 1.4, 1]);
+      armL(goo);
+      B.add(sphere(0.2, 16, 12), '#ffffff', [0, 1.46, 0.24], [0, 0, 0], 1, 'gloss');
+      B.add(sphere(0.11, 12, 8), '#1b1530', [0, 1.46, 0.4], [0, 0, 0], 1, 'eye');
+      B.add(sphere(0.035, 6, 4), '#ffffff', [0.04, 1.51, 0.48]);
+      B.add(new THREE.TorusGeometry(0.1, 0.02, 4, 12, Math.PI), '#0f6a52', [0, 1.18, 0.28], [0.25, 0, Math.PI]);
+      for (const [x, z, h] of [[0, -0.2, 0.3], [0.12, -0.24, 0.22], [-0.12, -0.22, 0.24]]) B.add(sphere(0.07, 8, 6), '#ff5ad8', [x, 1.88 + h * 0.4, z], [0, 0, 0], [1, 1.3, 1], 'glow');
+      break;
+    }
+    case 'nimbus': {
+      // a cloud spirit: puffs of cloud for a head, rosy cheeks and a little sun badge
+      const white = '#f4fbff';
+      B.mat = 'fabric';
+      torso('#9fd8ff', '#ffffff');
+      armL(white);
+      for (const [x, y, z, r] of [[0, 0, 0, 0.42], [0.3, -0.05, -0.05, 0.3], [-0.3, -0.04, -0.05, 0.32], [0.14, 0.28, -0.06, 0.3], [-0.16, 0.26, -0.08, 0.28], [0, 0.12, -0.3, 0.32]]) {
+        B.add(sphere(r, 16, 12), white, [H.x + x, H.y + y, H.z + z]);
+      }
+      eyes(B, 0, H.y + 0.04, H.z + 0.4, 0.13, 0.065);
+      for (const s2 of [-1, 1]) B.add(sphere(0.07, 8, 6), '#ffb3c9', [s2 * 0.24, H.y - 0.08, H.z + 0.34], [0, 0, 0], [1, 0.6, 0.6]);
+      B.add(new THREE.TorusGeometry(0.08, 0.02, 4, 12, Math.PI), '#4a6a9a', [0, H.y - 0.1, H.z + 0.42], [0.2, 0, Math.PI]);
+      B.add(sphere(0.1, 12, 8), '#ffd23f', [0, 1.12, 0.06], [0, 0, 0], [1, 1, 0.4], 'glow');
+      break;
+    }
+    case 'pebble': {
+      // a rock golem: chunky faceted stone, mossy top, glowing eyes, boulder fists
+      const stone = '#7a7f8a', dark = '#5a5f6a';
+      B.mat = 'stone';
+      B.add(new THREE.DodecahedronGeometry(0.42, 0), stone, [0, 1.07, -0.3], [0.3, 0.4, 0], [1.1, 1, 0.95]);
+      for (const s2 of [-1, 1]) {
+        B.add(new THREE.DodecahedronGeometry(0.15, 0), dark, [s2 * 0.34, 1.1, 0.06], [s2, 0.5, 0], [0.9, 1.6, 0.9]);
+        B.add(new THREE.DodecahedronGeometry(0.15, 0), stone, [s2 * 0.22, 1.02, 0.36], [0, s2, 0.5]);
+      }
+      B.add(new THREE.DodecahedronGeometry(0.46, 0), stone, [H.x, H.y, H.z], [0.2, 0.7, 0.1], [1.05, 0.92, 1]);
+      B.add(new THREE.DodecahedronGeometry(0.3, 0), '#57d68a', [0, H.y + 0.34, H.z - 0.06], [0, 0.3, 0], [1.3, 0.45, 1.2], 'leaf');
+      for (const s2 of [-1, 1]) B.add(new THREE.BoxGeometry(0.13, 0.07, 0.05), '#7dffb0', [s2 * 0.15, H.y + 0.04, H.z + 0.42], [0, 0, 0], 1, 'glowHot');
+      B.add(new THREE.BoxGeometry(0.3, 0.05, 0.05), dark, [0, H.y - 0.18, H.z + 0.41]);
+      B.add(new THREE.ConeGeometry(0.05, 0.12, 4), '#ff8fc7', [0.2, H.y + 0.5, H.z - 0.04], [0, 0, 0], 1, 'leaf');
+      break;
+    }
+    case 'boris': {
+      // a yeti: huge shaggy white head, blue face, little horns, big grin
+      const fur = '#f2f6ff', face = '#7aa8e0';
+      torso(fur, '#dfe8f8');
+      armL(fur);
+      B.add(sphere(0.5), fur, [H.x, H.y + 0.02, H.z], [0, 0, 0], [1.1, 1.05, 1]);
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        B.add(new THREE.ConeGeometry(0.1, 0.24, 5), fur, [Math.cos(a) * 0.46, H.y + 0.1 + Math.sin(a) * 0.36, H.z - 0.12], [0, 0, a - Math.PI / 2]);
+      }
+      B.add(sphere(0.3), face, [0, H.y - 0.04, H.z + 0.28], [0, 0, 0], [1.1, 0.95, 0.7], 'skin');
+      eyes(B, 0, H.y + 0.06, H.z + 0.46, 0.13, 0.07);
+      B.add(new THREE.TorusGeometry(0.15, 0.03, 4, 14, Math.PI), '#2a3a6a', [0, H.y - 0.12, H.z + 0.48], [0.1, 0, Math.PI]);
+      for (const s2 of [-1, 1]) B.add(new THREE.ConeGeometry(0.06, 0.22, 6), '#e8d9b0', [s2 * 0.26, H.y + 0.5, H.z - 0.04], [0, 0, -s2 * 0.4], 1, 'gloss');
+      break;
+    }
     default:
       torso(suit);
       B.add(sphere(0.45), suit, [H.x, H.y, H.z]);
   }
   if (hat) addHat(B, ch, hat);
-  return B.build();
+  const g = B.build();
+  // Scale the whole racer about the seat.
+  const sz = charSize(ch.id);
+  if (sz !== 1) {
+    g.translate(0, -0.8, 0.3);
+    g.scale(sz, sz, sz);
+    g.translate(0, 0.8, -0.3);
+  }
+  return g;
 }
 
 export function driverGeometry(ch, lo = false, hat = null) {

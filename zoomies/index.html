@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="dd34357">
+<meta name="zoomies-version" content="3a5946b">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -144,7 +144,7 @@ html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 .bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
 .bar i { height: 9px; border-radius: 3px; background: rgba(255,255,255,.12); }
 .bar i.on { background: var(--sun); }
-.char-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; align-content: center; }
+.char-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-content: center; }
 #char-grid .card { max-height: calc(24 * var(--vh)); }
 #char-grid .card .lk { position: absolute; top: 3px; right: 3px; font-family: var(--font-display); font-size: 9px; padding: 1px 4px; border-radius: 6px; background: rgba(29,21,55,.85); color: var(--mint); }
 #char-grid .card .lk:empty { display: none; }
@@ -703,6 +703,12 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #btn-drift { width: 104px; height: 104px; right: calc(22px + var(--sar)); bottom: calc(22px + var(--sab)); font-size: 15px; }
 #btn-item { width: 84px; height: 84px; }
 #btn-brake { width: 58px; height: 58px; font-size: 10.5px; }
+/* shows while you hold a throwable item: tap to throw it backwards */
+#btn-throwback { width: 56px; height: 56px; font-size: 8.5px; border-color: var(--sun); background: rgba(255,210,63,.22); display: none; }
+#btn-throwback .ic { font-size: 16px; }
+#btn-throwback.show { display: grid; animation: pop .3s ease-out; }
+#controls.tilt #btn-throwback { left: calc(32px + var(--sal)); bottom: calc(120px + var(--sab)); }
+#controls.touch #btn-throwback { right: calc(188px + var(--sar)); bottom: calc(118px + var(--sab)); }
 /* hold to look behind you */
 #btn-back { width: 50px; height: 50px; font-size: 8.5px; border-width: 2px; opacity: .85; }
 #btn-back .ic { font-size: 17px; margin-bottom: 1px; }
@@ -815,6 +821,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   <div id="steer-pad"><div id="steer-base"><div id="steer-knob"></div></div></div>
   <div class="steer-hint">Drag to steer</div>
   <button class="ctl" id="btn-brake" data-btn="brake" aria-label="Brake">BRAKE</button>
+  <button class="ctl" id="btn-throwback" aria-label="Throw your item backwards"><span><span class="ic">⤵️</span>THROW<br>BACK</span></button>
   <button class="ctl" id="btn-back" data-btn="back" aria-label="Look back"><span><span class="ic">👀</span>BACK</span></button>
   <button class="ctl" id="btn-item" data-btn="item" aria-label="Use item"><span><span class="ic" id="btn-item-ic"></span>ITEM</span></button>
   <button class="ctl" id="btn-drift" data-btn="drift" aria-label="Drift">DRIFT</button>
@@ -863,7 +870,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     <span class="eyebrow" id="char-mode">Grand Prix</span>
     <div class="char-grid" id="char-grid"></div>
     <div class="veh-pop" id="veh-pop" hidden>
-      <div class="vp-head"><b>Pick your ride</b><span id="vp-note">Five rides are free. Unlock the rest in the Career Garage or by levelling up.</span></div>
+      <div class="vp-head"><b>Pick your ride</b><span id="vp-note">Five rides are free. Buy the rest in the Career Garage, then use them everywhere.</span></div>
       <div class="vp-grid" id="vp-grid"></div>
     </div>
     <div class="bottom-bar">
@@ -1134,7 +1141,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><b>Stuck on a wall?</b>Steer away and the kart swings back round. If you're pinned, the drone lifts you out after a few seconds, or pause and tap <i>Back on the road</i>.</div>
         <div><b>Rocket start</b>Press and hold DRIFT right after the 2 disappears in the countdown.</div>
         <div><b>Gems</b>Each gem adds a little top speed, up to 10. Getting hit drops 3.</div>
-        <div><b>Items</b>Drive through the ? boxes, then tap ITEM to use what you got. For throwables (arrows on the button) swipe ITEM up to throw ahead or down to throw behind, or hold BRAKE while tapping it to throw behind.</div>
+        <div><b>Items</b>Drive through the crystal prize orbs, then tap ITEM to use what you got. Throwables can go either way: tap ITEM to throw ahead and the ⤵️ THROW BACK button to throw or drop behind you. You can also swipe ITEM up or down.</div>
         <div><b>Stuck?</b>If you're pinned against something for a few seconds, a drone lifts you back onto the road.</div>
         <div><b>Secret shortcuts</b>Every track hides one or two. Look for gaps in the wall, stacked crates and odd paths. Some need a boost to be worth it. Once found, they show on the minimap and the track card counts them.</div>
         <div><b>Ghosts</b>In Time Trial your best run is saved as a see-through ghost kart. Race it next time and watch the lap splits: green means you're ahead.</div>
@@ -1200,7 +1207,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=15e177b3", "./src/audio.js": "./src/audio.js?v=9185e717", "./src/career.js": "./src/career.js?v=53e69172", "./src/careerui.js": "./src/careerui.js?v=c7966754", "./src/characters.js": "./src/characters.js?v=6eeb348b", "./src/cosmetics.js": "./src/cosmetics.js?v=db481e9e", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=eda2b231", "./src/hud.js": "./src/hud.js?v=619cc34a", "./src/input.js": "./src/input.js?v=a91f52af", "./src/items.js": "./src/items.js?v=cef2bcce", "./src/kart.js": "./src/kart.js?v=9c7af513", "./src/karts.js": "./src/karts.js?v=06d27e9f", "./src/main.js": "./src/main.js?v=532408e4", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=270747a4", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/profile.js": "./src/profile.js?v=c43a3f76", "./src/race.js": "./src/race.js?v=ed106a5a", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=dbed08c9", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=69f2c660", "./src/tracks.js": "./src/tracks.js?v=1874a316", "./src/ui.js": "./src/ui.js?v=738dde80", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=08b516bc", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
-<script type="module" src="./src/main.js?v=532408e4"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=08ab71c4", "./src/audio.js": "./src/audio.js?v=9185e717", "./src/career.js": "./src/career.js?v=53e69172", "./src/careerui.js": "./src/careerui.js?v=c7966754", "./src/characters.js": "./src/characters.js?v=71d5d45a", "./src/cosmetics.js": "./src/cosmetics.js?v=a4117434", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=eda2b231", "./src/hud.js": "./src/hud.js?v=63c90bda", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=22f4f5c6", "./src/kart.js": "./src/kart.js?v=9c7af513", "./src/karts.js": "./src/karts.js?v=b2d6dcc5", "./src/main.js": "./src/main.js?v=a6f11a85", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=270747a4", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/profile.js": "./src/profile.js?v=f33aed62", "./src/race.js": "./src/race.js?v=b42c21a1", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=dbed08c9", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=1874a316", "./src/ui.js": "./src/ui.js?v=487de45e", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=1c2f2c79", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=a6f11a85"></script>
 </body>
 </html>

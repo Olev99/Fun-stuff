@@ -119,6 +119,9 @@ export class Input {
       el.addEventListener('lostpointercapture', () => set(false));
       el.addEventListener('contextmenu', (e) => e.preventDefault());
     });
+    // Throw the held item backwards.
+    const tb = root.querySelector('#btn-throwback');
+    if (tb) tb.addEventListener('pointerdown', (e) => { e.preventDefault(); this.itemPulse = -1; tb.classList.add('on'); setTimeout(() => tb.classList.remove('on'), 150); });
     const pad = root.querySelector('#steer-pad');
     const knob = root.querySelector('#steer-knob');
     const base = root.querySelector('#steer-base');

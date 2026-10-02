@@ -234,7 +234,18 @@ export class AIDriver {
         return k.path === race.track && Math.abs(k.trk.d) < 5;
       case 'bee':
       case 'storm':
+      case 'mirror':
         return k.place > 1 || Math.random() < 0.01;
+      case 'drum': {
+        const crowd = race.karts.some((o) => o !== k && (o.pos.x - k.pos.x) ** 2 + (o.pos.z - k.pos.z) ** 2 < 150);
+        return crowd || incoming() || Math.random() < 0.004;
+      }
+      case 'freeze': {
+        const ahead = race.karts.some((o) => o !== k && o.total - k.total > 4 && o.total - k.total < 55 && Math.abs(o.trk.d - k.trk.d) < 4);
+        return ahead || (smart > 0.5 && behindClose()) || Math.random() < 0.006;
+      }
+      case 'pogo':
+        return incoming() || Math.random() < 0.01;
       default:
         return true;
     }
