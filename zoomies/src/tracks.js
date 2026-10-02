@@ -120,7 +120,7 @@ export const TRACKS = [
     ],
   },
   {
-    id: 'neon', laps: 2, name: 'Neon Nebula', size: 'Long', theme: 'neon', scale: 1.3,
+    id: 'neon', laps: 3, name: 'Neon Nebula', size: 'Long', theme: 'neon', scale: 1.3,
     blurb: 'A glowing figure-eight skyway with a flyover.',
     music: { key: 7, bpm: 152, seed: 51, scale: 'minor' },
     points: [
@@ -132,7 +132,7 @@ export const TRACKS = [
     boosts: [{ at: 0.18, d: -3 }, { at: 0.33, d: 3 }, { at: 0.52, d: 0 }, { at: 0.76, d: -3 }, { at: 0.95, d: 3 }],
     ramps: [{ at: 0.6, len: 8, h: 1.8 }],
     gems: [{ at: 0.04, d: 0, n: 6 }, { at: 0.25, d: 3, n: 5 }, { at: 0.47, d: -3, n: 5 }, { at: 0.72, d: 0, n: 6 }, { at: 0.9, d: 2, n: 5 }],
-    obstacles: [{ at: 0.42, type: 'laser', amp: 7, speed: 1.2 }, { at: 0.8, type: 'laser', amp: 7, speed: 1 }],
+    obstacles: [{ at: 0.42, type: 'laser', amp: 7, speed: 1.2 }, { at: 0.8, type: 'laser', amp: 7, speed: 1 }, { at: 0.12, type: 'laser', amp: 6, speed: 1.4 }, { at: 0.58, type: 'laser', amp: 7, speed: 0.9 }],
     shortcuts: [
       { name: 'Hyperlane Leap', from: 0.3, to: 0.435, side: 1, surface: 'road', width: 9, deco: 'neonRings',
         wpts: [[120, 195, 5], [145, 175, 6.5], [168, 152, 8], [190, 132, 9.5]],
@@ -143,7 +143,7 @@ export const TRACKS = [
     ],
   },
   {
-    id: 'magma', laps: 2, name: 'Magma Mountain', size: 'Long', theme: 'volcano',
+    id: 'magma', laps: 3, name: 'Magma Mountain', size: 'Long', theme: 'volcano',
     blurb: 'Climb a smoking volcano, then bomb down its lava slopes.',
     music: { key: 9, bpm: 144, seed: 63, scale: 'minor' },
     points: [
@@ -157,9 +157,10 @@ export const TRACKS = [
     // Glide ramps sit so the landing comes before a shortcut entrance in both directions.
     ramps: [{ at: 0.49, len: 9, h: 2.2, glide: true }],
     gems: [{ at: 0.04, d: 0, n: 6 }, { at: 0.24, d: -3, n: 5 }, { at: 0.45, d: 3, n: 5 }, { at: 0.7, d: 0, n: 6 }, { at: 0.86, d: -2, n: 5 }],
-    obstacles: [{ at: 0.36, type: 'fireball', amp: 6, speed: 1 }, { at: 0.58, type: 'fireball', amp: 6, speed: 1.3 }, { at: 0.75, type: 'boulder', amp: 7, speed: 0.8 }],
+    obstacles: [{ at: 0.36, type: 'fireball', amp: 6, speed: 1 }, { at: 0.58, type: 'fireball', amp: 6, speed: 1.3 }, { at: 0.75, type: 'boulder', amp: 7, speed: 0.8 },
+      { at: 0.17, type: 'boulder', amp: 6, speed: 1.1 }, { at: 0.86, type: 'fireball', amp: 7, speed: 0.9 }],
     shoulder: 6, wallH: 1.8,
-    lakes: [{ x: 184, z: -104, rx: 22, rz: 14, lava: true }, { x: 205, z: 132, rx: 30, rz: 24, lava: true }],
+    lakes: [{ x: 184, z: -104, rx: 22, rz: 14, lava: true }, { x: 205, z: 132, rx: 30, rz: 24, lava: true }, { x: 100, z: 236, rx: 16, rz: 11, lava: true }],
     shortcuts: [
       { name: 'Crater Leap', lead: 25, from: 0.305, to: 0.4, side: -1, surface: 'road', width: 9, deco: 'lavaRocks',
         wpts: [[140, -105, 22], [172, -118, 21.5], [205, -128, 20], [232, -140, 18.5]],
@@ -167,10 +168,13 @@ export const TRACKS = [
       { name: 'Lava Tube', lead: 45, from: 0.08, to: 0.23, side: 1, surface: 'dirt', width: 10, deco: 'cave',
         wpts: [[48, -19, 4.5], [89, -17, 7.7], [130, -15, 10.9], [171, -14, 14]], gems: [{ at: 0.5, n: 5 }],
         obstacles: [{ at: 0.6, type: 'fireball', amp: 3, speed: 1.1 }] },
+      { name: 'Molten Gap', lead: 25, from: 0.615, to: 0.7, surface: 'road', width: 9, deco: 'lavaRocks',
+        wpts: [[140, 230, 0.6], [100, 234, 0.6], [60, 229, 0.5]],
+        ramps: [{ at: 0.3, len: 8, h: 2.2 }], voids: [{ at: 0.43, len: 0.15 }], gems: [{ at: 0.75, n: 4 }] },
     ],
   },
   {
-    id: 'cloud', laps: 2, name: 'Cloud Carnival', size: 'Long', theme: 'cloud', scale: 1.22,
+    id: 'cloud', laps: 3, name: 'Cloud Carnival', size: 'Long', theme: 'cloud', scale: 1.22,
     blurb: 'A floating fairground in the sky. Glide ramps included.',
     music: { key: 5, bpm: 148, seed: 83, scale: 'major' },
     points: [
@@ -183,7 +187,7 @@ export const TRACKS = [
     // Glide ramps sit so the landing comes before a shortcut entrance in both directions.
     ramps: [{ at: 0.52, len: 9, h: 2.4, glide: true }, { at: 0.835, len: 8, h: 2.0, glide: true }],
     gems: [{ at: 0.05, d: 0, n: 6 }, { at: 0.27, d: 3, n: 5 }, { at: 0.56, d: -3, n: 5 }, { at: 0.79, d: 0, n: 6 }],
-    obstacles: [{ at: 0.15, type: 'balloon', amp: 7, speed: 0.8 }, { at: 0.65, type: 'balloon', amp: 7, speed: 1 }],
+    obstacles: [{ at: 0.15, type: 'balloon', amp: 7, speed: 0.8 }, { at: 0.65, type: 'balloon', amp: 7, speed: 1 }, { at: 0.4, type: 'balloon', amp: 8, speed: 1.2 }, { at: 0.86, type: 'gumball', amp: 7, speed: 0.9 }],
     shortcuts: [
       { name: 'Rainbow Leap', from: 0.595, to: 0.73, side: 1, surface: 'road', width: 9, deco: 'rainbow',
         wpts: [[130, 64, 13.5], [162, 40, 13], [192, 16, 12], [220, -4, 11]],
@@ -250,7 +254,7 @@ export const TRACKS = [
     ],
   },
   {
-    id: 'glacier', laps: 2, name: 'Glacier Gorge', size: 'Long', theme: 'frost',
+    id: 'glacier', laps: 3, name: 'Glacier Gorge', size: 'Long', theme: 'frost',
     blurb: 'Sheer ice from start to finish. Brake early, drift long.',
     music: { key: 1, bpm: 130, seed: 127, scale: 'minor' },
     points: [
@@ -271,7 +275,8 @@ export const TRACKS = [
     boosts: [{ at: 0.2, d: 0 }, { at: 0.56, d: 3 }, { at: 0.9, d: -3 }],
     ramps: [{ at: 0.7, len: 8, h: 1.9 }],
     gems: [{ at: 0.03, d: 0, n: 5 }, { at: 0.25, d: 3, n: 5 }, { at: 0.45, d: -3, n: 6 }, { at: 0.65, d: 0, n: 5 }, { at: 0.83, d: 3, n: 5 }],
-    obstacles: [{ at: 0.4, type: 'snowball', amp: 6, speed: 1 }, { at: 0.58, type: 'penguin', amp: 7, speed: 0.8 }, { at: 0.89, type: 'snowball', amp: 6, speed: 1.2 }],
+    obstacles: [{ at: 0.4, type: 'snowball', amp: 6, speed: 1 }, { at: 0.58, type: 'penguin', amp: 7, speed: 0.8 }, { at: 0.89, type: 'snowball', amp: 6, speed: 1.2 },
+      { at: 0.12, type: 'penguin', amp: 6, speed: 1.1 }, { at: 0.7, type: 'snowball', amp: 7, speed: 0.9 }],
     // Glacier ice: even less grip than Frostbite Pass, with long black-ice sheets.
     grip: 0.42,
     traction: 0.72,
@@ -289,7 +294,7 @@ export const TRACKS = [
     ],
   },
   {
-    id: 'obsidian', laps: 2, name: 'Obsidian Rush', size: 'Long', theme: 'volcano',
+    id: 'obsidian', laps: 3, name: 'Obsidian Rush', size: 'Long', theme: 'volcano',
     blurb: 'Black-glass highways over rivers of lava.',
     music: { key: 4, bpm: 150, seed: 131, scale: 'minor' },
     points: [
@@ -311,10 +316,14 @@ export const TRACKS = [
     boosts: [{ at: 0.17, d: 0 }, { at: 0.36, d: 3 }, { at: 0.66, d: -3 }, { at: 0.81, d: 0 }],
     ramps: [{ at: 0.6, len: 9, h: 2.2, glide: true }],
     gems: [{ at: 0.03, d: 0, n: 6 }, { at: 0.22, d: -3, n: 5 }, { at: 0.46, d: 3, n: 5 }, { at: 0.72, d: 0, n: 6 }, { at: 0.9, d: -2, n: 5 }],
-    obstacles: [{ at: 0.33, type: 'fireball', amp: 6, speed: 1 }, { at: 0.58, type: 'boulder', amp: 7, speed: 0.8 }, { at: 0.7, type: 'fireball', amp: 6, speed: 1.3 }],
+    obstacles: [{ at: 0.33, type: 'fireball', amp: 6, speed: 1 }, { at: 0.58, type: 'boulder', amp: 7, speed: 0.8 }, { at: 0.7, type: 'fireball', amp: 6, speed: 1.3 },
+      { at: 0.08, type: 'boulder', amp: 6, speed: 1 }, { at: 0.9, type: 'fireball', amp: 6, speed: 1.1 }],
     shoulder: 6, wallH: 1.8,
-    lakes: [{ x: 145, z: 240, rx: 70, rz: 60, lava: true }, { x: -30, z: 320, rx: 24, rz: 30, lava: true }],
+    lakes: [{ x: 145, z: 240, rx: 70, rz: 60, lava: true }, { x: -30, z: 320, rx: 24, rz: 30, lava: true }, { x: 238, z: 240, rx: 14, rz: 22, lava: true }],
     shortcuts: [
+      { name: 'Lava Skip', lead: 25, from: 0.66, to: 0.805, surface: 'road', width: 9, deco: 'lavaRocks',
+        wpts: [[256, 302, 12], [238, 240, 10.5], [240, 176, 9]],
+        ramps: [{ at: 0.32, len: 8, h: 2.3 }], voids: [{ at: 0.45, len: 0.13 }], gems: [{ at: 0.2, n: 4 }, { at: 0.8, n: 4 }] },
       { name: 'Magma Chute', lead: 30, from: 0.14, to: 0.35, side: 1, surface: 'offroad', width: 9, deco: 'lavaRocks',
         wpts: [[-53, 275, 3.8], [-49, 311, 5.2], [-45, 347, 6.6], [-41, 383, 8]], gems: [{ at: 0.5, n: 4 }] },
       { name: 'Glass Bridge', lead: 30, from: 0.4, to: 0.6, side: 1, surface: 'road', width: 9, deco: 'lavaRocks',
@@ -410,7 +419,7 @@ export const TRACKS = [
     ],
   },
   {
-    id: 'moon', laps: 2, name: 'Moonbase Loop', size: 'Long', theme: 'moon', scale: 1.1,
+    id: 'moon', laps: 3, name: 'Moonbase Loop', size: 'Long', theme: 'moon', scale: 1.1,
     blurb: 'Low gravity! Floaty crater jumps with Earth overhead.',
     music: { key: 8, bpm: 128, seed: 173, scale: 'dorian' },
     points: [
@@ -430,7 +439,7 @@ export const TRACKS = [
     boosts: [{ at: 0.03, d: 0 }, { at: 0.28, d: 3 }, { at: 0.53, d: -3 }, { at: 0.78, d: 0 }],
     ramps: [{ at: 0.1, len: 8, h: 2.2 }, { at: 0.6, len: 8, h: 2.4 }],
     gems: [{ at: 0.13, d: 0, n: 6 }, { at: 0.2, d: 3, n: 5 }, { at: 0.45, d: -3, n: 5 }, { at: 0.63, d: 0, n: 6 }, { at: 0.9, d: 2, n: 5 }],
-    obstacles: [{ at: 0.26, type: 'rover', amp: 7, speed: 0.8 }, { at: 0.76, type: 'rover', amp: 7, speed: 1 }],
+    obstacles: [{ at: 0.26, type: 'rover', amp: 7, speed: 0.8 }, { at: 0.76, type: 'rover', amp: 7, speed: 1 }, { at: 0.5, type: 'rover', amp: 8, speed: 1.2 }, { at: 0.92, type: 'rover', amp: 6, speed: 0.9 }],
     patches: [{ at: 0.38, len: 18, d: -3, w: 9, type: 'sand' }, { at: 0.88, len: 18, d: 3, w: 9, type: 'sand' }],
     shortcuts: [
       { name: 'Crater Hop', lead: 30, from: 0.33, to: 0.6, side: 1, surface: 'road', width: 10,
@@ -439,6 +448,9 @@ export const TRACKS = [
       { name: 'Rover Tracks', lead: 30, from: 0.04, to: 0.32, side: 1, surface: 'offroad', width: 11, crates: true,
         wpts: [[44, 94, 0.6], [88, 144, 1.1], [133, 193, 1.7], [177, 242, 2.3]], gems: [{ at: 0.5, n: 5 }],
         obstacles: [{ at: 0.5, type: 'rover', amp: 3, speed: 0.9 }] },
+      { name: 'Comet Crater', lead: 25, from: 0.84, to: 0.965, surface: 'road', width: 9, deco: 'neonRings',
+        wpts: [[105, 33, 1.6], [73, 15, 1.6], [41, -8, 1.2]],
+        ramps: [{ at: 0.28, len: 8, h: 2.2 }], voids: [{ at: 0.42, len: 0.16 }], gems: [{ at: 0.8, n: 4 }] },
     ],
   },
   {

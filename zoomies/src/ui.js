@@ -1,4 +1,4 @@
-import { CHARACTERS, charById } from './characters.js';
+import { CHARACTERS, charById, charLocked } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
 import { Track } from './track.js';
 import { THEMES } from './world.js';
@@ -59,6 +59,13 @@ export class UI {
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
+        if (action !== 'back' && this._charLock()) {
+          // A locked racer is only a preview.
+          app.audio.play('wall', 5);
+          const l = document.querySelector('#scr-char .lockline');
+          if (l) { l.classList.remove('shake'); void l.offsetWidth; l.classList.add('shake'); }
+          break;
+        }
         if (this.mode === 'mp') app.mpCharDone();
         else if (action === 'back') app.toTitle();
         else this.trackSelect();
@@ -222,7 +229,7 @@ export class UI {
         b.dataset.id = ch.id;
         b.style.background = ch.color;
         b.setAttribute('aria-label', `${ch.name} the ${ch.species}`);
-        b.innerHTML = `<img alt="" src="${app.portraits[ch.id] || ''}"><span class="nm">${ch.name}</span>`;
+        b.innerHTML = `<img alt="" src="${app.portraits[ch.id] || ''}"><span class="nm">${ch.name}</span><span class="lk"></span>`;
         b.addEventListener('click', () => {
           app.firstGesture('char');
           app.audio.play('select');
@@ -233,6 +240,14 @@ export class UI {
     }
     app.showShowroom();
     $('veh-pop').hidden = true;
+    // Lock badges for racers that need a higher level (or hiring in the career).
+    const lvl = levelOf((app.career && app.career.xp) || 0).level;
+    grid.querySelectorAll('.card').forEach((c) => {
+      const ch = charById(c.dataset.id);
+      const lock = charLocked(ch.id, lvl, app.career);
+      c.classList.toggle('locked', !!lock);
+      c.querySelector('.lk').textContent = lock ? `🔒 Lv ${ch.lvl}` : ch.lvl ? 'NEW' : '';
+    });
     this.pickChar(app.settings.char);
     this.show('char');
   }
@@ -244,10 +259,17 @@ export class UI {
     document.querySelectorAll('#char-grid .card').forEach((c) => c.classList.toggle('sel', c.dataset.id === ch.id));
     $('ci-name').textContent = ch.name;
     $('ci-species').textContent = ch.species;
-    $('ci-tag').textContent = ch.tagline;
+    const lock = this._charLock();
+    $('ci-tag').innerHTML = lock ? `${ch.tagline}<br><b class="lockline">🔒 ${lock}</b>` : ch.tagline;
+    document.querySelector('#scr-char [data-go="next"]').classList.toggle('dim', !!lock);
     $('ci-stats').innerHTML = STAT_NAMES.map(([k, n]) =>
       `<span>${n}</span><div class="bar">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= ch.stats[k] ? 'on' : ''}"></i>`).join('')}</div>`).join('');
     this._syncVehicle();
+  }
+
+  _charLock() {
+    const app = this.app;
+    return charLocked(app.settings.char, levelOf((app.career && app.career.xp) || 0).level, app.career);
   }
 
   // The ride for quick races, cups, time trials and online (see app.menuLoadout).

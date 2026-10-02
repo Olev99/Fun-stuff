@@ -2,6 +2,7 @@ import { CHARACTERS, charById } from './characters.js';
 import { BODIES, UPGRADES, MAX_UPGRADE, kartStats } from './karts.js';
 import { trackById } from './tracks.js';
 import { fmtTime } from './util.js';
+import { levelOf } from './profile.js';
 
 // Career: start in the scrapyard with the Rust Bucket and one racer, win
 // coins in story events and spend them in the garage on karts, upgrades,
@@ -10,7 +11,10 @@ import { fmtTime } from './util.js';
 const KEY = 'zoomies-career-v1';
 
 // Racers join your team once you have beaten them in their chapter.
-export const RACER_PRICE = { mochi: 0, hopper: 600, zorp: 900, pip: 1200, ember: 1500, volt: 1900, rexi: 2300, bruno: 3000 };
+export const RACER_PRICE = {
+  mochi: 0, hopper: 600, zorp: 900, pip: 1200, ember: 1500, volt: 1900, rexi: 2300, bruno: 3000,
+  ...Object.fromEntries(CHARACTERS.filter((c) => c.price).map((c) => [c.id, c.price])),
+};
 
 export const PAINTS = [
   { id: 'stock', name: 'Racer colours', color: null, price: 0 },
@@ -421,7 +425,8 @@ function ordinalSuffix(n) {
   return s[(v - 20) % 10] || s[v] || s[0];
 }
 
-// Racers you can hire: beaten rivals (Mochi is always on the team).
-export const racerAvailable = (c, id) => id === 'mochi' || c.beaten.includes(id);
+// Racers you can hire: beaten rivals (Mochi is always on the team), and the
+// newer racers once you reach their player level.
+export const racerAvailable = (c, id) => id === 'mochi' || c.beaten.includes(id) || (!!charById(id).lvl && levelOf(c.xp || 0).level >= charById(id).lvl);
 
 export const ALL_RACERS = CHARACTERS.map((ch) => ch.id);

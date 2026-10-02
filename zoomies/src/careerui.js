@@ -266,7 +266,7 @@ export class CareerUI {
         if (racerAvailable(c, racer)) act = [`Hire ${coins(RACER_PRICE[racer])}`, c.coins >= RACER_PRICE[racer], 'buy-racer'];
         else {
           const chap = CHAPTERS.findIndex((x) => x.rival === racer);
-          act = [chap >= 0 ? `Beat in chapter ${chap + 1}` : 'Locked', false, ''];
+          act = [chap >= 0 ? `Beat in chapter ${chap + 1}` : charById(racer).lvl ? `Reach level ${charById(racer).lvl}` : 'Locked', false, ''];
         }
       } else if (racer !== c.racer) act = [`Drive as ${ch.name}`, true, 'equip-racer'];
       else act = ['Driving', false, ''];

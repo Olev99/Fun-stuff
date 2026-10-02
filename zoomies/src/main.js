@@ -14,7 +14,7 @@ import { BODIES, bodyLocked } from './karts.js';
 import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
-import { CHARACTERS } from './characters.js';
+import { CHARACTERS, charById, charLocked } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
 import { setMaxAniso } from './textures.js';
 import { fmtTime, ordinal } from './util.js';
@@ -284,7 +284,7 @@ class App {
 
   startDemo(trackId, reverse) {
     this.disposeRace();
-    const grid = shuffle(CHARACTERS.map((c) => c.id));
+    const grid = shuffle(CHARACTERS.map((c) => c.id)).slice(0, 8);
     this.race = new Race(this, { mode: 'demo', trackDef: trackById(trackId), reverse, grid, speedClass: 'zoom', laps: 99 });
     this.race.setSize(this.w, this.h, this.pr);
     // let the demo pack spread out a little before we show it
@@ -311,25 +311,41 @@ class App {
     this.view = this.showroom;
   }
 
-  makeGrid(player, gpOrder = null) {
-    const others = CHARACTERS.filter((c) => c.id !== player).map((c) => c.id);
+  // Eight racers: the player plus seven others (always including `must`,
+  // such as a career rival), the player in the middle of the pack.
+  makeGrid(player, gpOrder = null, must = []) {
     if (gpOrder) return gpOrder;
-    shuffle(others);
+    const req = must.filter((id) => id && id !== player);
+    const pool = shuffle(CHARACTERS.map((c) => c.id).filter((id) => id !== player && !req.includes(id)));
+    const others = shuffle([...req, ...pool.slice(0, 7 - req.length)]);
     others.splice(5, 0, player);
     return others;
+  }
+
+  // A cup keeps the same eight racers for all its races.
+  _gpField(gp, must = []) {
+    gp.field = this.makeGrid(gp.player, null, must);
+    gp.points = {};
+    for (const id of gp.field) gp.points[id] = 0;
   }
 
   startFromMenu(mode) {
     const s = this.settings;
     if (mode === 'gp') {
       const cup = CUPS.find((c) => c.id === s.cup) || CUPS[0];
-      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: s.char, extra: { playerLoadout: this.menuLoadout() } };
-      for (const c of CHARACTERS) this.gp.points[c.id] = 0;
+      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: this.menuChar(), extra: { playerLoadout: this.menuLoadout() } };
+      this._gpField(this.gp);
       this.startGPRace();
     } else {
       this.gp = null;
-      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: s.char, speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
+      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: this.menuChar(), speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
     }
+  }
+
+  // The racer picked on the racer screen, if unlocked (else Mochi).
+  menuChar() {
+    const id = this.settings.char;
+    return charLocked(id, levelOf((this.career && this.career.xp) || 0).level, this.career) ? 'mochi' : charById(id).id;
   }
 
   // The ride picked on the racer screen (quick races, Grand Prix, time trials,
@@ -342,10 +358,10 @@ class App {
 
   startGPRace() {
     const gp = this.gp;
-    let order = null;
+    let order = gp.field;
     if (gp.index > 0) {
       // Leader starts at the back.
-      order = CHARACTERS.map((c) => c.id).sort((a, b) => gp.points[a] - gp.points[b] || (a === gp.player ? 1 : -1));
+      order = gp.field.slice().sort((a, b) => gp.points[a] - gp.points[b] || (a === gp.player ? 1 : -1));
     }
     this.startRace({ mode: 'gp', trackId: gp.tracks[gp.index], reverse: gp.reverse, player: gp.player, speedClass: gp.speedClass, order, ...(gp.extra || {}) });
   }
@@ -616,7 +632,7 @@ class App {
 
   showGPFinal(afterPodium = false) {
     const gp = this.gp;
-    const table = CHARACTERS.map((c) => ({ ch: c, pts: gp.points[c.id], isPlayer: c.id === gp.player }))
+    const table = gp.field.map((id) => ({ ch: charById(id), pts: gp.points[id], isPlayer: id === gp.player }))
       .sort((a, b) => b.pts - a.pts || (a.isPlayer ? -1 : 1));
     table.forEach((r, i) => (r.place = i + 1));
     const me = table.find((r) => r.isPlayer);
@@ -746,19 +762,19 @@ class App {
     const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev };
     this.careerRun = { evId };
     if (ev.type === 'cup') {
-      const others = CHARACTERS.map((ch) => ch.id).filter((id) => id !== player);
       this.gp = {
         cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: chapter.cls, player, careerEv: ev, wins: 0, gems: 0,
-        extra: { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev },
       };
-      for (const ch of CHARACTERS) this.gp.points[ch.id] = 0;
+      this._gpField(this.gp, [rival]);
+      const others = this.gp.field.filter((id) => id !== player);
+      this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev };
       this.startGPRace();
     } else if (ev.type === 'time') {
       this.startRace({ ...base, mode: 'tt' });
     } else if (ev.type === 'duel') {
       this.startRace({ ...base, mode: 'quick', grid: [rival, player], difficulty: chapter.bossDiff, loadoutsById: aiLoadouts(chapter, [rival], rival) });
     } else {
-      const grid = this.makeGrid(player);
+      const grid = this.makeGrid(player, null, [rival]);
       this.startRace({ ...base, mode: 'quick', grid, loadoutsById: aiLoadouts(chapter, grid.filter((id) => id !== player), rival) });
     }
   }
@@ -865,7 +881,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.host(this.settings.char, this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
+      await ses.host(this.menuChar(), this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
     } catch (e) {
       ses.close();
       this.ui.lobby('start', `Could not create a room: ${(e && e.message) || e}. Check your internet connection.`);
@@ -887,7 +903,7 @@ class App {
     const ses = new NetSession(this);
     this._wireSession(ses);
     try {
-      await ses.join(code, this.settings.char, this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
+      await ses.join(code, this.menuChar(), this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
     } catch (e) {
       ses.close();
       this.ui.lobby('start', (e && e.message) || 'Could not connect.');
@@ -898,7 +914,7 @@ class App {
   }
 
   mpCharDone() {
-    if (this.session) this.session.pickChar(this.settings.char);
+    if (this.session) this.session.pickChar(this.menuChar());
     this.returnToLobbyView();
   }
 

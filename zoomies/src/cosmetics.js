@@ -232,6 +232,8 @@ export const STARTER = ['nohat', 'classic', 'beep'];
 const ANCHOR = {
   mochi: [2.04, -0.24, 1], pip: [2.08, -0.22, 1], bruno: [2.1, -0.22, 1.08], rexi: [1.98, -0.28, 0.95],
   volt: [1.95, -0.22, 1.05], ember: [2.04, -0.24, 1], zorp: [2.2, -0.22, 1.05], hopper: [2.03, -0.26, 1.08],
+  yuzu: [2.04, -0.26, 1.02], lulu: [2.0, -0.22, 1.1], bao: [2.08, -0.22, 1.06], hoot: [2.06, -0.22, 1.04],
+  bandit: [2.04, -0.22, 1], fizz: [2.04, -0.22, 1], ollie: [2.32, -0.28, 1.1], gus: [2.12, -0.22, 1.1],
 };
 
 // Add a hat to a racer's driver model.
