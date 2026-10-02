@@ -617,6 +617,7 @@ class App {
         sum.xp += dr.xp;
         sum.levelCoins += dr.levelCoins;
         sum.ups.push(...dr.ups);
+        sum.caps = [...(sum.caps || []), ...(dr.caps || [])];
         sum.level = dr.level;
       } else lines.push('Already completed today. Come back tomorrow for a new challenge!');
     }

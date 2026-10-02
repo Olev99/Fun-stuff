@@ -13,7 +13,7 @@ import qrcode from '../vendor/qrcode.mjs';
 import { PeerTransport, LocalTransport, NetSession, makeCode } from './net.js';
 import { saveCareer, loadCareer, newCareer } from './career.js';
 import { saveRecords } from './settings.js';
-import { levelOf } from './profile.js';
+import { levelOf, oldLevel } from './profile.js';
 import { ownedCount } from './cosmetics.js';
 
 const $ = (id) => document.getElementById(id);
@@ -44,6 +44,8 @@ export function mergeCareer(A, B) {
   m.coins = mergeNum(a.coins, b.coins, base('coins'));
   m.earned = mergeNum(a.earned, b.earned, base('earned'));
   m.freeCaps = mergeNum(a.freeCaps, b.freeCaps, base('freeCaps'));
+  // Level rewards already paid on either device (older saves: by their old level).
+  m.lvlPaid = Math.max(...[A, B].map((x) => (x && x.lvlPaid) || oldLevel(num(x && x.xp))));
   for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) m[k] = union(a[k], b[k]);
   m.champion = !!(a.champion || b.champion);
   // Upgrades: the higher level of each, per kart.

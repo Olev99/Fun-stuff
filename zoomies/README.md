@@ -5,7 +5,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 ## What's in it
 
 - **20 racers of all shapes and sizes:** the 8 starters (Mochi the cat, Pip the penguin, Bruno the bear, Rexi the dino, Volt the robot, Ember the fox, Zorp the alien and Hopper the frog) are free. 12 more join through the Career, from tiny Fizz the bee and Gloop the slime to Nimbus the cloud, Pebble the rock golem and Boris the yeti, who sit almost twice as big in their karts. Each has its own speed, acceleration, handling and weight.
-  - New racers are hired in the Career Garage once you reach their level. Locked racers show a 🔒 Career badge on the racer screen.
+  - New racers are hired in the Career Garage once you reach their level (from level 3 for Yuzu up to level 18 for Boris). Locked racers show a 🔒 Career badge on the racer screen.
 - **20 tracks in 4 sizes and 14 themes,** each also playable in reverse. Every track hides secret shortcuts: jumps, glides, tunnels and boost-only cuts. Medium and Long tracks have two each.
 - **Epic adventures:** two long one-lap tracks in three legs where every vehicle changes on the way. On water it turns into a speedboat (a hull pops out, it rocks on the swell and slides through bends); in the sky it sprouts wings and a propeller and you fly through gold boost rings past storm clouds, then land on a runway. The HUD counts legs instead of laps, and each leg gets its own banner.
   - **Jungle Odyssey:** temple road, river rapids with a waterfall jump, a lagoon of crocodiles and floating logs, then up a sea cliff and fly home over the sea. Secrets: the Lost Temple ruins, a Hidden Grotto river channel and the Storm Gap sky lane.
@@ -47,11 +47,12 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Quick Race.
   - Time Trial, with saved records.
   - Multiplayer.
-- **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Every 5th level gives a free prize capsule, and so does the daily reward. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
+- **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Style points count for half. Each level takes longer than the last: a good racer needs about 25 races for level 10 and 100 for level 18. Each level-up shows what it unlocks: racers you can now hire, and a free prize capsule every 5th level. The daily reward also gives a free capsule. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
 - **Gumball machine (🍬 Prizes):**
   - Spend 600 coins, or a free capsule, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary.
+  - **Jackpots (8%):** real prizes instead of a cosmetic. A paint job (3%), a free upgrade level on your current ride (2.5%), 1,500 coins (1.5%), a kart or bike you don't own (0.7%) or a racer you haven't hired (0.3%). Jackpot karts, bikes and racers work everywhere, like ones bought in the Career.
   - Hats show on your racer everywhere, even to friends online. Trails colour your boost flames, and your horn honks when you overtake someone.
   - Duplicates pay coins back.
 - **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.

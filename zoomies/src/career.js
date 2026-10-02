@@ -2,7 +2,7 @@ import { CHARACTERS, charById } from './characters.js';
 import { BODIES, UPGRADES, MAX_UPGRADE, kartStats } from './karts.js';
 import { trackById } from './tracks.js';
 import { fmtTime } from './util.js';
-import { levelOf } from './profile.js';
+import { levelOf, oldLevel } from './profile.js';
 
 // Career: start in the scrapyard with the Rust Bucket and one racer, win
 // coins in story events and spend them in the garage on karts, upgrades,
@@ -218,6 +218,7 @@ export function newCareer() {
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
     xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    lvlPaid: 1, // highest level whose rewards were paid
     // gumball machine prizes: owned ids and what you're wearing
     cos: [], hat: 'nohat', trail: 'classic', horn: 'beep',
   };
@@ -227,7 +228,10 @@ export function loadCareer() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const c = Object.assign(newCareer(), JSON.parse(raw));
+      const saved = JSON.parse(raw);
+      const c = Object.assign(newCareer(), saved);
+      // Saves from before the steeper level curve: their old level's rewards were paid.
+      if (saved.lvlPaid === undefined) c.lvlPaid = oldLevel(c.xp || 0);
       if (!BODIES[c.body]) c.body = 'buggy';
       if (!c.bodies.includes(c.body)) c.bodies.push(c.body);
       if (!c.racers.includes(c.racer)) c.racer = c.racers[0] || 'mochi';

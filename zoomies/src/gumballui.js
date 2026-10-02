@@ -2,12 +2,15 @@ import { charById } from './characters.js';
 import { paintById, saveCareer } from './career.js';
 import { checkAchievements } from './profile.js';
 import { KINDS, RARITY, CAPSULE_PRICE, spinGumball, owns, ownedCount, COSMETIC_TOTAL, hatById, trailById, hornById, cosmeticById } from './cosmetics.js';
+import { rollJackpot, JACKPOT_CHANCE } from './prizes.js';
 
 const $ = (id) => document.getElementById(id);
 const BALLS = ['#ff5a8a', '#ffd23f', '#36a9ff', '#19e3b1', '#c77dff', '#ff8a3a', '#ffffff', '#7dff9a'];
 
 // The gumball machine: spend coins (or free capsules from levelling up) on
-// random hats, boost trails and horns, then pick what to wear.
+// random hats, boost trails and horns, then pick what to wear. A rare
+// jackpot gives a real prize instead: a racer, a ride, paint, an upgrade
+// or a pile of coins.
 export class GumballUI {
   constructor(app) {
     this.app = app;
@@ -45,6 +48,17 @@ export class GumballUI {
   _showKart() {
     const c = this.c;
     this.app.showroom.setChar(charById(c.racer), { body: c.body, paint: paintById(c.paint).color, hat: c.hat });
+  }
+
+  // Show off a jackpot in the showroom (without changing your selection).
+  _showJackpot(it) {
+    const c = this.c;
+    const o = { body: c.body, paint: paintById(c.paint).color, hat: c.hat };
+    let ch = charById(c.racer);
+    if (it.prize === 'racer') ch = charById(it.ref);
+    else if (it.prize === 'body') o.body = it.ref;
+    else if (it.prize === 'paint') o.paint = paintById(it.ref).color;
+    this.app.showroom.setChar(ch, o);
   }
 
   action(a) {
@@ -91,7 +105,11 @@ export class GumballUI {
       const x = 50 + Math.cos(a) * rr * 0.95, y = 58 + Math.sin(a) * rr * 0.8;
       balls += `<i style="left:${x.toFixed(1)}%;top:${Math.min(80, y).toFixed(1)}%;background:${BALLS[i % BALLS.length]}"></i>`;
     }
-    const odds = Object.values(RARITY).map((r) => `<span style="color:${r.color}">${r.name} ${r.weight}%</span>`).join('');
+    // Cosmetic odds share what the jackpot leaves.
+    const tiers = Object.values(RARITY).filter((r) => r.weight > 0), total = tiers.reduce((a, r) => a + r.weight, 0);
+    const pct = (v) => `${Math.max(1, Math.round(v * 100))}%`;
+    const odds = tiers.map((r) => `<span style="color:${r.color}">${r.name} ${pct((r.weight / total) * (1 - JACKPOT_CHANCE))}</span>`).join('')
+      + `<span style="color:${RARITY.jackpot.color}">Jackpot ${pct(JACKPOT_CHANCE)}</span>`;
     return `<div class="gwrap"><div class="gmachine" id="gmachine">
         <div class="globe"><div class="balls">${balls}</div><div class="shine"></div></div>
         <div class="gneck"></div>
@@ -108,10 +126,17 @@ export class GumballUI {
     const L = this.last;
     if (!L) {
       el.className = 'greveal idle';
-      el.innerHTML = `<b>Win hats, boost trails and horns!</b><small>Every 5th level gives a free turn. Duplicates pay coins back.</small>`;
+      el.innerHTML = `<b>Win hats, boost trails and horns!</b><small>Rare jackpots hold real prizes: racers, karts, bikes, paint, upgrades and coins. Every 5th level and the daily reward give a free turn.</small>`;
       return;
     }
     const it = L.item, r = RARITY[it.rarity];
+    if (L.jackpot) {
+      el.className = 'greveal show jackpot legendary';
+      el.style.setProperty('--r', r.color);
+      el.innerHTML = `<span class="ri">${it.icon}</span><span class="rm"><small style="color:${r.color}">🎰 JACKPOT!</small><b>${it.name}</b>
+        <em class="new">${it.note}</em></span>`;
+      return;
+    }
     const kindName = { hat: 'Hat', trail: 'Boost trail', horn: 'Horn' }[it.kind];
     const worn = this.c[KINDS.find((k) => k.id === it.kind).slot] === it.id;
     el.className = `greveal show ${it.rarity}`;
@@ -158,10 +183,10 @@ export class GumballUI {
     }
     if (!(c.freeCaps > 0) && c.coins < CAPSULE_PRICE) {
       this.app.audio.play('uiBack');
-      this._note('Not enough coins. Race to earn more!');
+      this._note('Not enough coins. Earn more in the Career!');
       return;
     }
-    const res = spinGumball(c);
+    const res = spinGumball(c, Math.random, rollJackpot);
     if (!res) return;
     const achs = checkAchievements(c, this.app.records);
     saveCareer(c);
@@ -182,14 +207,15 @@ export class GumballUI {
     }, 800);
     setTimeout(() => {
       m.classList.add('pop');
-      this.app.audio.play('reveal', res.item.rarity);
+      this.app.audio.play('reveal', res.jackpot ? 'legendary' : res.item.rarity);
       this.last = res;
       this.busy = false;
       this.render();
       // A new hat goes straight on so you can see it.
+      if (res.jackpot) this._showJackpot(res.item);
       if (!res.dup && res.item.kind === 'hat') this.pick(res.item.id, true);
       if (!res.dup && res.item.kind === 'horn') this.app.audio.horn(res.item.id, 0.5);
-      if (res.item.rarity === 'legendary' || res.item.rarity === 'epic') this.app.showroom.bounce = 1;
+      if (res.item.rarity === 'legendary' || res.item.rarity === 'epic' || res.jackpot) this.app.showroom.bounce = 1;
       if (achs.length) this._note(achs.map((a) => `🏆 ${a.name} +${a.reward} 🪙`).join(' · '));
       if (achs.length) this.render();
     }, 1700);

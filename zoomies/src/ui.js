@@ -210,7 +210,12 @@ export class UI {
     const coins = sum ? sum.coins : 0;
     const top = sum ? `<div class="rw-top">${coins ? `<span class="rw-c">+${coins} 🪙</span>` : ''}<span class="rw-x">+${sum.xp} XP</span><span class="rw-l">Lv ${lv.level}</span><span class="xpbar"><i style="width:${pct}%"></i></span></div>` : '';
     const extra = lines.map((l) => `<div class="rw-line">${l}</div>`).join('');
-    const ups = sum && sum.ups.length ? sum.ups.map((L) => `<div class="rw-up">⭐ LEVEL ${L}! +${80 + 20 * L} 🪙${L % 5 === 0 ? ' · free gumball 🍬' : ''}</div>`).join('') : '';
+    // What each new level brings: racers you can now hire and free capsules.
+    const ups = sum && sum.ups.length ? sum.ups.map((L) => {
+      const gets = CHARACTERS.filter((ch) => ch.lvl === L).map((ch) => `${ch.name} can be hired`);
+      if ((sum.caps || []).includes(L)) gets.push('free gumball 🍬');
+      return `<div class="rw-up">⭐ LEVEL ${L}!${gets.length ? ` · ${gets.join(' · ')}` : ''}</div>`;
+    }).join('') : '';
     const ach = achs.map((a) => `<div class="rw-ach">🏆 ${a.icon} <b>${a.name}</b> · ${a.desc} <span>+${a.reward} 🪙</span></div>`).join('');
     return `<div class="rewards">${top}${extra}${ups}${ach}</div>`;
   }

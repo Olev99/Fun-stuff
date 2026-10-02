@@ -8,7 +8,17 @@ import { rng } from './util.js';
 // achievements and the daily challenge streak.
 
 // ---------------- levels ----------------
-export const xpToNext = (level) => 100 + 40 * (level - 1);
+// Each level takes longer than the last. A good racer (about 300 XP a race)
+// needs about 6 races for level 5, 25 for level 10 and 100 for level 18.
+export const xpToNext = (level) => 250 + 100 * (level - 1) + 8 * (level - 1) ** 2;
+
+// The old, much faster curve; only used to avoid paying the same level
+// rewards twice for saves from before the change.
+export function oldLevel(xp) {
+  let level = 1, left = xp;
+  while (left >= 100 + 40 * (level - 1)) left -= 100 + 40 * (level - 1), level++;
+  return level;
+}
 
 export function levelOf(xp) {
   let level = 1, need = xpToNext(1), left = xp;
@@ -52,7 +62,8 @@ export function awardRace(c, info) {
   // Coins are only earned in the career (it passes them in); every other
   // mode pays XP.
   if (info.coins !== undefined) coins = info.coins;
-  xp = (info.mode === 'tt' ? 50 : 40 + (PLACE_XP[place - 1] || 8)) + (info.style || 0) + (info.online ? 30 : 0) + (info.xpBonus || 0);
+  // Style points count for half, so levels come from racing well, not farming tricks.
+  xp = (info.mode === 'tt' ? 50 : 40 + (PLACE_XP[place - 1] || 8)) + Math.round((info.style || 0) / 2) + (info.online ? 30 : 0) + (info.xpBonus || 0);
   // stats
   addStat(c, 'races');
   if (info.mode !== 'tt') {
@@ -75,16 +86,20 @@ export function grant(c, coins, xp) {
   c.xp = (c.xp || 0) + xp;
   const after = levelOf(c.xp).level;
   let levelCoins = 0;
-  const ups = [];
+  const ups = [], caps = [];
+  // Free capsules are paid once per level, ever (even if a save's level
+  // dropped when the curve got steeper).
+  c.lvlPaid = c.lvlPaid || 1;
   for (let L = before + 1; L <= after; L++) {
     levelCoins += levelReward(L);
     ups.push(L);
-    if (L % 5 === 0) c.freeCaps = (c.freeCaps || 0) + 1;
+    if (L % 5 === 0 && L > c.lvlPaid) { c.freeCaps = (c.freeCaps || 0) + 1; caps.push(L); }
   }
+  c.lvlPaid = Math.max(c.lvlPaid, after);
   c.coins += coins;
   c.earned = (c.earned || 0) + coins;
   // Level-ups no longer pay coins (coins come from the career only).
-  return { coins, xp, levelCoins: 0, ups, level: after };
+  return { coins, xp, levelCoins: 0, ups, caps, level: after };
 }
 
 // ---------------- achievements ----------------
@@ -132,7 +147,7 @@ export const ACHIEVEMENTS = [
   { id: 'streak7', icon: '🔥', name: 'On a Roll', desc: 'Keep a 7-day daily streak', reward: 700, prog: (c) => [Math.min((c.daily && c.daily.best) || 0, 7), 7] },
   { id: 'battle1', icon: '🎈', name: 'Balloon Buster', desc: 'Win a balloon battle', reward: 150, ...count('battleWins', 1) },
   { id: 'lv10', icon: '⭐', name: 'Rising Star', desc: 'Reach level 10', reward: 300, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 10), 10] },
-  { id: 'lv30', icon: '🌟', name: 'Superstar', desc: 'Reach level 30', reward: 1500, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 30), 30] },
+  { id: 'lv30', icon: '🌟', name: 'Superstar', desc: 'Reach level 25', reward: 1500, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 25), 25] },
   { id: 'cap1', icon: '🍬', name: 'Sweet Tooth', desc: 'Open a gumball capsule', reward: 50, ...count('capsules', 1) },
   { id: 'cos10', icon: '🎩', name: 'Dress Up', desc: 'Collect 10 gumball prizes', reward: 300, prog: (c) => [Math.min(ownedCount(c), 10), 10] },
   { id: 'cosall', icon: '🧺', name: 'Completionist', desc: 'Collect every gumball prize', reward: 2000, prog: (c) => [ownedCount(c), COSMETIC_TOTAL] },

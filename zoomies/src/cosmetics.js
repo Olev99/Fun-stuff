@@ -8,6 +8,8 @@ export const RARITY = {
   rare: { name: 'Rare', weight: 28, refund: 80, color: '#7dff9a' },
   epic: { name: 'Epic', weight: 10, refund: 150, color: '#c77dff' },
   legendary: { name: 'Legendary', weight: 2, refund: 300, color: '#ffd23f' },
+  // Real prizes (racers, rides, paint, upgrades, coins): rolled first, see prizes.js.
+  jackpot: { name: 'Jackpot', weight: 0, refund: 0, color: '#ff5ad8' },
 };
 
 export const CAPSULE_PRICE = 600;
@@ -272,16 +274,25 @@ export function ownedCount(c) {
 export const COSMETIC_TOTAL = ALL.length - STARTER.length;
 
 // One turn of the gumball machine. Costs a free capsule if you have one,
-// otherwise CAPSULE_PRICE coins. Duplicates pay back coins.
-export function spinGumball(c, rnd = Math.random) {
+// otherwise CAPSULE_PRICE coins. Duplicates pay back coins. `jackpot` may
+// return a real prize instead of a cosmetic (see prizes.js).
+export function spinGumball(c, rnd = Math.random, jackpot = null) {
   const free = (c.freeCaps || 0) > 0;
   if (!free && c.coins < CAPSULE_PRICE) return null;
   if (free) c.freeCaps--;
   else c.coins -= CAPSULE_PRICE;
+  c.stats = c.stats || {};
+  const jp = jackpot && jackpot(c, rnd);
+  if (jp) {
+    c.stats.capsules = (c.stats.capsules || 0) + 1;
+    c.stats.jackpots = (c.stats.jackpots || 0) + 1;
+    return { item: jp, dup: false, refund: 0, free, jackpot: true };
+  }
   const pool = ALL.filter((it) => !STARTER.includes(it.id));
-  let r = rnd() * Object.values(RARITY).reduce((a, b) => a + b.weight, 0);
+  const tiers = Object.entries(RARITY).filter(([, v]) => v.weight > 0);
+  let r = rnd() * tiers.reduce((a, [, v]) => a + v.weight, 0);
   let rarity = 'common';
-  for (const [k, v] of Object.entries(RARITY)) {
+  for (const [k, v] of tiers) {
     if ((r -= v.weight) < 0) { rarity = k; break; }
   }
   // Prefer something new within the rolled rarity, but duplicates can happen.
