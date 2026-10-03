@@ -1,0 +1,9 @@
+{
+  "name": "zoomies-tests",
+  "private": true,
+  "type": "module",
+  "description": "Headless browser tests for Zoomies (see run.mjs)",
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}
