@@ -1,0 +1,34 @@
+import { chromium } from 'playwright-core';
+const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
+const errs = [];
+p.on('pageerror', e => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 300)); });
+await p.goto('http://localhost:8000/index.html');
+await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
+await p.tap('#scr-title [data-go="quick"]');
+await p.waitForTimeout(700);
+console.log('btn:', await p.textContent('#veh-btn'));
+await p.tap('#veh-btn');
+await p.waitForTimeout(500);
+await p.screenshot({ path: 'ui/picker-open.png' });
+await p.tap('#vp-grid [data-id="sportbike"]');
+await p.waitForTimeout(600);
+console.log('locked note:', await p.textContent('#vp-note'), '| still:', await p.textContent('#veh-nm'));
+await p.screenshot({ path: 'ui/picker-locked.png' });
+await p.tap('#vp-grid [data-id="scooter"]');
+await p.waitForTimeout(600);
+console.log('picked:', await p.textContent('#veh-nm'), 'popup hidden:', await p.evaluate(() => document.getElementById('veh-pop').hidden));
+await p.screenshot({ path: 'ui/picker-scooter.png' });
+// buy sportbike in career data -> unlocked
+await p.evaluate(() => { const a = window.zoomies; a.career.bodies.push('sportbike'); });
+await p.tap('#veh-btn'); await p.waitForTimeout(300);
+await p.tap('#vp-grid [data-id="sportbike"]'); await p.waitForTimeout(300);
+console.log('after buying:', await p.textContent('#veh-nm'));
+await p.tap('#scr-char [data-go="next"]'); await p.waitForTimeout(600);
+await p.tap('#scr-track [data-go="race"]'); await p.waitForTimeout(2500);
+console.log('race body:', await p.evaluate(() => window.zoomies.race.player.bodyDef.id));
+// remove from career: menuLoadout falls back to classic
+console.log('fallback:', await p.evaluate(() => { const a = window.zoomies; a.career.bodies = a.career.bodies.filter((x) => x !== 'sportbike'); return a.menuLoadout().body; }));
+await p.screenshot({ path: 'ui/race-back.png' });
+console.log('errors', errs.length);
+await b.close();
