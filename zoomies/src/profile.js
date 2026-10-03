@@ -66,7 +66,8 @@ export function awardRace(c, info) {
   xp = (info.mode === 'tt' ? 50 : 40 + (PLACE_XP[place - 1] || 8)) + Math.round((info.style || 0) / 2) + (info.online ? 30 : 0) + (info.xpBonus || 0);
   // stats
   addStat(c, 'races');
-  if (info.mode !== 'tt') {
+  // Race wins and podiums (battles have their own trophy).
+  if (info.mode !== 'tt' && info.mode !== 'battle') {
     if (place === 1) addStat(c, 'wins');
     if (place && place <= 3) addStat(c, 'podiums');
   }

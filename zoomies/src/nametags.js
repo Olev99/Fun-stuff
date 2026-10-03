@@ -40,7 +40,7 @@ export class NameTags {
       let a = 0;
       const dist = cam.distanceTo(k.pos);
       let edge = false;
-      if (show && dist < t.max) {
+      if (show && dist < t.max && !k.out) {
         _v.set(k.pos.x, k.pos.y + 2.3, k.pos.z).project(camera);
         if (_v.z < 1 && Math.abs(_v.x) < 1.15 && Math.abs(_v.y) < 1.15) {
           // Fade out towards the edge of the range.
@@ -71,9 +71,11 @@ export class NameTags {
         t.a = a;
         t.d.style.opacity = a.toFixed(2);
       }
-      if (k.place !== t.n) {
-        t.n = k.place;
-        t.place.textContent = k.place;
+      // In a battle the tag shows balloons left instead of the place.
+      const lbl = race.battle ? `🎈${k.balloons}` : k.place;
+      if (lbl !== t.n) {
+        t.n = lbl;
+        t.place.textContent = lbl;
       }
     }
   }

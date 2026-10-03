@@ -1,3 +1,5 @@
+import { arenaById } from './arenas.js';
+
 // Track layouts. Points are [x, z, height, widthMultiplier]. Feature positions
 // are fractions of a lap (0 = start line); lateral offsets are metres (+ = right).
 // Shortcuts leave the main road through a gap in the wall on `side` at `from`
@@ -637,5 +639,5 @@ export const CUPS = [
 ];
 
 export function trackById(id) {
-  return TRACKS.find((t) => t.id === id) || TRACKS[0];
+  return TRACKS.find((t) => t.id === id) || arenaById(id) || TRACKS[0];
 }

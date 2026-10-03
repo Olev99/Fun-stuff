@@ -46,7 +46,14 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Grand Prix: 9 cups of 4 races with points.
   - Quick Race.
   - Time Trial, with saved records.
+  - Balloon Battle (see below).
   - Multiplayer.
+- **🎈 Balloon Battle:** six racers in an open arena, three balloons each, two and a half minutes on the clock.
+  - Every hit pops a balloon, followed by a few safe seconds. Ram a rival with a 🌶️ Chili Boost (or while on a Rainbow Rush) to steal one of theirs, up to five.
+  - Lose your last balloon and you're out. The last racer left wins, or whoever holds the most balloons when time runs out (most hits breaks a tie).
+  - The orbs hold battle items only (no warps, rockets or gems), and a racer down to one balloon gets more shields and rainbows. The arena's moving obstacles knock you aside but don't pop balloons.
+  - Five arenas, each a bowl round a central island: **Barnyard Bowl** (hay bales and mud), **Snowglobe Rink** (slippery ice and snowballs), **Neon Pinball** (a long oval with boost strips and laser sweepers), **Sandcastle Cove** (rolling dunes and crabs) and **Moon Crater** (low gravity and big bumps).
+  - Computer racers hunt the leader, grab orbs, line up their shots (faster on Hard) and drop traps on whoever is chasing them. Winning a battle earns the Balloon Buster trophy, and the arena cards count your wins.
 - **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Style points count for half. Each level takes longer than the last: a good racer needs about 25 races for level 10 and 100 for level 18. Each level-up shows what it unlocks: racers you can now hire, and a free prize capsule every 5th level. The daily reward also gives a free capsule. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
@@ -177,13 +184,15 @@ zoomies/
   src/kart.js         kart physics (drift, boosts, jumps, glide, respawn) and visuals
   src/track.js        spline paths, shortcuts, bridges, path-space queries
   src/tracks.js       track layouts, shortcuts and cups
+  src/arenas.js       Balloon Battle arenas
+  src/battle.js       Balloon Battle rules, balloons and the battle AI
   src/world.js        sky, terrain, lakes, walls, scenery and landmarks per theme
   src/characters.js   racers and their procedural models
   src/karts.js        kart bodies, upgrades and kart stats
   src/nametags.js     name and place tags floating over the karts
   src/ghost.js        time trial ghost recording and replay
   src/ai.js           computer drivers and difficulty levels
-  src/items.js        items, item boxes, gems, obstacles, crates
+  src/items.js        items, prize orbs, gems, obstacles, crates
   src/input.js        tilt, touch and keyboard input
   src/audio.js        synthesised sound effects and music
   tools/build-single.mjs  bundles everything into one HTML file

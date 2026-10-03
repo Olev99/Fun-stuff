@@ -296,7 +296,7 @@ export class ItemSystem {
       for (const s of p.itemRows) {
         const fr = p.frame(s, {});
         const k = fr.hw / 8.5;
-        const offs = fr.hw > 7 ? [-6, -2, 2, 6] : [-3, 3];
+        const offs = this.race.battle ? [-5.5, 0, 5.5] : fr.hw > 7 ? [-6, -2, 2, 6] : [-3, 3];
         for (const d of offs) {
           p.pointAt(s, d * k, v);
           this.boxes.push({ pos: v.clone().setY(v.y + 1.4), active: true, t: 0, ph: Math.random() * 6 });
@@ -392,6 +392,7 @@ export class ItemSystem {
   roll(kart) {
     const pool = this.race.mods && this.race.mods.items;
     if (pool) return pool[Math.floor(Math.random() * pool.length)];
+    if (this.race.battle) return this.race.battle.roll(kart);
     const n = this.race.karts.length;
     const p = n > 1 ? (kart.place - 1) / (n - 1) : 0;
     const table = kart.place === 1 ? TABLES[0] : p < 0.45 ? TABLES[1] : p < 0.8 ? TABLES[2] : TABLES[3];
@@ -471,7 +472,7 @@ export class ItemSystem {
         this.blast(src.x, kart.pos.y, src.z, 9.5, 'bump', kart, true);
         break;
       case 'bee': {
-        const target = this.race.karts.find((o) => o.place === kart.place - 1 && !o.finished) || null;
+        const target = this.race.battle ? this.race.battle.beeTarget(kart) : this.race.karts.find((o) => o.place === kart.place - 1 && !o.finished) || null;
         this.addProjectile('bee', kart, src.x + fx * 2, src.z + fz * 2, 0, 0, target);
         break;
       }
@@ -499,7 +500,7 @@ export class ItemSystem {
   _selfEffect(kart, it) {
     if (kart.remote) return;
     switch (it) {
-      case 'chili': kart.startBoost(1.35, 9); break;
+      case 'chili': kart.startBoost(1.35, 9); kart.ramT = 1.5; break;
       case 'bubble': kart.shield = 14; break;
       case 'rainbow': kart.starTime = 7.5; kart.startBoost(0.6, 6); break;
       case 'magnet': kart.magnetTime = 6; break;
@@ -764,7 +765,9 @@ export class ItemSystem {
           const l = Math.hypot(dx, dz) || 1;
           k.vel.x += (dx / l) * 10;
           k.vel.z += (dz / l) * 10;
-          k.hit(o.def.hit);
+          // In a battle the arena's obstacles knock you aside but leave your balloons alone.
+          if (race.battle) k.slip(0.9);
+          else k.hit(o.def.hit);
           race.onObstacleHit(k, o);
         }
       }
@@ -907,7 +910,8 @@ export class ItemSystem {
     const b = this.boxes[i];
     if (!b.active) return;
     b.active = false;
-    b.t = 2.2;
+    // Battles refill the orbs more slowly, so a fight lasts.
+    b.t = this.race.battle ? 8 : 2.2;
     this.race.fx.burst(b.pos.x, b.pos.y, b.pos.z, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], 14, 9, 0.5, 0.6, 12);
   }
 

@@ -16,6 +16,8 @@ import { Showroom } from './showroom.js';
 import { Race } from './race.js';
 import { CHARACTERS, charById, charLocked } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
+import { ARENAS, arenaById } from './arenas.js';
+import { BATTLE_FIELD } from './battle.js';
 import { setMaxAniso } from './textures.js';
 import { fmtTime, ordinal } from './util.js';
 import { NetSession } from './net.js';
@@ -336,6 +338,14 @@ class App {
       this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: this.menuChar(), extra: { playerLoadout: this.menuLoadout() } };
       this._gpField(this.gp);
       this.startGPRace();
+    } else if (mode === 'battle') {
+      // Balloon Battle: a smaller field, spread round the arena.
+      this.gp = null;
+      const player = this.menuChar();
+      const others = this.makeGrid(player).filter((id) => id !== player).slice(0, BATTLE_FIELD - 1);
+      const grid = [...others.slice(0, 2), player, ...others.slice(2)];
+      const arena = arenaById(s.arena) ? s.arena : ARENAS[0].id;
+      this.startRace({ mode, trackId: arena, reverse: false, player, grid, speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
     } else {
       this.gp = null;
       this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: this.menuChar(), speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
@@ -512,6 +522,23 @@ class App {
         html: rw + `<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`)).join('')}</div>`
           + (host ? '' : '<p class="lobby-summary" style="margin:8px 0 0">Waiting for the host to pick the next race…</p>'),
         buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Back to lobby', 'hot']] : [['leave', 'Leave', 'ghost small']],
+      });
+      return;
+    }
+    if (race.mode === 'battle') {
+      const won = me && me.place === 1;
+      if (won) {
+        addStat(this.career, 'battleWins');
+        const b = (this.records.battle = this.records.battle || {});
+        b[race.trackDef.id] = (b[race.trackDef.id] || 0) + 1;
+        saveRecords(this.records);
+      }
+      const rw = this.profileAward(race, me, { trackId: null });
+      ui.results({
+        title: won ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`,
+        sub: `Balloon Battle · ${race.trackDef.name}`,
+        html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons)}</span><span class="pts">💥 ${r.hits}</span>`)).join('')}</div>`,
+        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Arenas', 'alt'], ['retry', 'Battle again', 'hot']],
       });
       return;
     }

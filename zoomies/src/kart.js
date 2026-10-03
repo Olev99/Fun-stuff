@@ -294,7 +294,7 @@ export class Kart {
   }
 
   hit(kind = 'spin') {
-    if (this.starTime > 0 || this.rocketTime > 0 || this.invuln > 0 || this.ghostTime > 0 || this.finishedLock) return false;
+    if (this.starTime > 0 || this.rocketTime > 0 || this.invuln > 0 || this.ghostTime > 0 || this.finishedLock || this.out) return false;
     if (this.shield > 0) {
       this.shield = 0;
       this.invuln = 0.6;
@@ -318,6 +318,8 @@ export class Kart {
       this.vy = kind === 'spin' ? 6 : 3;
       this.grounded = false;
     }
+    // Balloon Battle: every hit pops a balloon.
+    if (this.race.battle) this.race.battle.onHit(this);
     return true;
   }
 
@@ -510,12 +512,20 @@ export class Kart {
       // swings the way that points away from the wall, even when the kart
       // hit the wall facing backwards, so you never end up driving the
       // wrong way along it. The driver's own steering away takes over.
-      const awayFromWall = this.steerS * Math.sign(trk.d) < -0.15;
+      // In a battle arena there is no race direction: slide along the
+      // wall whichever way the kart is already pointing.
+      let ref = Math.atan2(trk.tx, trk.tz);
+      let rel = Math.atan2(Math.sin(this.yaw - ref), Math.cos(this.yaw - ref));
+      let sg = 1;
+      if (this.race.battle && Math.abs(rel) > Math.PI / 2) {
+        sg = -1;
+        ref += Math.PI;
+        rel = Math.atan2(Math.sin(this.yaw - ref), Math.cos(this.yaw - ref));
+      }
+      const awayFromWall = this.steerS * Math.sign(trk.d) * sg < -0.15;
       if (!awayFromWall && !c.brake) {
-        let rel = this.yaw - Math.atan2(trk.tx, trk.tz);
-        rel = Math.atan2(Math.sin(rel), Math.cos(rel));
         // d > 0 is the right-hand wall; turning right lowers yaw.
-        if (-Math.sign(trk.d) * rel > 0) this.yaw -= rel * Math.min(1, dt * 3);
+        if (-Math.sign(trk.d) * sg * rel > 0) this.yaw -= rel * Math.min(1, dt * 3);
       }
     }
     // Only the ground slows you: flying over grass or a gap is not off-road.
@@ -604,7 +614,7 @@ export class Kart {
 
     // Wrong way detection
     const heading = Math.sin(this.yaw) * trk.tx + Math.cos(this.yaw) * trk.tz;
-    if (heading < -0.35 && spd > 4) this.wrongWay += dt;
+    if (heading < -0.35 && spd > 4 && !this.race.battle) this.wrongWay += dt;
     else this.wrongWay = Math.max(0, this.wrongWay - dt * 2);
 
     // Stuck detection: trying to drive but barely moving for a few seconds.
@@ -615,7 +625,7 @@ export class Kart {
     // bouncing back and forth, wedged, or going round in circles. Progress
     // counts from the furthest-back point, so it has to be real forward
     // progress; brief spins and hops don't reset the clock.
-    if (c.throttle > 0 && this.respawnT <= 0 && !this.finished) {
+    if (c.throttle > 0 && this.respawnT <= 0 && !this.finished && !this.race.battle) {
       this.progT += dt;
       if (this.total < this.progAt) this.progAt = this.total;
       else if (this.total - this.progAt > 12) { this.progAt = this.total; this.progT = 0; }
@@ -829,8 +839,8 @@ export class Kart {
     const sc = root.scale.x * clamp(1 - h * 0.08, 0.4, 1);
     this.shadow.scale.set(sc, 1, sc);
     this.shadow.visible = !(this.path.voids.length && this.path.isVoid(this.trk.s)) && this.mode === 0;
-    this.root.visible = !this.podiumHidden && !(this.respawnT > 0.3 && Math.floor(time * 20) % 2 === 0);
-    this.shadow.visible = this.shadow.visible && !this.podiumHidden && !this.cheer;
+    this.root.visible = !this.podiumHidden && !(this.out && !this.cheer) && !(this.respawnT > 0.3 && Math.floor(time * 20) % 2 === 0);
+    this.shadow.visible = this.shadow.visible && !this.podiumHidden && !this.cheer && !this.out;
   }
 
   // Boat hull / wings pop in with a springy overshoot after a transform.

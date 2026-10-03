@@ -63,9 +63,12 @@ export class HUD {
     if (sp) sp.className = '';
     const tt = race.mode === 'tt';
     this.pos.style.visibility = tt ? 'hidden' : 'visible';
-    $('hud-gems').style.visibility = tt ? 'hidden' : 'visible';
+    $('hud-gems').style.visibility = tt || race.battle ? 'hidden' : 'visible';
+    this.lap.classList.toggle('balloons', !!race.battle);
+    this.timeEl.classList.remove('low');
     this.showTrackName(race);
-    if (race.mode !== 'demo') this.hint(this.controlsHint(), 5.5);
+    if (race.battle) this.hint('Pop everyone else\'s balloons! Ram a rival with a 🌶️ Chili Boost to steal one.', 6);
+    else if (race.mode !== 'demo') this.hint(this.controlsHint(), 5.5);
     if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
   }
 
@@ -101,7 +104,7 @@ export class HUD {
     }
     const ev = race.careerEv;
     const dv = race.dailyEv;
-    const cls = dv ? `Daily challenge · ${dv.mod.icon} ${dv.mod.name}` : ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : `${race.speedClass.name} class`;
+    const cls = dv ? `Daily challenge · ${dv.mod.icon} ${dv.mod.name}` : ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : race.battle ? '🎈 Balloon Battle' : `${race.speedClass.name} class`;
     const extra = this.app.gp ? ` · Race ${this.app.gp.index + 1} of ${this.app.gp.tracks.length}` : '';
     this.trackName.innerHTML = `<small>${cls}${extra}</small>${race.trackDef.name}${race.track.reverse ? ' ⟲' : ''}`;
     this.trackName.hidden = false;
@@ -153,13 +156,15 @@ export class HUD {
       c.stroke();
       c.setLineDash([]);
     }
+    // Arenas are drawn as the whole floor of the bowl.
+    const arenaW = tr.def.arena ? tr.hw[0] * 2 * s : 0;
     path();
     c.strokeStyle = 'rgba(29,21,55,0.85)';
-    c.lineWidth = 16;
+    c.lineWidth = arenaW ? arenaW + 8 : 16;
     c.stroke();
     path();
-    c.strokeStyle = '#fff7e8';
-    c.lineWidth = 8;
+    c.strokeStyle = arenaW ? 'rgba(255,247,232,0.75)' : '#fff7e8';
+    c.lineWidth = arenaW || 8;
     c.stroke();
     // Rivers in blue, sky lanes as dashed sky-blue.
     for (const [kind, col, dash] of [[1, '#3fb8f0', []], [2, '#8fd0ff', [7, 5]]]) {
@@ -178,11 +183,13 @@ export class HUD {
         c.setLineDash([]);
       }
     }
-    const [sx0, sy0] = this.mapT(tr.px[0], tr.pz[0]);
-    c.fillStyle = '#ffd23f';
-    c.beginPath();
-    c.arc(sx0, sy0, 5, 0, Math.PI * 2);
-    c.fill();
+    if (!tr.def.arena) {
+      const [sx0, sy0] = this.mapT(tr.px[0], tr.pz[0]);
+      c.fillStyle = '#ffd23f';
+      c.beginPath();
+      c.arc(sx0, sy0, 5, 0, Math.PI * 2);
+      c.fill();
+    }
     this.mapBg = bg;
   }
 
@@ -197,7 +204,7 @@ export class HUD {
     const order = race.order || race.karts;
     for (let i = order.length - 1; i >= 0; i--) {
       const k = order[i];
-      if (k.isPlayer) continue;
+      if (k.isPlayer || k.out) continue;
       const [x, y] = this.mapT(k.pos.x, k.pos.z);
       c.fillStyle = k.ch.color;
       c.strokeStyle = '#1d1537';
@@ -231,7 +238,17 @@ export class HUD {
     if (!p) return;
     const laps = race.laps;
     const legs = race.track.legs;
-    if (legs.length && laps === 1) {
+    if (race.battle) {
+      // Balloons left instead of laps, and the battle clock counting down.
+      this._set('lap', `b${p.out ? -1 : p.balloons}`, () => {
+        this.lap.innerHTML = p.out ? 'OUT' : '<i>🎈</i>'.repeat(p.balloons);
+      });
+      const tl = Math.ceil(race.battle.timeLeft);
+      this._set('time', `b${tl}`, () => {
+        this.timeEl.textContent = `${Math.floor(tl / 60)}:${String(tl % 60).padStart(2, '0')}`;
+        this.timeEl.classList.toggle('low', tl <= 30);
+      });
+    } else if (legs.length && laps === 1) {
       // One-lap adventures count legs instead of laps.
       const leg = Math.min(legs.length, (p.leg || 0) + 1);
       this._set('lap', `g${leg}`, () => { this.lap.innerHTML = `LEG <b>${leg}</b>/${legs.length}`; });
@@ -250,8 +267,10 @@ export class HUD {
       const txt = (d.goal === 1 ? 'Goal: win' : 'Goal: top 3') + (d.gems ? ` · 💎 ${p.gemsGot || 0}/${d.gems}` : '');
       this._set('goal', txt, (v) => { this.goalEl.textContent = v; });
     }
-    const t = race.state === 'finished' ? p.finishTime : race.raceTime;
-    this._set('time', Math.floor(t * 20), () => { this.timeEl.textContent = fmtTime(t); });
+    if (!race.battle) {
+      const t = race.state === 'finished' ? p.finishTime : race.raceTime;
+      this._set('time', Math.floor(t * 20), () => { this.timeEl.textContent = fmtTime(t); });
+    }
 
     // Item slot
     if (p.rolling > 0) {

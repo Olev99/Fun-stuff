@@ -1,4 +1,6 @@
 import { CHARACTERS, charById, charLocked } from './characters.js';
+import { ARENAS, arenaById } from './arenas.js';
+import { BATTLE_FIELD } from './battle.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
 import { Track } from './track.js';
 import { THEMES } from './world.js';
@@ -223,7 +225,7 @@ export class UI {
   // ---------------- Characters ----------------
   charSelect() {
     const app = this.app;
-    $('char-mode').textContent = { gp: 'Grand Prix', quick: 'Quick Race', tt: 'Time Trial', mp: 'Multiplayer' }[this.mode];
+    $('char-mode').textContent = { gp: 'Grand Prix', quick: 'Quick Race', tt: 'Time Trial', mp: 'Multiplayer', battle: 'Balloon Battle' }[this.mode];
     document.querySelector('#scr-char [data-go="next"]').textContent = this.mode === 'mp' ? 'Done' : 'Next';
     document.querySelector('#scr-char [data-go="back"]').hidden = this.mode === 'mp';
     const grid = $('char-grid');
@@ -403,6 +405,24 @@ export class UI {
         c.closePath();
       };
       c.lineJoin = 'round';
+      if (def.arena) {
+        // An arena: the whole bowl floor round its island.
+        const hw = tr.hw[0];
+        const sa = Math.min((cw - 24) / (b.maxX - b.minX + hw * 2), (chh - 24) / (b.maxZ - b.minZ + hw * 2));
+        const cx = x0 + cw / 2, cy = y0 + chh / 2;
+        c.beginPath();
+        for (let i = 0; i <= tr.N; i += 3) {
+          const k = i % tr.N;
+          const x = cx - (tr.px[k] - tr.center.x) * sa, y = cy - (tr.pz[k] - tr.center.z) * sa;
+          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.closePath();
+        c.strokeStyle = '#1d1537'; c.lineWidth = hw * 2 * sa + 8; c.stroke();
+        c.strokeStyle = '#fff7e8'; c.lineWidth = hw * 2 * sa; c.stroke();
+        c.font = '26px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText('🎈', cx, cy);
+        return;
+      }
       path(); c.strokeStyle = '#1d1537'; c.lineWidth = defs.length === 1 ? 14 : 8; c.stroke();
       path(); c.strokeStyle = '#fff7e8'; c.lineWidth = defs.length === 1 ? 7 : 4; c.stroke();
       const [sx, sy] = T(tr.px[0], tr.pz[0]);
@@ -418,8 +438,9 @@ export class UI {
 
   trackSelect() {
     const gp = this.mode === 'gp';
-    $('track-title').textContent = gp ? 'Pick a cup' : 'Pick a track';
-    $('reverse-wrap').hidden = gp;
+    const battle = this.mode === 'battle';
+    $('track-title').textContent = gp ? 'Pick a cup' : battle ? 'Pick an arena' : 'Pick a track';
+    $('reverse-wrap').hidden = gp || battle;
     $('class-seg').hidden = this.mode === 'tt';
     $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
@@ -429,6 +450,8 @@ export class UI {
     if (gp) {
       const cup = CUPS.find((c) => c.id === this.app.settings.cup) || CUPS[0];
       this.app.previewTrack(cup.tracks[0], cup.reverse);
+    } else if (battle) {
+      this.app.previewTrack(arenaById(this.app.settings.arena) ? this.app.settings.arena : ARENAS[0].id, false);
     } else {
       this.app.previewTrack(this.app.settings.track, this.app.settings.reverse);
     }
@@ -458,6 +481,31 @@ export class UI {
           row.querySelectorAll('.tcard').forEach((x) => x.classList.remove('sel'));
           b.classList.add('sel');
           app.previewTrack(cup.tracks[0], cup.reverse);
+        });
+        row.appendChild(b);
+      }
+      return;
+    }
+    if (this.mode === 'battle') {
+      if (!arenaById(app.settings.arena)) app.settings.arena = ARENAS[0].id;
+      for (const def of ARENAS) {
+        const b = document.createElement('button');
+        b.className = 'tcard' + (app.settings.arena === def.id ? ' sel' : '');
+        const cv = document.createElement('canvas');
+        this._thumb(cv, [def], false);
+        b.appendChild(cv);
+        const wins = ((app.records.battle || {})[def.id]) || 0;
+        const tx = document.createElement('div');
+        tx.className = 'tx';
+        tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz Arena">Arena</span>🎈 ${BATTLE_FIELD} racers${wins ? ` · 🏆 ${wins} win${wins > 1 ? 's' : ''}` : ''}</span><span class="tb">${def.blurb}</span>`;
+        b.appendChild(tx);
+        b.addEventListener('click', () => {
+          app.audio.play('select');
+          app.settings.arena = def.id;
+          saveSettings(app.settings);
+          row.querySelectorAll('.tcard').forEach((x) => x.classList.remove('sel'));
+          b.classList.add('sel');
+          app.previewTrack(def.id, false);
         });
         row.appendChild(b);
       }

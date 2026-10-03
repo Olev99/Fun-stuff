@@ -11,6 +11,7 @@ import { charById } from './characters.js';
 import { wheelGeometry } from './karts.js';
 import { clamp, damp, dampAngle, pbrMat, GeoBuilder, ordinal } from './util.js';
 import { SkidMarks } from './skids.js';
+import { Battle, BattleAI } from './battle.js';
 import * as TX from './textures.js';
 
 export const SPEED_CLASSES = {
@@ -126,7 +127,10 @@ export class Race {
     this._overtakeT = 0;
     this.lookBack = false;
 
+    // Balloon Battle in an arena instead of a race.
+    this.battle = this.mode === 'battle' ? new Battle(this) : null;
     this._makeKarts(opts);
+    if (this.battle) this.battle.setup();
     this.tags = new NameTags(this, this.app.settings.tags || 'all');
     // Time trials record the run and replay your best one as a ghost.
     if (this.mode === 'tt') {
@@ -179,8 +183,9 @@ export class Race {
       const look = (opts.looks && opts.looks[i]) || (isPlayer && opts.look) || null;
       const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body || (look && look.body), upgrades: lo.upgrades, paint: lo.paint, look });
       k.nick = (opts.nicks && opts.nicks[i]) || null;
-      const slot = tr.gridSlot(i);
+      const slot = this.battle ? this.battle.startSlot(i, grid.length) : tr.gridSlot(i);
       k.placeAt(slot.s, this.mode === 'tt' ? 0 : slot.d);
+      if (slot.flip) k.yaw += Math.PI;
       if (isPlayer) this.player = k;
       else if (this.mode === 'mp' && (guest || this.slotPeer.has(i))) {
         k.remote = true;
@@ -188,7 +193,7 @@ export class Race {
       } else {
         const [a, b] = this.diff.skill;
         const skill = this.mode === 'demo' ? 0.9 + Math.random() * 0.1 : a + Math.random() * (b - a);
-        k.ai = new AIDriver(k, this, skill, this.mode === 'demo' ? DIFFICULTY.normal : this.diff);
+        k.ai = this.battle ? new BattleAI(k, this, skill, this.diff) : new AIDriver(k, this, skill, this.mode === 'demo' ? DIFFICULTY.normal : this.diff);
       }
       this.scene.add(k.root);
       this.scene.add(k.shadow);
@@ -237,7 +242,7 @@ export class Race {
         this._applyRocketStarts();
       }
     } else if (this.state === 'finished') {
-      if (!this.results && !this.session && this.stateTime > 4.5) this._finishResults();
+      if (!this.results && !this.session && !this.battle && this.stateTime > 4.5) this._finishResults();
     }
     if (this.net && this.net.isHost && !this.results) this._checkNetEnd(dt);
 
@@ -269,6 +274,10 @@ export class Race {
     if (this.ghost) this.ghost.update(locked ? 0 : this.raceTime);
 
     this.items.update(dt, this.session ? this.netClock : this.time);
+    if (this.battle) {
+      this.battle.update(dt);
+      this.battle.animate(dt, this.time);
+    }
     if (this.net && this.net.isGuest) this.items.tickReplica(dt);
     if (!(this.net && this.net.isGuest)) this._positions();
 
@@ -340,8 +349,8 @@ export class Race {
 
   _rubberBand() {
     const humans = this.karts.filter((k) => k.isPlayer || k.human);
-    if (!humans.length || this.mode === 'demo') {
-      for (const k of this.karts) if (k.ai) k.speedMul = 0.97 + k.ai.skill * 0.03;
+    if (!humans.length || this.mode === 'demo' || this.battle) {
+      for (const k of this.karts) if (k.ai) k.speedMul = this.battle && !k.isPlayer ? this.diff.speed * (0.95 + k.ai.skill * 0.05) : 0.97 + k.ai.skill * 0.03;
       return;
     }
     const ref = humans.reduce((s, k) => s + k.total, 0) / humans.length;
@@ -388,7 +397,7 @@ export class Race {
   _physics(h, locked) {
     const time = this.time;
     for (const k of this.karts) {
-      if (k.remote) continue;
+      if (k.remote || k.out) continue;
       if (k.rocketTime > 0 && !locked) {
         if (!k.pilot) k.pilot = new AIDriver(k, this, 1, this.diff, true);
         k.pilot.update(h, time);
@@ -410,7 +419,7 @@ export class Race {
       }
       this._handleEvents(k);
       if (!locked) this._checkPads(k);
-      this._checkLap(k);
+      if (!this.battle) this._checkLap(k);
     }
     this._collide();
   }
@@ -600,7 +609,7 @@ export class Race {
   _assist(k, c) {
     const lvl = this.app.settings.assist;
     const base = lvl === 'strong' ? 0.5 : lvl === 'light' ? 0.25 : 0;
-    if (!base || !k.grounded || k.spinTime > 0 || k.respawnT > 0 || this.state !== 'race') return;
+    if (!base || this.battle || !k.grounded || k.spinTime > 0 || k.respawnT > 0 || this.state !== 'race') return;
     const p = k.path, trk = k.trk;
     const spd = Math.max(0, k.fwdSpeed);
     if (spd < 6) return;
@@ -714,7 +723,7 @@ export class Race {
       for (let j = i + 1; j < ks.length; j++) {
         const b = ks[j];
         if (a.remote && b.remote) continue;
-        if (a.ghostTime > 0 || b.ghostTime > 0) continue;
+        if (a.ghostTime > 0 || b.ghostTime > 0 || a.out || b.out) continue;
         const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
         const R = 1.2 * (a.root.scale.x + b.root.scale.x);
         const d2 = dx * dx + dz * dz;
@@ -740,6 +749,8 @@ export class Race {
             this.shake = Math.max(this.shake, 0.2);
           }
         }
+        // Battles: a boosted ram steals a balloon.
+        if (this.battle && this.battle.ram(a, b, -rv)) continue;
         const strong = (k) => k.starTime > 0 || k.rocketTime > 0;
         if (strong(a) && !strong(b) && !b.remote) b.hit('spin');
         else if (strong(b) && !strong(a) && !a.remote) a.hit('spin');
@@ -750,6 +761,12 @@ export class Race {
   }
 
   _positions() {
+    if (this.battle) {
+      if (this.battle.done) return;
+      this.order = this.battle.standings();
+      this.order.forEach((k, i) => (k.place = i + 1));
+      return;
+    }
     const sorted = [...this.karts].sort((a, b) => {
       if (a.finished !== b.finished) return a.finished ? -1 : 1;
       if (a.finished) return a.finishTime - b.finishTime;
@@ -887,6 +904,7 @@ export class Race {
   // The player's item landed on someone: style points.
   _hitBy(k, owner) {
     if (owner && owner === this.player && k !== owner && k.spinTime > 0) this.style('HIT', 20, 'hit');
+    if (this.battle && k.spinTime > 0) this.battle.credit(k, owner);
   }
 
   // Skill feedback: a floating label plus style points (they become XP).
@@ -1351,7 +1369,8 @@ export class Race {
     if (this.mode === 'demo') this._demoCam(dt);
     else if (this.state === 'intro' || this.state === 'wait') this._introCam();
     else if (this.state === 'podium') this._podiumCam(dt);
-    else if (this.state === 'finished' || this.state === 'done') this._orbitCam(dt, this.player);
+    else if (this.state === 'finished' || this.state === 'done') this._orbitCam(dt, this.player && this.player.out ? (this.order || this.karts)[0] : this.player);
+    else if (this.player && this.player.out) this._chase(dt, false, (this.order || this.karts).find((k) => !k.out) || this.player);
     else this._chase(dt, this.stateTime < 0.02 && this.state === 'countdown');
     // Radial speed blur while boosting (post-processing).
     const pk = this.mode === 'demo' ? null : this.player;
@@ -1390,6 +1409,7 @@ export class Race {
     this.wheelMesh.dispose();
     this.wheelMeshLo.dispose();
     for (const k of this.karts) k.mat.dispose();
+    if (this.battle) this.battle.dispose();
     this.shadowTex.dispose();
     this.skids.dispose();
     if (this.podiumMesh) { this.podiumMesh.geometry.dispose(); this.podiumMat.dispose(); }

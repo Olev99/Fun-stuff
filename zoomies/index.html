@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="c3b3509">
+<meta name="zoomies-version" content="0a18c98">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -109,7 +109,7 @@ h2.title {
 .logo small { display: block; font-size: .36em; color: var(--mint); letter-spacing: .06em; margin-top: 6px; }
 .tagline { font-weight: 700; font-size: clamp(14px, calc(3.8 * var(--vh)), 18px); color: var(--cream); max-width: 34ch; line-height: 1.25; }
 .tagline b { color: var(--sun); }
-.menu { display: grid; gap: 12px; width: min(300px, calc(42 * var(--vw))); }
+.menu { display: grid; gap: clamp(7px, calc(2.4 * var(--vh)), 12px); width: min(300px, calc(42 * var(--vw))); }
 .menu > * { min-width: 0; }
 html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 .menu-row .btn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 8px; padding-right: 8px; font-size: clamp(14px, calc(4 * var(--vh)), 17px); }
@@ -117,6 +117,7 @@ html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 .menu-row { display: flex; gap: 10px; }
 .menu-row .btn { flex: 1; text-align: center; }
 .menu-row.tight { gap: 6px; }
+.btn.battle-btn { background: var(--berry); color: #fff; }
 .menu-row.tight .btn { min-width: 0; white-space: nowrap; padding-left: 4px; padding-right: 4px; font-size: clamp(12px, calc(3.5 * var(--vh)), 16px); }
 .menu-row.tight .btn.ico { flex: 0 0 auto; width: 40px; }
 .install-tip {
@@ -187,6 +188,7 @@ html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 .tcard .tz { display: inline-block; font-family: var(--font-display); font-size: 9.5px; letter-spacing: .04em; padding: 2px 6px 1px; border-radius: 6px; background: var(--ink); color: var(--sun); margin-right: 4px; }
 .tcard .tz.Medium { color: var(--mint); } .tcard .tz.Long { color: var(--berry); }
 .tcard .tz.Epic { color: var(--ink); background: linear-gradient(90deg, #19e3b1, #36a9ff, #c77dff); }
+.tcard .tz.Arena { color: #fff; background: var(--berry); }
 .tcard .tb.sc { color: var(--cream); opacity: .8; } .tcard .tb.sc.all { color: var(--mint); opacity: 1; }
 /* Lobby */
 .lobby { width: min(720px, 100%); }
@@ -636,6 +638,11 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #hud-lap { font-family: var(--font-display); font-size: 20px; color: var(--cream); text-shadow: 0 3px 0 var(--ink), 0 0 6px rgba(0,0,0,.4); }
 #hud-lap b { color: var(--sun); font-weight: 400; }
 #hud-time { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--cream); text-shadow: 0 2px 0 var(--ink); }
+#hud-lap.balloons { font-size: 24px; letter-spacing: -4px; min-height: 30px; }
+#hud-lap.balloons i { font-style: normal; display: inline-block; animation: bob 1.8s ease-in-out infinite; }
+#hud-lap.balloons i:nth-child(2) { animation-delay: .3s; } #hud-lap.balloons i:nth-child(3) { animation-delay: .6s; } #hud-lap.balloons i:nth-child(4) { animation-delay: .9s; }
+@keyframes bob { 50% { transform: translateY(-3px) rotate(-6deg); } }
+#hud-time.low { color: #ff6b6b; font-size: 18px; }
 .hud-tr { position: absolute; top: calc(2px + var(--sat)); right: calc(14px + var(--sar)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 #hud-pos {
   font-family: var(--font-display); font-size: 56px; line-height: 1; color: var(--sun);
@@ -845,15 +852,18 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <button class="btn mint small" data-go="quick">Quick Race</button>
     </div>
     <div class="menu-row">
+      <button class="btn battle-btn small" data-go="battle">🎈 Battle</button>
       <button class="btn mint small" data-go="tt">Time Trial</button>
+    </div>
+    <div class="menu-row">
       <button class="btn sky small" data-go="mp">Multiplayer</button>
+      <button class="btn alt small gum-btn" data-go="gumball" aria-label="Gumball machine">🍬 Prizes<i id="menu-gum" hidden></i></button>
     </div>
     <button class="btn sky small desk-only wheel-btn" data-go="wheel">📱 Phone as a wheel<span id="menu-wheel"></span></button>
     <div class="menu-row tight">
       <button class="btn alt small ico" data-go="settings" aria-label="Settings">⚙️</button>
       <button class="btn alt small ico" data-go="help" aria-label="Help">❓</button>
       <button class="btn alt small" data-go="profile" id="menu-trophies">🏆</button>
-      <button class="btn alt small gum-btn" data-go="gumball" aria-label="Gumball machine">🍬 Prizes<i id="menu-gum" hidden></i></button>
     </div>
   </nav>
   <p class="install-tip" id="install-tip" hidden>For full screen: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
@@ -1139,6 +1149,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><b>Drift + turbo</b>Hold DRIFT while turning. Sparks go mint, gold, then hot pink. Let go for a boost.</div>
         <div><b>Tricks</b>Tap DRIFT just after launching off a ramp. You get a boost when you land.</div>
         <div><b>Slipstream</b>Tuck in right behind another kart for a moment and you get a free boost.</div>
+        <div><b>🎈 Balloon Battle</b>Five arenas, six racers, three balloons each. Every hit pops one; ram a rival with a 🌶️ Chili Boost to steal one. Lose them all and you're out. Last one standing wins, or the most balloons when the clock runs out.</div>
         <div><b>Look back</b>Hold the 👀 button (or the minimap, or Q on a keyboard) to see what's behind you.</div>
         <div><b>Boats and planes</b>On the Epic adventures your ride turns into a boat on water (it slides, so drift early) and a plane in the sky. Fly through the gold rings for a boost and dodge the storm clouds.</div>
         <div><b>Stuck on a wall?</b>Steer away and the kart swings back round. If you're pinned, the drone lifts you out after a few seconds, or pause and tap <i>Back on the road</i>.</div>
@@ -1210,7 +1221,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=08ab71c4", "./src/audio.js": "./src/audio.js?v=9185e717", "./src/career.js": "./src/career.js?v=d6417c31", "./src/careerui.js": "./src/careerui.js?v=c7966754", "./src/characters.js": "./src/characters.js?v=3ce17da4", "./src/cosmetics.js": "./src/cosmetics.js?v=2a076158", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=9d8dd641", "./src/hud.js": "./src/hud.js?v=63c90bda", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=22f4f5c6", "./src/kart.js": "./src/kart.js?v=9c7af513", "./src/karts.js": "./src/karts.js?v=b2d6dcc5", "./src/main.js": "./src/main.js?v=796f1a88", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=270747a4", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=bb25e2b6", "./src/profile.js": "./src/profile.js?v=8dc3b9cc", "./src/race.js": "./src/race.js?v=b42c21a1", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=b1e2dc15", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=1874a316", "./src/ui.js": "./src/ui.js?v=27518463", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=1c2f2c79", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
-<script type="module" src="./src/main.js?v=796f1a88"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=08ab71c4", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=2ee8ef6b", "./src/battle.js": "./src/battle.js?v=a8e310b1", "./src/career.js": "./src/career.js?v=d6417c31", "./src/careerui.js": "./src/careerui.js?v=c7966754", "./src/characters.js": "./src/characters.js?v=3ce17da4", "./src/cosmetics.js": "./src/cosmetics.js?v=2a076158", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=9d8dd641", "./src/hud.js": "./src/hud.js?v=69420cf5", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=2fc83512", "./src/kart.js": "./src/kart.js?v=57b1f7a6", "./src/karts.js": "./src/karts.js?v=b2d6dcc5", "./src/main.js": "./src/main.js?v=33e39639", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=bb25e2b6", "./src/profile.js": "./src/profile.js?v=9a8d66a5", "./src/race.js": "./src/race.js?v=05b6a436", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=b1e2dc15", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=16e720b2", "./src/ui.js": "./src/ui.js?v=66d93f60", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=ef92b5c0", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=33e39639"></script>
 </body>
 </html>

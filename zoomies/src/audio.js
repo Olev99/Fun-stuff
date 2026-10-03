@@ -293,6 +293,10 @@ export class Audio {
       case 'shield':
         this._tone('sine', 400, 900, 0.35, 0.16);
         break;
+      case 'pop':
+        this._noise(0.09, 0.5, 'highpass', 1800, 6000);
+        this._tone('sine', 780, 180, 0.12, 0.2);
+        break;
       case 'shieldPop':
         this._noise(0.2, 0.3, 'highpass', 2000, 5000);
         this._tone('sine', 900, 300, 0.2, 0.14);

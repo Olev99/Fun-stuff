@@ -1246,6 +1246,8 @@ export class World {
 
   _buildStart() {
     const tr = this.track;
+    // Arenas have no start line.
+    if (tr.def.arena) return;
     const checker = this._tex(TX.checkerTexture());
     const fr = tr.frame(0, {});
     const line = new THREE.Mesh(tr.patch(-1.5, 1.5, -fr.hw, fr.hw, { lift: 0.03, segs: 2 }), stdMat({ map: checker, roughness: 0.7 }));
