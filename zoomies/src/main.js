@@ -1,0 +1,1163 @@
+import * as THREE from 'three';
+import { loadSettings, saveSettings, loadRecords, saveRecords, QUALITY } from './settings.js';
+import { Audio } from './audio.js';
+import { Input } from './input.js';
+import { HUD } from './hud.js';
+import { UI } from './ui.js';
+import { CareerUI } from './careerui.js';
+import { GumballUI } from './gumballui.js';
+import { WheelHost, WheelPad } from './wheel.js';
+import { Sync } from './sync.js';
+import { cleanNick } from './nametags.js';
+import { lookOf, cleanLook } from './cosmetics.js';
+import { BODIES, bodyLocked } from './karts.js';
+import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
+import { Showroom } from './showroom.js';
+import { Race } from './race.js';
+import { CHARACTERS, charById, charLocked } from './characters.js';
+import { TRACKS, CUPS, trackById } from './tracks.js';
+import { ARENAS, arenaById } from './arenas.js';
+import { BATTLE_FIELD } from './battle.js';
+import { setMaxAniso } from './textures.js';
+import { fmtTime, ordinal } from './util.js';
+import { NetSession } from './net.js';
+import { PostFX } from './post.js';
+import { installHeightFog } from './env.js';
+import {
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, rivalFor, playerLoadout, aiLoadouts, applyResult,
+} from './career.js';
+
+const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
+
+// Can this browser render into half-float targets (needed for HDR bloom)?
+const HDR = (() => {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    if (!gl) return false;
+    const ok = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
+    const lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+    return ok;
+  } catch (e) {
+    return false;
+  }
+})();
+import { isTouch, isDesktop, isMac, platformName } from './platform.js';
+
+const VERSION = (document.querySelector('meta[name="zoomies-version"]') || {}).content || 'dev';
+const $ = (id) => document.getElementById(id);
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+class App {
+  constructor() {
+    // Same game everywhere; computers get keyboard hints, a scaled UI and Max graphics.
+    document.documentElement.classList.add(isDesktop ? 'desktop' : 'touch');
+    if (isMac) document.documentElement.classList.add('mac');
+    this.uiZoom = 1;
+    this.settings = loadSettings();
+    this.records = loadRecords();
+    // One save for career progress, the wallet, XP, stats and achievements.
+    this.career = loadCareer() || newCareer();
+    this.careerRun = null;
+    this.canvas = $('gl');
+    installHeightFog();
+    const r = (this.renderer = new THREE.WebGLRenderer({
+      // With HDR post-processing the scene is drawn (with MSAA) into an
+      // offscreen target, so the screen buffer needs no AA and no depth.
+      canvas: this.canvas, antialias: !HDR, depth: !HDR, powerPreference: 'high-performance', stencil: false,
+    }));
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    // Only used if half-float render targets are missing and we draw straight
+    // to the screen; the post pipeline does its own tone mapping.
+    r.toneMapping = THREE.NeutralToneMapping;
+    r.shadowMap.type = THREE.PCFShadowMap;
+    r.info.autoReset = false;
+    this.post = new PostFX(r);
+    setMaxAniso(r.capabilities.getMaxAnisotropy());
+    this.applyQuality(true);
+
+    this.audio = new Audio();
+    this.audio.musicOn = this.settings.music;
+    this.audio.musicVol = this.settings.musicVol ?? 0.7;
+    this.audio.sfxOn = this.settings.sfx;
+    this.input = new Input(this.settings);
+    this.input.bindTouch($('controls'));
+    this.hud = new HUD(this);
+    this.ui = new UI(this);
+    this.careerUI = new CareerUI(this, this.ui);
+    this.gumballUI = new GumballUI(this);
+    // A phone can be the steering wheel for a computer (see wheel.js).
+    this.wheelHost = new WheelHost(this);
+    this.wheelPad = new WheelPad(this);
+    this.input.wheel = this.wheelHost;
+    this.sync = new Sync(this);
+    this.showroom = new Showroom(this);
+    this.portraits = this.showroom.portraits(r, 112);
+    $('fps').hidden = !this.settings.showFps;
+
+    this.race = null;
+    this.view = null;
+    this.paused = false;
+    this.gp = null;
+    this.ft = 1 / 60;
+    this.drTimer = 0;
+    this.goodTime = 0;
+    this.blockRaise = 0;
+    this.fpsFrames = 0;
+    this.fpsTime = 0;
+
+    this.resize();
+    addEventListener('resize', () => this.resize());
+    if (window.visualViewport) visualViewport.addEventListener('resize', () => this.resize());
+    addEventListener('orientationchange', () => setTimeout(() => this.resize(), 250));
+    document.addEventListener('visibilitychange', () => this.onVisibility());
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    // iOS only applies :active styles when a touch listener exists.
+    document.addEventListener('touchstart', () => {}, { passive: true });
+    // Any tap unlocks (or, after a phone call or app switch, revives) audio.
+    const kick = () => { if (!this.paused && !this.audio.ready) this.audio.unlock(); };
+    for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, kick, { capture: true, passive: true });
+    document.addEventListener('dblclick', (e) => e.preventDefault());
+    addEventListener('keydown', (e) => this.onKey(e));
+    $('podium-ui').addEventListener('click', () => { if (this.race) this.race.endPodium(); });
+    this.canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
+    this.canvas.addEventListener('webglcontextrestored', () => location.reload());
+
+    this.toTitle();
+    this._checkVersion();
+    // Opened from the QR code on a computer: become its steering wheel.
+    if (this.wheelPad.wanted) this.wheelPad.open();
+    else if (this.sync.wanted) this.sync.open('title');
+    this.loop = this.loop.bind(this);
+    this.last = performance.now();
+    requestAnimationFrame(this.loop);
+    setTimeout(() => {
+      const l = $('loading');
+      l.style.opacity = 0;
+      setTimeout(() => l.remove(), 450);
+    }, 60);
+  }
+
+  // After an update, a browser may still hold the previous page. If a newer
+  // version is live, reload once (between races) so everything matches.
+  _checkVersion() {
+    if (VERSION === 'dev' || !/^https?:$/.test(location.protocol)) return;
+    fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j || !j.v || j.v === VERSION) return;
+        let tried = null;
+        try { tried = sessionStorage.getItem('zoomies.reloadFor'); } catch (e) { /* storage blocked */ }
+        if (tried === j.v) return;
+        try { sessionStorage.setItem('zoomies.reloadFor', j.v); } catch (e) { /* ignore */ }
+        this.pendingReload = true;
+        if (!this.race || this.race.mode === 'demo') location.reload();
+      })
+      .catch(() => {});
+  }
+
+  get versionInfo() {
+    const steer = { keys: 'keyboard or controller', wheel: 'phone wheel', tilt: 'tilt', touch: 'touch' }[this.settings.steering] || this.settings.steering;
+    return `Version ${VERSION} · ${platformName} · ${this.wheelHost && this.wheelHost.live ? 'phone wheel' : steer} · ${this.quality.name} graphics`;
+  }
+
+  // Keyboard for menus: Enter picks the highlighted (hot) button, Esc goes
+  // back or pauses, P pauses.
+  onKey(e) {
+    if (e.repeat || e.target.tagName === 'INPUT') return;
+    if (!$('podium-ui').hidden && ['Enter', 'NumpadEnter', 'Space', 'Escape'].includes(e.code)) {
+      if (this.race) this.race.endPodium();
+      return;
+    }
+    const inRace = this.race && this.race.mode !== 'demo';
+    const scr = document.querySelector('#ui > .screen:not([hidden])');
+    if (inRace && (e.code === 'KeyP' || e.code === 'Escape') && (!scr || scr.id === 'scr-pause')) {
+      if (this.paused || this.menuOpen) this.resume();
+      else this.pause();
+      return;
+    }
+    if (!scr) return;
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      const b = scr.querySelector('.btn.hot:not([hidden]):not(:disabled)');
+      if (b) { e.preventDefault(); b.click(); }
+    } else if (e.code === 'Escape') {
+      const b = scr.querySelector('[data-go="back"]:not([hidden]), [data-go="close"]:not([hidden]), [data-go="menu"]:not([hidden])');
+      if (b) { e.preventDefault(); b.click(); }
+    }
+  }
+
+  // ---------------- setup ----------------
+  applyQuality(initial = false) {
+    // Auto means Max on a Mac or other computer.
+    const q = this.settings.quality === 'auto' && isDesktop ? 'max' : this.settings.quality;
+    this.quality = QUALITY[q] || QUALITY.auto;
+    const dpr = window.devicePixelRatio || 1;
+    this.maxPR = Math.min(dpr, this.quality.maxPR);
+    this.minPR = Math.min(dpr, this.quality.minPR);
+    this.pr = Math.min(dpr, this.quality.startPR);
+    this.renderer.shadowMap.enabled = !!this.quality.shadows;
+    this.post.configure({ samples: this.quality.msaa, bloom: this.quality.bloom, shafts: this.quality.shafts || 0 });
+    this.drTimer = 0;
+    this.goodTime = 0;
+    this.blockRaise = 3;
+    if (!initial) this.resize();
+  }
+
+  resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    this.w = w;
+    this.h = h;
+    // The UI was laid out for a phone held sideways. On a big screen, scale
+    // it up as one piece so menus and the HUD stay readable.
+    const z = isDesktop ? Math.max(1, Math.min(2.2, Math.min(w / 1000, h / 560))) : 1;
+    this.uiZoom = z;
+    const ui = $('ui');
+    document.documentElement.style.setProperty('--vw', `${w / z / 100}px`);
+    document.documentElement.style.setProperty('--vh', `${h / z / 100}px`);
+    if (z > 1) {
+      ui.style.width = `${w / z}px`;
+      ui.style.height = `${h / z}px`;
+      ui.style.transform = `scale(${z})`;
+    } else {
+      ui.style.width = ui.style.height = ui.style.transform = '';
+    }
+    this.renderer.setPixelRatio(this.pr);
+    this.renderer.setSize(w, h, false);
+    this.post.setSize(Math.floor(w * this.pr), Math.floor(h * this.pr));
+    this.showroom.setSize(w, h);
+    if (this.race) this.race.setSize(w, h, this.pr);
+  }
+
+  firstGesture() {
+    this.audio.unlock();
+    if (this._gestured) return;
+    this._gestured = true;
+    if (this.settings.steering === 'tilt' && isTouch) {
+      this.input.requestTilt().then((ok) => {
+        if (!ok) {
+          this.settings.steering = 'touch';
+          saveSettings(this.settings);
+        }
+        this.applyControls();
+      });
+    }
+    if (this.race && this.race.mode === 'demo') this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
+  }
+
+  applyControls() {
+    const el = $('controls');
+    const racing = this.race && this.race.mode !== 'demo' && !this.paused && !this.menuOpen && ['intro', 'countdown', 'race'].includes(this.race.state);
+    el.hidden = !(isTouch && racing);
+    const tilt = this.settings.steering === 'tilt' && this.input.tilt.listening;
+    el.className = tilt ? 'tilt' : 'touch';
+  }
+
+  // ---------------- views ----------------
+  disposeRace() {
+    this.hud.podium(null);
+    if (this.race) {
+      this.race.dispose();
+      this.race = null;
+    }
+  }
+
+  toTitle() {
+    if (this.pendingReload) { location.reload(); return; }
+    this.paused = false;
+    this.gp = null;
+    this.careerRun = null;
+    this.dailyRun = null;
+    this.audio.stopEngine();
+    this.audio.setTempo(1);
+    this.hud.show(false);
+    const def = TRACKS[Math.floor(Math.random() * TRACKS.length)];
+    this.startDemo(def.id, false);
+    this.ui.title();
+    this.applyControls();
+    this.releaseWake();
+  }
+
+  startDemo(trackId, reverse) {
+    this.disposeRace();
+    const grid = shuffle(CHARACTERS.map((c) => c.id)).slice(0, 8);
+    this.race = new Race(this, { mode: 'demo', trackDef: trackById(trackId), reverse, grid, speedClass: 'zoom', laps: 99 });
+    this.race.setSize(this.w, this.h, this.pr);
+    // let the demo pack spread out a little before we show it
+    for (let i = 0; i < 90; i++) this.race.update(1 / 60);
+    this.view = this.race;
+    if (this.audio.ready) this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
+  }
+
+  previewTrack(trackId, reverse) {
+    clearTimeout(this._prevT);
+    this._prevT = setTimeout(() => {
+      const r = this.race;
+      if (r && r.mode === 'demo' && r.trackDef.id === trackId && r.track.reverse === !!reverse) {
+        this.view = r;
+        return;
+      }
+      this.startDemo(trackId, !!reverse);
+    }, 60);
+  }
+
+  showShowroom() {
+    clearTimeout(this._prevT);
+    this.disposeRace();
+    this.view = this.showroom;
+  }
+
+  // Eight racers: the player plus seven others (always including `must`,
+  // such as a career rival), the player in the middle of the pack.
+  makeGrid(player, gpOrder = null, must = []) {
+    if (gpOrder) return gpOrder;
+    const req = must.filter((id) => id && id !== player);
+    const pool = shuffle(CHARACTERS.map((c) => c.id).filter((id) => id !== player && !req.includes(id)));
+    const others = shuffle([...req, ...pool.slice(0, 7 - req.length)]);
+    others.splice(5, 0, player);
+    return others;
+  }
+
+  // A cup keeps the same eight racers for all its races.
+  _gpField(gp, must = []) {
+    gp.field = this.makeGrid(gp.player, null, must);
+    gp.points = {};
+    for (const id of gp.field) gp.points[id] = 0;
+  }
+
+  startFromMenu(mode) {
+    const s = this.settings;
+    if (mode === 'gp') {
+      const cup = CUPS.find((c) => c.id === s.cup) || CUPS[0];
+      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: this.menuChar(), extra: { playerLoadout: this.menuLoadout() } };
+      this._gpField(this.gp);
+      this.startGPRace();
+    } else if (mode === 'battle') {
+      // Balloon Battle: a smaller field, spread round the arena.
+      this.gp = null;
+      const player = this.menuChar();
+      const others = this.makeGrid(player).filter((id) => id !== player).slice(0, BATTLE_FIELD - 1);
+      const grid = [...others.slice(0, 2), player, ...others.slice(2)];
+      const arena = arenaById(s.arena) ? s.arena : ARENAS[0].id;
+      this.startRace({ mode, trackId: arena, reverse: false, player, grid, speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
+    } else {
+      this.gp = null;
+      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: this.menuChar(), speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
+    }
+  }
+
+  // The racer picked on the racer screen, if unlocked (else Mochi).
+  menuChar() {
+    const id = this.settings.char;
+    return charLocked(id, levelOf((this.career && this.career.xp) || 0).level, this.career) ? 'mochi' : charById(id).id;
+  }
+
+  // The ride picked on the racer screen (quick races, Grand Prix, time trials,
+  // online), if it is unlocked; otherwise the Zoom Classic.
+  menuLoadout() {
+    const id = this.settings.vehicle;
+    const lvl = levelOf((this.career && this.career.xp) || 0).level;
+    return { body: BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic' };
+  }
+
+  startGPRace() {
+    const gp = this.gp;
+    let order = gp.field;
+    if (gp.index > 0) {
+      // Leader starts at the back.
+      order = gp.field.slice().sort((a, b) => gp.points[a] - gp.points[b] || (a === gp.player ? 1 : -1));
+    }
+    this.startRace({ mode: 'gp', trackId: gp.tracks[gp.index], reverse: gp.reverse, player: gp.player, speedClass: gp.speedClass, order, ...(gp.extra || {}) });
+  }
+
+  startRace(cfg) {
+    // A track preview still pending would replace this race with a demo.
+    clearTimeout(this._prevT);
+    // Only daily challenge races report back as the daily.
+    if (!cfg.dailyEv) this.dailyRun = null;
+    this.lastCfg = cfg;
+    this.disposeRace();
+    this.paused = false;
+    const grid = cfg.grid || this.makeGrid(cfg.player, cfg.order);
+    // Career races: per-racer karts (bodies and upgrades) for the computer racers.
+    const byId = cfg.loadoutsById;
+    let loadouts = byId && cfg.mode !== 'tt' ? grid.map((id) => (id === cfg.player ? cfg.playerLoadout : byId[id]) || null) : null;
+    // Outside the career, some computer racers ride bikes.
+    if (!byId && cfg.mode !== 'tt') loadouts = grid.map((id) => (id === cfg.player ? cfg.playerLoadout || null : Math.random() < 0.35 ? { body: 'bike' } : null));
+    this.race = new Race(this, {
+      mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
+      difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
+      loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
+      look: lookOf(this.career),
+    });
+    this.race.setSize(this.w, this.h, this.pr);
+    this.view = this.race;
+    this.ui.hideAll();
+    this.hud.reset(this.race);
+    this.hud.show(true);
+    this.input.resetButtons();
+    this.applyControls();
+    this.audio.unlock();
+    this.audio.startEngine();
+    this.audio.setTempo(1);
+    this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
+    this._tiltChecked = false;
+    this.requestWake();
+  }
+
+  restart() {
+    if (this.lastCfg) this.startRace(this.lastCfg);
+  }
+
+  pause() {
+    const r = this.race;
+    if (!r || r.mode === 'demo' || this.paused || !['intro', 'countdown', 'race', 'wait'].includes(r.state)) return;
+    document.querySelector('#scr-pause [data-go="restart"]').hidden = r.mode === 'mp';
+    document.querySelector('#scr-pause [data-go="rescue"]').hidden = r.state !== 'race' || !r.player || r.player.finished;
+    document.querySelector('#scr-pause [data-go="quit"]').textContent = this.careerRun ? 'Quit to career' : 'Quit to menu';
+    if (r.mode === 'mp') {
+      // Online races cannot stop for one player: show the menu but keep racing.
+      this.menuOpen = true;
+      this.input.resetButtons();
+      this.ui.show('pause');
+      this.applyControls();
+      return;
+    }
+    this.paused = true;
+    this.audio.suspend();
+    this.input.resetButtons();
+    this.ui.show('pause');
+    this.applyControls();
+  }
+
+  // Pause menu escape hatch: the drone puts you back on the road.
+  rescuePlayer() {
+    const k = this.race && this.race.player;
+    if (k && this.race.state === 'race' && !k.finished && k.respawnT <= 0) k.rescueReq = true;
+    this.resume();
+  }
+
+  resume() {
+    if (this.menuOpen) {
+      this.menuOpen = false;
+      this.ui.hideAll();
+      this.applyControls();
+      return;
+    }
+    if (!this.paused) return;
+    this.paused = false;
+    this.audio.resume();
+    this.ui.hideAll();
+    this.input.resetButtons();
+    this.applyControls();
+    this.last = performance.now();
+  }
+
+  onVisibility() {
+    if (document.hidden) {
+      if (this.race && this.race.mode !== 'demo' && this.race.mode !== 'mp' && ['intro', 'countdown', 'race'].includes(this.race.state)) this.pause();
+      this.audio.suspend();
+    } else {
+      if (!this.paused) this.audio.resume();
+      if (this.race && this.race.mode !== 'demo') this.requestWake();
+      this.last = performance.now();
+    }
+  }
+
+  async requestWake() {
+    try {
+      if ('wakeLock' in navigator && !this.wake && !document.hidden) {
+        this.wake = await navigator.wakeLock.request('screen');
+        this.wake.addEventListener('release', () => { this.wake = null; });
+      }
+    } catch (e) {
+      this.wake = null;
+    }
+  }
+
+  releaseWake() {
+    if (this.wake) {
+      this.wake.release().catch(() => {});
+      this.wake = null;
+    }
+  }
+
+  // ---------------- results ----------------
+  onRaceComplete(race, rows, afterPodium = false) {
+    // Races (not time trials or Grand Prix legs) end on the podium first.
+    if (!afterPodium && race.mode !== 'tt' && race.mode !== 'demo' && !this.gp && race.state !== 'podium') {
+      this.audio.stopEngine();
+      this.menuOpen = false;
+      this.hud.show(false);
+      this.applyControls();
+      race.startPodium(rows, rows.find((r) => r.isPlayer), () => this.onRaceComplete(race, rows, true));
+      return;
+    }
+    this.audio.stopEngine();
+    this.menuOpen = false;
+    this.applyControls();
+    this.hud.show(false);
+    const ui = this.ui;
+    const me = rows.find((r) => r.isPlayer);
+    if (this.careerRun && !this.gp) {
+      this.onCareerComplete(race, rows);
+      return;
+    }
+    if (this.dailyRun) {
+      this.onDailyComplete(race, rows);
+      return;
+    }
+    if (race.mode === 'mp') {
+      const host = this.session && this.session.isHost;
+      if (race.battle && me && me.place === 1) addStat(this.career, 'battleWins');
+      const rw = this.profileAward(race, me, race.battle ? { trackId: null } : {});
+      const cell = (r) => (race.battle
+        ? `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons || 0)}</span><span class="pts">💥 ${r.hits || 0}</span>`
+        : `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`);
+      ui.results({
+        title: me ? (race.battle && me.place === 1 ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`) : 'Results',
+        sub: `Online · ${race.battle ? 'Balloon Battle · ' : ''}${race.trackDef.name}`,
+        html: rw + `<div class="results">${rows.map((r) => ui.row(r, cell(r))).join('')}</div>`
+          + (host ? '' : '<p class="lobby-summary" style="margin:8px 0 0">Waiting for the host to pick the next race…</p>'),
+        buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Back to lobby', 'hot']] : [['leave', 'Leave', 'ghost small']],
+      });
+      return;
+    }
+    if (race.mode === 'battle') {
+      const won = me && me.place === 1;
+      if (won) {
+        addStat(this.career, 'battleWins');
+        const b = (this.records.battle = this.records.battle || {});
+        b[race.trackDef.id] = (b[race.trackDef.id] || 0) + 1;
+        saveRecords(this.records);
+      }
+      const rw = this.profileAward(race, me, { trackId: null });
+      ui.results({
+        title: won ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`,
+        sub: `Balloon Battle · ${race.trackDef.name}`,
+        html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons)}</span><span class="pts">💥 ${r.hits}</span>`)).join('')}</div>`,
+        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Arenas', 'alt'], ['retry', 'Battle again', 'hot']],
+      });
+      return;
+    }
+    const key = race.trackDef.id + (race.track.reverse ? '-r' : '');
+    if (race.mode === 'tt') {
+      const rec = this.records[key] || {};
+      const total = me.time;
+      const bestLap = Math.min(...(me.lapTimes.length ? me.lapTimes : [Infinity]));
+      const newBest = !rec.tt || total < rec.tt;
+      if (newBest) rec.tt = total;
+      if (!rec.lap || bestLap < rec.lap) rec.lap = bestLap;
+      this.records[key] = rec;
+      saveRecords(this.records);
+      if (newBest) addStat(this.career, 'tt');
+      if (race.newGhost && race.ghost) addStat(this.career, 'ghosts');
+      const rw = this.profileAward(race, me, { record: newBest });
+      ui.results({
+        title: newBest ? 'New record!' : 'Time trial',
+        sub: race.trackDef.name,
+        html: `${rw}<div class="big-msg"><em>${fmtTime(total)}</em></div>
+          <div class="tt-times">${me.lapTimes.map((t, i) => `<div><small>Lap ${i + 1}</small>${fmtTime(t)}</div>`).join('')}
+          <div><small>Best total</small>${fmtTime(rec.tt)}</div><div><small>Best lap</small>${fmtTime(rec.lap)}</div></div>
+          ${race.newGhost ? '<p class="car-goal" style="text-align:center;margin:8px 0 0">👻 Ghost saved. Race against it next time!</p>' : ''}`,
+        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Retry', 'hot']],
+      });
+      return;
+    }
+    if (race.mode === 'gp') {
+      const gp = this.gp;
+      for (const r of rows) {
+        r.plus = POINTS[r.place - 1] || 0;
+        gp.points[r.ch.id] += r.plus;
+      }
+      const last = gp.index >= gp.tracks.length - 1;
+      if (me.place === 1) gp.wins = (gp.wins || 0) + 1;
+      gp.gems = (gp.gems || 0) + (race.player.gemsGot || 0);
+      const quit = gp.careerEv ? 'career' : 'menu';
+      // Career cups pay out at the end; their races only give XP.
+      const rw = this.profileAward(race, me, gp.careerEv ? { coins: 0 } : {});
+      ui.results({
+        title: `${me.place}${ordinal(me.place).toLowerCase()} place`,
+        sub: `Race ${gp.index + 1} of ${gp.tracks.length} · ${race.trackDef.name}`,
+        html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">+${r.plus}</span><span class="pts">${gp.points[r.ch.id]}</span>`)).join('')}</div>`,
+        buttons: last ? [[quit, 'Quit', 'ghost small'], ['final', 'Final standings', 'hot']] : [[quit, 'Quit', 'ghost small'], ['next', 'Next race', 'hot']],
+      });
+      return;
+    }
+    const rw = this.profileAward(race, me);
+    ui.results({
+      title: `${me.place}${ordinal(me.place).toLowerCase()} place`,
+      sub: race.trackDef.name,
+      html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`,
+      buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Race again', 'hot']],
+    });
+  }
+
+  // ---------------- profile ----------------
+  // Coins, XP, stats and achievements for a finished race. Returns the
+  // rewards block for the results screen.
+  profileAward(race, me, extra = {}) {
+    const sum = awardRace(this.career, {
+      mode: race.mode, place: me ? me.place : 0, gems: (race.player && race.player.gemsGot) || 0,
+      style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id, online: race.mode === 'mp', ...extra,
+    });
+    return this.rewardsFinish(sum);
+  }
+
+  rewardsFinish(sum, extraLines = []) {
+    const achs = checkAchievements(this.career, this.records);
+    saveCareer(this.career);
+    if ((sum && sum.ups.length) || achs.length) setTimeout(() => this.audio.play('levelup'), 400);
+    return this.ui.rewardsHtml(this.career, sum, achs, extraLines);
+  }
+
+  // ---------------- daily challenge ----------------
+  startDaily() {
+    const d = dailyFor();
+    this.gp = null;
+    this.careerRun = null;
+    this.dailyRun = d;
+    const player = this.career.racer || this.settings.char;
+    this.startRace({
+      mode: 'quick', trackId: d.track, reverse: d.rev, player, speedClass: d.cls, difficulty: d.diff, mods: d.mod, playerLoadout: this.menuLoadout(),
+      dailyEv: d,
+    });
+  }
+
+  onDailyComplete(race, rows) {
+    const d = this.dailyRun;
+    const me = rows.find((r) => r.isPlayer);
+    const gems = (race.player && race.player.gemsGot) || 0;
+    const pass = me.place <= d.goal && gems >= (d.gems || 0);
+    const sum = awardRace(this.career, {
+      mode: race.mode, place: me.place, gems, style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id,
+    });
+    const lines = [];
+    let title = pass ? 'Challenge complete!' : 'Not quite!';
+    if (pass) {
+      const dr = completeDaily(this.career);
+      if (dr) {
+        lines.push(`🔥 ${dr.streak}-day streak! Daily reward: a free prize capsule 🍬 · +${dr.xp} XP`);
+        sum.coins += dr.coins;
+        sum.xp += dr.xp;
+        sum.levelCoins += dr.levelCoins;
+        sum.ups.push(...dr.ups);
+        sum.caps = [...(sum.caps || []), ...(dr.caps || [])];
+        sum.level = dr.level;
+      } else lines.push('Already completed today. Come back tomorrow for a new challenge!');
+    }
+    this.audio.play(pass ? 'finish' : 'lose');
+    const rw = this.rewardsFinish(sum, lines);
+    this.ui.results({
+      title,
+      sub: `Daily challenge · ${d.mod.name}`,
+      html: `${rw}<div class="results">${rows.map((r) => this.ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`,
+      buttons: [['menu', 'Menu', 'ghost small'], ['daily', pass ? 'Race again' : 'Retry', 'hot']],
+    });
+  }
+
+  showGPFinal(afterPodium = false) {
+    const gp = this.gp;
+    const table = gp.field.map((id) => ({ ch: charById(id), pts: gp.points[id], isPlayer: id === gp.player }))
+      .sort((a, b) => b.pts - a.pts || (a.isPlayer ? -1 : 1));
+    table.forEach((r, i) => (r.place = i + 1));
+    const me = table.find((r) => r.isPlayer);
+    // The cup's final standings get a podium ceremony first.
+    if (!afterPodium && this.race && this.race.mode !== 'demo' && this.race.state !== 'podium') {
+      this.ui.hideAll();
+      this.race.startPodium(table, me, () => this.showGPFinal(true));
+      return;
+    }
+    if (gp.careerEv) {
+      this.onCareerCupFinal(table, me);
+      return;
+    }
+    const trophy = me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁';
+    const key = `cup:${gp.cup.id}`;
+    const prevBest = this.records[key];
+    const prevN = prevBest ? parseInt(prevBest, 10) : 99;
+    if (me.place < prevN) {
+      this.records[key] = `${me.place}${ordinal(me.place).toLowerCase()}`;
+      saveRecords(this.records);
+    }
+    const msg = me.place === 1 ? `You won the <em>${gp.cup.name}</em>!` : `You finished <em>${me.place}${ordinal(me.place).toLowerCase()}</em> overall`;
+    this.audio.play(me.place <= 3 ? 'finish' : 'lose');
+    if (me.place === 1) addToSet(this.career, 'cups', gp.cup.id);
+    const bonus = [150, 90, 60][me.place - 1] || 20;
+    const rw = this.rewardsFinish(grant(this.career, bonus, me.place <= 3 ? 150 : 50), [`Cup bonus for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
+    this.ui.results({
+      title: 'Final standings',
+      sub: gp.cup.name,
+      html: `${rw}<div class="trophy">${trophy}</div><div class="big-msg" style="margin:4px 0 10px">${msg}</div>
+        <div class="results">${table.map((r) => this.ui.row(r, `<span></span><span class="pts">${r.pts}</span>`)).join('')}</div>`,
+      buttons: [['menu', 'Menu', 'ghost small'], ['again', 'Play again', 'hot']],
+    });
+  }
+
+  onResultsAction(action) {
+    switch (action) {
+      case 'career':
+        this.openCareer();
+        break;
+      case 'daily':
+        this.startDaily();
+        break;
+      case 'garage':
+        this.openCareer(true);
+        break;
+      case 'lobby':
+        this.backToLobby();
+        break;
+      case 'leave':
+        this.leaveMP();
+        break;
+      case 'retry':
+        if (this.dailyRun) this.startDaily();
+        else if (this.careerRun) this.startCareerEvent(this.careerRun.evId);
+        else this.restart();
+        break;
+      case 'tracks':
+        this.ui.mode = this.lastCfg.mode;
+        this.ui.trackSelect();
+        break;
+      case 'menu':
+        this.toTitle();
+        break;
+      case 'next':
+        this.gp.index++;
+        this.startGPRace();
+        break;
+      case 'final':
+        this.showGPFinal();
+        break;
+      case 'again': {
+        const cup = this.gp.cup;
+        this.settings.cup = cup.id;
+        this.startFromMenu('gp');
+        break;
+      }
+    }
+  }
+
+  // A shortcut the player drove through; true the first time ever.
+  markShortcut(trackId, name) {
+    const f = (this.records.found = this.records.found || {});
+    const list = (f[trackId] = f[trackId] || []);
+    if (list.includes(name)) return false;
+    list.push(name);
+    saveRecords(this.records);
+    return true;
+  }
+
+  // ---------------- career ----------------
+  // Leave a race from the pause menu: career players go back to the hub.
+  quitRace() {
+    if (this.careerRun) this.openCareer();
+    else this.toTitle();
+  }
+
+  openCareer(garage = false) {
+    this.paused = false;
+    this.menuOpen = false;
+    this.gp = null;
+    this.careerRun = null;
+    this.dailyRun = null;
+    this.audio.stopEngine();
+    this.audio.setTempo(1);
+    this.hud.show(false);
+    this.releaseWake();
+    saveCareer(this.career);
+    if (!this.race || this.race.mode !== 'demo') this.disposeRace();
+    this.applyControls();
+    if (garage) this.careerUI.openGarage();
+    else this.careerUI.open();
+  }
+
+  resetCareer() {
+    clearCareer();
+    this.career = newCareer();
+    this.careerUI.ci = null;
+  }
+
+  startCareerEvent(evId) {
+    const c = this.career;
+    const { ev, chapter } = eventById(evId);
+    const player = c.racer;
+    const rival = rivalFor(c, chapter);
+    const lo = playerLoadout(c);
+    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev };
+    this.careerRun = { evId };
+    if (ev.type === 'cup') {
+      this.gp = {
+        cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: chapter.cls, player, careerEv: ev, wins: 0, gems: 0,
+      };
+      this._gpField(this.gp, [rival]);
+      const others = this.gp.field.filter((id) => id !== player);
+      this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev };
+      this.startGPRace();
+    } else if (ev.type === 'time') {
+      this.startRace({ ...base, mode: 'tt' });
+    } else if (ev.type === 'duel') {
+      this.startRace({ ...base, mode: 'quick', grid: [rival, player], difficulty: chapter.bossDiff, loadoutsById: aiLoadouts(chapter, [rival], rival) });
+    } else {
+      const grid = this.makeGrid(player, null, [rival]);
+      this.startRace({ ...base, mode: 'quick', grid, loadoutsById: aiLoadouts(chapter, grid.filter((id) => id !== player), rival) });
+    }
+  }
+
+  onCareerComplete(race, rows) {
+    const me = rows.find((r) => r.isPlayer);
+    const { ev } = eventById(this.careerRun.evId);
+    const res = { place: me.place, finished: me.finished, time: me.time, gems: (race.player && race.player.gemsGot) || 0 };
+    // Lead over the next racer (duels and "win by" stars).
+    const next = rows.find((r) => r.place === me.place + 1);
+    res.margin = me.place === 1 && next ? next.time - me.time : 0;
+    const out = applyResult(this.career, ev.id, res);
+    if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    const rw = this.profileAward(race, me, { coins: 0, xpBonus: out.pass ? 50 : 0 });
+    let extra = '';
+    if (ev.type === 'time') extra = `<div class="big-msg"><em>${fmtTime(me.time)}</em></div><div class="car-goal">Target ${fmtTime(ev.target)}</div>`;
+    const rowsHtml = ev.type === 'time' ? '' : `<div class="results">${rows.map((r) => this.ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`;
+    this.careerUI.results(out, rw + rowsHtml, extra);
+  }
+
+  onCareerCupFinal(table, me) {
+    const gp = this.gp;
+    const res = { place: me.place, wins: gp.wins || 0, gems: gp.gems || 0, finished: true };
+    const out = applyResult(this.career, gp.careerEv.id, res);
+    if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    if (me.place === 1) addToSet(this.career, 'cups', gp.careerEv.id);
+    const rw = this.rewardsFinish(grant(this.career, 0, me.place <= 3 ? 200 : 60));
+    this.audio.play(me.place === 1 ? 'finish' : 'lose');
+    const trophy = me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁';
+    const rowsHtml = `<div class="trophy">${trophy}</div><div class="results">${table.map((r) => this.ui.row(r, `<span></span><span class="pts">${r.pts}</span>`)).join('')}</div>`;
+    this.gp = null;
+    this.careerUI.results(out, rw + rowsHtml);
+  }
+
+  // ---------------- multiplayer ----------------
+  openMultiplayer() {
+    if (!NetSession.supported()) {
+      this.ui.lobby('start', 'Online races need the full game page (open it in Safari, not inside another app).');
+      return;
+    }
+    this.ui.lobby(this.session ? 'room' : 'start');
+  }
+
+  onLobbyAction(action) {
+    if (action === 'host') this.hostMP();
+    else if (action === 'join') this.joinMP(document.getElementById('join-code').value.trim());
+    else if (action === 'leave') this.leaveMP();
+    else if (action === 'char') { this.ui.mode = 'mp'; this.ui.charSelect(); }
+    else if (action === 'start') this.startMP();
+  }
+
+  _wireSession(ses) {
+    ses.onLobby = () => {
+      if (this.ui.current === 'lobby') this.ui.renderLobby();
+      if (ses.isGuest && this.ui.current === 'lobby') this.previewTrack(ses.lobby.track, ses.lobby.reverse);
+    };
+    ses.onClosed = (reason) => {
+      const inRace = this.race && this.race.mode === 'mp';
+      this.session = null;
+      ses.close();
+      if (inRace) this.toTitle();
+      this.ui.lobby('start', reason || 'Disconnected.');
+    };
+    ses.onError = (e) => {
+      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', (e && e.message) || 'Connection problem.');
+    };
+    ses.onStart = (cfg) => this.startNetRace(cfg);
+    ses.onToLobby = () => this.returnToLobbyView();
+  }
+
+  // Tear down any half-open session (a double tap on Host/Join used to leave
+  // an orphaned connection behind, which showed up as an extra idle player).
+  _resetSession() {
+    if (this.session) {
+      const old = this.session;
+      this.session = null;
+      old.close();
+    }
+  }
+
+  async hostMP() {
+    if (this._netBusy) return;
+    this._netBusy = true;
+    try {
+      await this._hostMP();
+    } finally {
+      this._netBusy = false;
+    }
+  }
+
+  async joinMP(code) {
+    if (this._netBusy) return;
+    this._netBusy = true;
+    try {
+      await this._joinMP(code);
+    } finally {
+      this._netBusy = false;
+    }
+  }
+
+  async _hostMP() {
+    this._resetSession();
+    this.ui.lobby('start', 'Creating a room…');
+    const ses = new NetSession(this);
+    this._wireSession(ses);
+    try {
+      await ses.host(this.menuChar(), this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
+    } catch (e) {
+      ses.close();
+      this.ui.lobby('start', `Could not create a room: ${(e && e.message) || e}. Check your internet connection.`);
+      return;
+    }
+    this.session = ses;
+    ses.lobby = { track: this.settings.track, reverse: false, speedClass: this.settings.speedClass, difficulty: this.settings.difficulty, ai: true };
+    this.ui.lobby('room');
+    this.previewTrack(ses.lobby.track, false);
+  }
+
+  async _joinMP(code) {
+    if (!/^[A-Za-z0-9]{4}$/.test(code)) {
+      this.ui.lobby('start', 'Type the 4-letter code shown on the host\'s phone.');
+      return;
+    }
+    this._resetSession();
+    this.ui.lobby('start', 'Connecting…');
+    const ses = new NetSession(this);
+    this._wireSession(ses);
+    try {
+      await ses.join(code, this.menuChar(), this.settings.name, { ...lookOf(this.career), body: this.menuLoadout().body });
+    } catch (e) {
+      ses.close();
+      this.ui.lobby('start', (e && e.message) || 'Could not connect.');
+      return;
+    }
+    this.session = ses;
+    this.ui.lobby('room');
+  }
+
+  mpCharDone() {
+    if (this.session) this.session.pickChar(this.menuChar());
+    this.returnToLobbyView();
+  }
+
+  returnToLobbyView() {
+    this.menuOpen = false;
+    this.hud.show(false);
+    this.audio.stopEngine();
+    this.audio.setTempo(1);
+    if (!this.session) { this.toTitle(); return; }
+    this.ui.lobby('room');
+    this.previewTrack(this.session.lobby.track, this.session.lobby.reverse);
+    this.applyControls();
+  }
+
+  backToLobby() {
+    const ses = this.session;
+    if (!ses) { this.toTitle(); return; }
+    ses.inRace = false;
+    if (ses.isHost) ses.send({ t: 'toLobby' });
+    ses.race = null;
+    this.returnToLobbyView();
+  }
+
+  leaveMP() {
+    const ses = this.session;
+    this.session = null;
+    if (ses) ses.close();
+    this.menuOpen = false;
+    this.toTitle();
+  }
+
+  startMP() {
+    const ses = this.session;
+    if (!ses || !ses.isHost || ses.players.length < 2) return;
+    const L = ses.lobby;
+    // Only players we've heard from recently get a kart.
+    const now = performance.now();
+    const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char, nick: p.nick || p.name, look: p.look || null }));
+    if (humans.length < 2) return;
+    const taken = new Set(humans.map((h) => h.char));
+    // A battle arena takes a smaller field than a race.
+    const arena = !!trackById(L.track).arena;
+    const field = arena ? BATTLE_FIELD : 8;
+    const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, field - humans.length)) : [];
+    // Computer racers start in front, humans in shuffled slots at the back.
+    const grid = [...ai];
+    const hs = shuffle(humans.slice());
+    const slots = [];
+    for (const h of hs) { slots.push({ id: h.id, slot: grid.length, nick: h.nick, look: h.look }); grid.push(h.char); }
+    const cfg = { trackId: L.track, reverse: arena ? false : L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
+    ses.inRace = true;
+    ses.send({ t: 'start', cfg });
+    this.startNetRace(cfg);
+    const waiting = new Set(humans.filter((h) => h.id !== 'host').map((h) => h.id));
+    let went = false;
+    const go = () => {
+      if (went || !this.race || this.race.mode !== 'mp') return;
+      went = true;
+      ses.send({ t: 'go' });
+      this.race.netGo();
+    };
+    ses.onReady = (id) => { waiting.delete(id); if (!waiting.size) go(); };
+    setTimeout(go, 8000);
+  }
+
+  startNetRace(cfg) {
+    const ses = this.session;
+    if (!ses) return;
+    const me = ses.isHost ? 'host' : ses.meId;
+    const mine = cfg.humans.find((h) => h.id === me);
+    if (!mine) return;
+    clearTimeout(this._prevT);
+    this.disposeRace();
+    this.paused = false;
+    this.menuOpen = false;
+    this.gp = null;
+    const def = trackById(cfg.trackId);
+    this.race = new Race(this, {
+      mode: 'mp', trackDef: def, reverse: cfg.reverse, grid: cfg.grid, speedClass: cfg.speedClass, difficulty: cfg.difficulty,
+      laps: def.laps || 3, net: ses, playerSlot: mine.slot, humans: ses.isHost ? cfg.humans.filter((h) => h.id !== 'host') : [],
+      humanSlots: cfg.humans.map((h) => h.slot),
+      nicks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanNick(h.nick)])),
+      looks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanLook(h.look)])),
+    });
+    ses.race = this.race;
+    this.race.setSize(this.w, this.h, this.pr);
+    this.view = this.race;
+    this.ui.hideAll();
+    this.hud.reset(this.race);
+    this.hud.show(true);
+    this.hud.hint('Get ready…', 3);
+    this.input.resetButtons();
+    this.applyControls();
+    this.audio.unlock();
+    this.audio.startEngine();
+    this.audio.setTempo(1);
+    this.audio.playSong(def.music, def.theme);
+    this._tiltChecked = false;
+    this.requestWake();
+    if (ses.isGuest) ses.send({ t: 'ready' });
+  }
+
+  // ---------------- loop ----------------
+  loop(now) {
+    requestAnimationFrame(this.loop);
+    let dt = (now - this.last) / 1000;
+    this.last = now;
+    if (dt <= 0) return;
+    dt = Math.min(dt, 0.05);
+
+    this._pollPad();
+    if (!this.paused && this.view) {
+      this.renderer.info.reset();
+      this.view.update(dt);
+      this._checkTilt();
+      this._frameStats(dt);
+      if (this.post.active) this.post.render(this.view.scene, this.view.camera, this.view.grade, dt);
+      else this.renderer.render(this.view.scene, this.view.camera);
+    }
+    this.ui.tick(dt);
+    this.wheelHost.tick(dt);
+    this.wheelPad.tick(dt);
+  }
+
+  // Controllers work the menus too: A = the hot button, B = back, Start = pause.
+  _pollPad() {
+    const inp = this.input;
+    inp.pollPad();
+    const E = inp.padEdges;
+    if (!E.a && !E.b && !E.start) return;
+    const scr = document.querySelector('#ui > .screen:not([hidden])');
+    const key = (code) => this.onKey({ code, target: document.body, preventDefault() {} });
+    if (E.start) key('Escape');
+    else if (scr && E.a) key('Enter');
+    else if (scr && E.b) key('Escape');
+  }
+
+  _checkTilt() {
+    const r = this.race;
+    if (!r || r.mode === 'demo' || this._tiltChecked || r.state !== 'race' || r.raceTime < 2.5) return;
+    this._tiltChecked = true;
+    if (isTouch && this.settings.steering === 'tilt' && !this.input.tiltLive) {
+      this.settings.steering = 'touch';
+      saveSettings(this.settings);
+      this.applyControls();
+      this.hud.toast('No tilt sensor: touch steering on');
+      this.hud.hint('Drag on the left side of the screen to steer', 4);
+    }
+  }
+
+  _frameStats(dt) {
+    this.ft += (dt - this.ft) * 0.08;
+    this.fpsFrames++;
+    this.fpsTime += dt;
+    if (this.fpsTime >= 0.5) {
+      if (this.settings.showFps) {
+        const info = this.renderer.info.render;
+        this.hud.fps(`${Math.round(this.fpsFrames / this.fpsTime)} fps · ${this.pr.toFixed(2)}x · ${info.calls} calls · ${(info.triangles / 1000).toFixed(0)}k tris`);
+      }
+      this.fpsFrames = 0;
+      this.fpsTime = 0;
+    }
+    // Dynamic resolution. Low Power Mode caps Safari at 30 fps; a steady
+    // 30 fps cadence is treated as the target so we don't blur the picture
+    // for nothing.
+    this.dtHist = this.dtHist || [];
+    this.dtHist.push(dt);
+    if (this.dtHist.length > 90) this.dtHist.shift();
+    if (this.dtHist.length === 90 && this.fpsFrames === 0) {
+      const sorted = this.dtHist.slice().sort((a, b) => a - b);
+      const med = sorted[45];
+      const spread = sorted[80] - sorted[10];
+      if (med > 0.03 && med < 0.037 && spread < 0.004) this.capped = true;
+      else if (med < 0.022) this.capped = false;
+    }
+    const target = this.capped ? 1 / 30 : 1 / 60;
+    if (this.blockRaise > 0) this.blockRaise -= dt;
+    this.drTimer += dt;
+    if (this.ft > target * 1.18) {
+      this.goodTime = 0;
+      if (this.drTimer > 1.2 && this.pr > this.minPR + 0.01) {
+        this.pr = Math.max(this.minPR, this.pr - (this.ft > target * 1.5 ? 0.3 : 0.15));
+        this.drTimer = 0;
+        this.blockRaise = 15;
+        this.resize();
+      }
+    } else if (this.ft < target * 1.05) {
+      this.goodTime += dt;
+      if (this.goodTime > 4 && this.blockRaise <= 0 && this.pr < this.maxPR - 0.01) {
+        this.pr = Math.min(this.maxPR, this.pr + 0.15);
+        this.goodTime = 0;
+        this.drTimer = 0;
+        this.resize();
+      }
+    }
+  }
+}
+
+function boot() {
+  try {
+    window.zoomies = new App();
+  } catch (e) {
+    console.error(e, e.stack);
+    const m = $('loading-msg');
+    if (m) m.textContent = `Could not start: ${e.message}. Try reloading.`;
+  }
+}
+
+const fontsReady = document.fonts && document.fonts.load ? Promise.race([
+  Promise.all([document.fonts.load('40px Bungee'), document.fonts.load('700 16px "Baloo 2"')]),
+  new Promise((r) => setTimeout(r, 1500)),
+]) : Promise.resolve();
+fontsReady.then(boot, boot);
+
