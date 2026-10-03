@@ -12,7 +12,7 @@ The goal is one awesome, original kart racer for iPhone Safari and the Mac. Ever
   - Online multiplayer for up to 4 phones, the Mac version with phone-as-wheel, and progress sync between devices.
   - XP, levels, trophies and the prize machine.
 - **Where it's published:**
-  - GitHub Pages serves the branch `claude/iphone-racing-game-0wytrs` at https://olev99.github.io/Fun-stuff/.
+  - GitHub Pages serves `main` at https://olev99.github.io/Fun-stuff/. The first build, PR #1, was merged into `main`.
   - A playable single-file copy is published as a private artifact for the owner. Rebuild it with `build-single.mjs` and republish to the same artifact link when asked.
 
 **Decisions and preferences from the owner (keep to these):**
@@ -59,7 +59,7 @@ How to apply it:
 
 - **Code:** all the code is in `zoomies/`: plain ES modules plus vendored three.js, with no build step. Serve `zoomies/` statically (the test runner does this on port 8000).
 - **Before every commit:** run `node zoomies/tools/stamp.mjs`. It stamps file hashes so phones never mix old and new files.
-- **Branch:** work on `claude/iphone-racing-game-0wytrs` and push with `git push -u origin claude/iphone-racing-game-0wytrs`. Draft PR #1 is open, and GitHub Pages deploys this branch.
+- **Branch:** `main` holds the released game. Do new work on the branch the session gives you, push it and open a pull request into `main`. The owner says when to merge, and once a pull request is merged the game on GitHub Pages updates.
 - **Model names:** keep model names out of repo files, commit messages and PR text.
 - **README:** `zoomies/README.md` is the player-facing feature list. Keep it accurate when features change.
 - **Playable single-file build:** `node zoomies/tools/build-single.mjs <out.html> --fragment`.
