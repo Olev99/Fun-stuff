@@ -54,6 +54,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - The orbs hold battle items only (no warps, rockets or gems), and a racer down to one balloon gets more shields and rainbows. The arena's moving obstacles knock you aside but don't pop balloons.
   - Five arenas, each a bowl round a central island: **Barnyard Bowl** (hay bales and mud), **Snowglobe Rink** (slippery ice and snowballs), **Neon Pinball** (a long oval with boost strips and laser sweepers), **Sandcastle Cove** (rolling dunes and crabs) and **Moon Crater** (low gravity and big bumps).
   - Computer racers hunt the leader, grab orbs, line up their shots (faster on Hard) and drop traps on whoever is chasing them. Winning a battle earns the Balloon Buster trophy, and the arena cards count your wins.
+  - Online too: every phone pops its own balloons, steals and knock-outs sync between phones, and the host calls the end and sends everyone the results. A friend who is knocked out watches the rest of the fight.
 - **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Style points count for half. Each level takes longer than the last: a good racer needs about 25 races for level 10 and 100 for level 18. Each level-up shows what it unlocks: racers you can now hire, and a free prize capsule every 5th level. The daily reward also gives a free capsule. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
@@ -117,7 +118,7 @@ Sync again whenever you switch devices. Pairing uses the same free WebRTC setup 
 1. Everyone opens the game (same link), taps **Multiplayer** and types a name. The name floats over your kart on your friends' screens.
 2. One player taps **Host a race** and gets a 4-letter room code.
 3. Friends type the code and tap **Join**. Up to 4 phones can play, and each player picks a racer.
-4. The host picks the track, speed and computer racers (Off, Easy, Normal or Hard), then taps **Start race**.
+4. The host picks the track, speed and computer racers (Off, Easy, Normal or Hard), then taps **Start race**. The track picker also runs through the five battle arenas (marked 🎈): pick one and it's a Balloon Battle for up to 4 friends plus computer racers.
 5. After the race, the host can take everyone back to the lobby for the next one.
 
 How it works:

@@ -677,19 +677,21 @@ export class UI {
     $('lobby-players').innerHTML = rows.join('');
     const cfg = ses.lobby;
     const def = trackById(cfg.track);
+    // The host's picker runs through the tracks, then the battle arenas.
+    const label = def.arena ? `🎈 ${def.name}` : `${def.name}${cfg.reverse ? ' ⟲' : ''}`;
     const cls = { chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[cfg.speedClass];
     const dif = { easy: 'Easy', normal: 'Normal', hard: 'Hard' }[cfg.difficulty];
     if (ses.isHost) {
       $('lobby-status').textContent = `${ses.players.length} of 4 players`;
       $('lobby-settings').innerHTML = `
-        <div class="row"><span class="lbl">Track</span><div class="picker"><button data-lb="track-prev" aria-label="Previous track">◀</button><span>${def.name}${cfg.reverse ? ' ⟲' : ''}</span><button data-lb="track-next" aria-label="Next track">▶</button></div></div>
+        <div class="row"><span class="lbl">${def.arena ? 'Battle' : 'Track'}</span><div class="picker"><button data-lb="track-prev" aria-label="Previous track">◀</button><span>${label}</span><button data-lb="track-next" aria-label="Next track">▶</button></div></div>
         <div class="row"><span class="lbl">Speed</span><div class="seg">${['chill', 'zoom', 'turbo'].map((c) => `<button data-lb="cls-${c}" class="${cfg.speedClass === c ? 'on' : ''}">${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
         <div class="row"><span class="lbl">Computer racers</span><div class="seg">${['off', 'easy', 'normal', 'hard'].map((d) => `<button data-lb="ai-${d}" class="${(d === 'off' ? !cfg.ai : cfg.ai && cfg.difficulty === d) ? 'on' : ''}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div></div>
-        <div class="row"><span class="lbl">Reverse</span><label class="toggle"><input type="checkbox" data-lb="reverse" ${cfg.reverse ? 'checked' : ''} aria-label="Reverse"></label></div>`;
-      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>Start race</button>`;
+        ${def.arena ? '' : `<div class="row"><span class="lbl">Reverse</span><label class="toggle"><input type="checkbox" data-lb="reverse" ${cfg.reverse ? 'checked' : ''} aria-label="Reverse"></label></div>`}`;
+      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>${def.arena ? 'Start battle' : 'Start race'}</button>`;
     } else {
       $('lobby-status').textContent = 'Connected';
-      $('lobby-settings').innerHTML = `<div class="lobby-summary">Track: <b>${def.name}${cfg.reverse ? ' (reverse)' : ''}</b><br>Speed: <b>${cls}</b><br>Computer racers: <b>${cfg.ai ? dif : 'Off'}</b><br><br>The host picks the track and starts the race.</div>`;
+      $('lobby-settings').innerHTML = `<div class="lobby-summary">${def.arena ? `Balloon Battle: <b>${def.name}</b>` : `Track: <b>${def.name}${cfg.reverse ? ' (reverse)' : ''}</b>`}<br>Speed: <b>${cls}</b><br>Computer racers: <b>${cfg.ai ? dif : 'Off'}</b><br><br>The host picks the track and starts the race.</div>`;
       $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button>`;
     }
     if (!this._lobbyBound) {
@@ -700,9 +702,10 @@ export class UI {
         app.audio.play('select');
         const v = b.dataset.lb;
         const L = app.session.lobby;
-        const idx = TRACKS.findIndex((t) => t.id === L.track);
-        if (v === 'track-prev') app.session.setLobby({ track: TRACKS[(idx - 1 + TRACKS.length) % TRACKS.length].id });
-        else if (v === 'track-next') app.session.setLobby({ track: TRACKS[(idx + 1) % TRACKS.length].id });
+        const all = [...TRACKS, ...ARENAS];
+        const idx = all.findIndex((t) => t.id === L.track);
+        if (v === 'track-prev') app.session.setLobby({ track: all[(idx - 1 + all.length) % all.length].id });
+        else if (v === 'track-next') app.session.setLobby({ track: all[(idx + 1) % all.length].id });
         else if (v.startsWith('cls-')) app.session.setLobby({ speedClass: v.slice(4) });
         else if (v === 'ai-off') app.session.setLobby({ ai: false });
         else if (v.startsWith('ai-')) app.session.setLobby({ ai: true, difficulty: v.slice(3) });

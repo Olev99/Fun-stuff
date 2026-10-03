@@ -515,11 +515,15 @@ class App {
     }
     if (race.mode === 'mp') {
       const host = this.session && this.session.isHost;
-      const rw = this.profileAward(race, me);
+      if (race.battle && me && me.place === 1) addStat(this.career, 'battleWins');
+      const rw = this.profileAward(race, me, race.battle ? { trackId: null } : {});
+      const cell = (r) => (race.battle
+        ? `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons || 0)}</span><span class="pts">💥 ${r.hits || 0}</span>`
+        : `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`);
       ui.results({
-        title: me ? `${me.place}${ordinal(me.place).toLowerCase()} place` : 'Results',
-        sub: `Online · ${race.trackDef.name}`,
-        html: rw + `<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`)).join('')}</div>`
+        title: me ? (race.battle && me.place === 1 ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`) : 'Results',
+        sub: `Online · ${race.battle ? 'Balloon Battle · ' : ''}${race.trackDef.name}`,
+        html: rw + `<div class="results">${rows.map((r) => ui.row(r, cell(r))).join('')}</div>`
           + (host ? '' : '<p class="lobby-summary" style="margin:8px 0 0">Waiting for the host to pick the next race…</p>'),
         buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Back to lobby', 'hot']] : [['leave', 'Leave', 'ghost small']],
       });
@@ -983,13 +987,16 @@ class App {
     const humans = ses.players.filter((p) => p.id === 'host' || now - (ses.seen.get(p.id) ?? -1e9) < 5000).map((p) => ({ id: p.id, char: p.char, nick: p.nick || p.name, look: p.look || null }));
     if (humans.length < 2) return;
     const taken = new Set(humans.map((h) => h.char));
-    const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, 8 - humans.length)) : [];
+    // A battle arena takes a smaller field than a race.
+    const arena = !!trackById(L.track).arena;
+    const field = arena ? BATTLE_FIELD : 8;
+    const ai = L.ai ? shuffle(CHARACTERS.map((c) => c.id).filter((id) => !taken.has(id))).slice(0, Math.max(0, field - humans.length)) : [];
     // Computer racers start in front, humans in shuffled slots at the back.
     const grid = [...ai];
     const hs = shuffle(humans.slice());
     const slots = [];
     for (const h of hs) { slots.push({ id: h.id, slot: grid.length, nick: h.nick, look: h.look }); grid.push(h.char); }
-    const cfg = { trackId: L.track, reverse: L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
+    const cfg = { trackId: L.track, reverse: arena ? false : L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
     ses.inRace = true;
     ses.send({ t: 'start', cfg });
     this.startNetRace(cfg);

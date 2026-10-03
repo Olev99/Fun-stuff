@@ -25,14 +25,17 @@ const SNAP_HZ = 20;
 const STATE_HZ = 30;
 
 // Compact kart state for the network. Flags: 1 grounded, 2 drifting,
-// 4 boosting, 8 offroad, 16 gliding, 32 finished, 64 trick, 128 respawning.
+// 4 boosting, 8 offroad, 16 gliding, 32 finished, 64 trick, 128 respawning,
+// 256 ghost, 512 out of a battle, 1024 ramming (battle), 2048 can't be hit.
+// a[22]: balloons.
 function kartState(k) {
   const r = (v) => Math.round(v * 100) / 100;
   const flags = (k.grounded ? 1 : 0) | (k.drifting ? 2 : 0) | (k.boostTime > 0 ? 4 : 0) | (k.offroad ? 8 : 0) |
-    (k.gliding ? 16 : 0) | (k.finished ? 32 : 0) | (k.trickAnim > 0 ? 64 : 0) | (k.respawnT > 0 ? 128 : 0) | (k.ghostTime > 0 ? 256 : 0);
+    (k.gliding ? 16 : 0) | (k.finished ? 32 : 0) | (k.trickAnim > 0 ? 64 : 0) | (k.respawnT > 0 ? 128 : 0) | (k.ghostTime > 0 ? 256 : 0) |
+    (k.out ? 512 : 0) | (k.ramT > 0 ? 1024 : 0) | (k.invuln > 0 ? 2048 : 0);
   return [r(k.pos.x), r(k.pos.y), r(k.pos.z), r(k.yaw), r(k.vel.x), r(k.vel.z), r(k.vy), flags, k.driftDir, k.driftLevel,
     r(k.steerS), k.laps, r(k.total), k.place, k.gems, r(k.spinTime), r(k.starTime), r(k.shrinkTime), r(k.shield), r(k.rocketTime),
-    k.path && k.path.id !== undefined ? k.path.id : -1, r(k.finishTime || 0)];
+    k.path && k.path.id !== undefined ? k.path.id : -1, r(k.finishTime || 0), k.balloons ?? -1];
 }
 
 // Glue between the item system and the network session.
@@ -128,7 +131,7 @@ export class Race {
     this.lookBack = false;
 
     // Balloon Battle in an arena instead of a race.
-    this.battle = this.mode === 'battle' ? new Battle(this) : null;
+    this.battle = this.mode === 'battle' || (this.mode === 'mp' && opts.trackDef.arena) ? new Battle(this) : null;
     this._makeKarts(opts);
     if (this.battle) this.battle.setup();
     this.tags = new NameTags(this, this.app.settings.tags || 'all');
@@ -244,7 +247,7 @@ export class Race {
     } else if (this.state === 'finished') {
       if (!this.results && !this.session && !this.battle && this.stateTime > 4.5) this._finishResults();
     }
-    if (this.net && this.net.isHost && !this.results) this._checkNetEnd(dt);
+    if (this.net && this.net.isHost && !this.results && !this.battle) this._checkNetEnd(dt);
 
     const inp = this.player && this.player.ai == null && this.state !== 'wait' ? this.app.input.read(dt) : null;
     if (inp && this.player) {
@@ -1006,7 +1009,7 @@ export class Race {
       k.human = false;
       k.path = this.track;
       k.seg = -1;
-      k.ai = new AIDriver(k, this, 0.9, this.diff);
+      k.ai = k.out ? null : this.battle ? new BattleAI(k, this, 0.9, this.diff) : new AIDriver(k, this, 0.9, this.diff);
       this.app.hud.toast(`${k.ch.name} left the race`);
     }
   }
@@ -1042,6 +1045,8 @@ export class Race {
     const want = pathId >= 0 ? this.track.shortcuts[pathId] : this.track;
     if (want && k.path !== want) { k.path = want; k.seg = -1; }
     if (f & 32 && !k.finished) { k.finished = true; k.finishTime = a[21]; }
+    k.invuln = f & 2048 ? 0.2 : 0;
+    if (this.battle) this.battle.applyNet(k, a[22], !!(f & 512), !!(f & 1024));
   }
 
   _updateRemote(k, dt) {
@@ -1138,7 +1143,8 @@ export class Race {
         if (this.player) this.player.hit(msg.kind);
         break;
       case 'results': {
-        const rows = msg.rows.map((r) => ({ ch: charById(r.id), nick: this.karts[r.slot] && this.karts[r.slot].nick, time: r.time, finished: r.finished, place: r.place, isPlayer: r.slot === this.mySlot, slot: r.slot, lapTimes: [] }));
+        const rows = msg.rows.map((r) => ({ ch: charById(r.id), nick: this.karts[r.slot] && this.karts[r.slot].nick, time: r.time, finished: r.finished, place: r.place, isPlayer: r.slot === this.mySlot, slot: r.slot, lapTimes: [],
+          balloons: r.b || 0, hits: r.h || 0, out: !!r.out }));
         this.results = rows;
         this.app.onRaceComplete(this, rows);
         break;

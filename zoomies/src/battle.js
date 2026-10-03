@@ -170,7 +170,17 @@ export class Battle {
     const fx = Math.sin(att.yaw), fz = Math.cos(att.yaw);
     const dx = vic.pos.x - att.pos.x, dz = vic.pos.z - att.pos.z;
     if ((dx * fx + dz * fz) / (Math.hypot(dx, dz) || 1) < 0.35) return false;
-    if (!vic.hit('spin')) return true;
+    // Online, each device pops its own karts' balloons: the host tells a
+    // friend's phone about the hit, and a friend's phone sees the ram itself.
+    if (vic.remote) {
+      if (att.remote) return true;
+      const now = this.race.time;
+      if (vic.invuln > 0 || vic.spinTime > 0 || vic.shield > 0 || now < (vic.ramCool || 0)) return true;
+      vic.ramCool = now + 3;
+      const net = this.race.net;
+      if (net && net.isHost) net.sendHit(vic, 'spin');
+    } else if (!vic.hit('spin')) return true;
+    if (att.remote) return true;
     att.hitsLanded++;
     if (att.balloons < MAX_BALLOONS) {
       att.balloons++;
@@ -190,7 +200,7 @@ export class Battle {
   _knockOut(k) {
     const race = this.race;
     k.out = true;
-    k.outAt = race.raceTime;
+    k.outAt = this._clock();
     this.outOrder.push(k);
     race.fx.burst(k.pos.x, k.pos.y + 1.5, k.pos.z, ['#ffffff', '#cfd8e6', '#1d1537'], 30, 9, 1, 0.9, 3, false);
     const alive = race.karts.filter((o) => !o.out).length;
@@ -198,13 +208,38 @@ export class Battle {
       race.app.hud.banner('OUT!<small>No balloons left</small>', 'final');
       race.app.audio.play('lose');
       race.flash = 0.5;
-      // Watch for a moment, then the battle is over for you.
-      this.endAt = race.raceTime + 2.6;
+      // Watch for a moment, then the battle is over for you (online, you
+      // watch the others until the host calls the end).
+      if (!race.net) this.endAt = race.raceTime + 2.6;
+      else race.app.hud.hint('You\'re out! Watching the others…', 4);
     } else if (race.player && !race.player.out) {
       race.app.hud.toast(`${k.nick || k.ch.name} is out! ${alive} left`);
     }
     this._park(k);
     if (alive <= 1 && this.endAt < 0) this.endAt = race.raceTime + 1.6;
+  }
+
+  // The battle clock: the host's clock online.
+  _clock() {
+    return this.race.net ? this.race.netClock : this.race.raceTime;
+  }
+
+  // Online: balloons and knock-outs of karts simulated on another device.
+  applyNet(k, n, out, ram) {
+    k.ramT = ram ? 0.2 : 0;
+    if (n >= 0 && n !== k.balloons && !k.out) {
+      if (n < k.balloons && k.balloonMeshes) {
+        const g = k.balloonMeshes[n];
+        if (g) {
+          g.userData.b.getWorldPosition(this._tmp);
+          this.race.fx.burst(this._tmp.x, this._tmp.y, this._tmp.z, [COLORS[(k.index + n) % COLORS.length], '#ffffff'], 18, 7, 0.4, 0.5, 4);
+        }
+        if (this.race.player && k.pos.distanceToSquared(this.race.player.pos) < 900) this.race.app.audio.play('pop');
+      }
+      k.balloons = n;
+      this._layout(k);
+    }
+    if (out && !k.out) this._knockOut(k);
   }
 
   // Knocked-out karts leave the arena.
@@ -223,7 +258,7 @@ export class Battle {
   update(dt) {
     const race = this.race;
     if (this.done || race.state !== 'race') return;
-    this.timeLeft = Math.max(0, BATTLE_TIME - race.raceTime);
+    this.timeLeft = Math.max(0, BATTLE_TIME - this._clock());
     const hud = race.app.hud;
     const tl = Math.ceil(this.timeLeft);
     if (tl !== this._lastTl) {
@@ -235,6 +270,8 @@ export class Battle {
       if (k.ramT > 0) k.ramT -= dt;
       if (k.out && k.pos.y > -300) this._park(k);
     }
+    // Online, the host calls the end and sends everyone the results.
+    if (race.net && race.net.isGuest) return;
     if (this.timeLeft <= 0 || (this.endAt >= 0 && race.raceTime >= this.endAt)) this._end();
   }
 
@@ -274,6 +311,9 @@ export class Battle {
     setTimeout(() => {
       if (race.app.race === race && !race.results) {
         race.results = this.rows;
+        if (race.net && race.net.isHost) {
+          race.session.send({ t: 'results', rows: this.rows.map((r) => ({ slot: r.slot, id: r.ch.id, time: 0, finished: true, place: r.place, b: r.balloons, h: r.hits, out: r.out })) });
+        }
         race.app.onRaceComplete(race, this.rows);
       }
     }, 3200);
