@@ -2,6 +2,37 @@
 
 The goal is one awesome, original kart racer for iPhone Safari and the Mac. Everything (names, characters, items, tracks) must be our own, never copied from another kart game.
 
+## Where we are (handover for new sessions)
+
+- **Read the history first.** A new session has no memory of earlier chats. Read this file, `zoomies/README.md` (the full player-facing feature list), `git log` (detailed commit messages, newest first) and the description of PR #1.
+- **What exists:** the whole game is playable.
+  - 20 racers and 20 tracks, including 2 Epic boat and plane adventures, and 10 karts and bikes.
+  - A Career with a Garage, Grand Prix cups, Quick Race, Time Trial with ghosts, and a Daily Challenge.
+  - Balloon Battle in 5 arenas, against computer racers and online.
+  - Online multiplayer for up to 4 phones, the Mac version with phone-as-wheel, and progress sync between devices.
+  - XP, levels, trophies and the prize machine.
+- **Where it's published:**
+  - GitHub Pages serves the branch `claude/iphone-racing-game-0wytrs` at https://olev99.github.io/Fun-stuff/.
+  - A playable single-file copy is published as a private artifact for the owner. Rebuild it with `build-single.mjs` and republish to the same artifact link when asked.
+
+**Decisions and preferences from the owner (keep to these):**
+- **Originality:** the game must be original and sellable, with nothing that copies another kart game's names, items, item-box look or characters. Racers vary a lot in look and size.
+- **Phone first:** design for the iPhone in landscape, played with tilt or touch, and keep the Mac version working too.
+- **Economy:**
+  - Coins come only from the Career, plus one-off trophy rewards. Quick play, cups, battles and online pay XP only.
+  - Whatever the Career unlocks (karts, bikes, racers) is usable in every mode. Five rides and the 8 starter racers are free.
+  - Levelling should feel earned: the XP curve is steep and style points count for half. Each level-up shows what it unlocks.
+- **Prize machine:** a turn costs 600 coins. It mostly gives cosmetics, with rare jackpots (8%) that give real prizes.
+- **Shortcuts:** narrow and half-hidden. Scenery must never sit on the road, and you must never seem to drive on thin air.
+- **Throwing behind:** items that can be thrown ahead or behind get a THROW BACK button on touch screens.
+- **No idle work:** no scheduled check-ins or PR watching; only act when the owner writes. Keep token use low (see the routing below).
+
+**Known open points:**
+- **Real devices:** nothing has been tested on real phones or Macs yet (frame rate, tilt feel), and PeerJS's public broker can't be reached from the cloud sandbox.
+- **Computer drivers and shortcuts:** they miss two shortcuts from one direction (Dune Surf and Snowmobile Trail).
+- **Battle length:** battles often end within 1–2 minutes once you're knocked out. The owner may want them longer (4 balloons, or coming back after being knocked out).
+- **Online ram glitch:** in an online battle, lag can very rarely give the rammer a balloon without the victim losing one.
+
 ## Model and effort routing (follow this every session)
 
 The expensive model plans, decides and reviews; cheaper models implement and test. The quality bar never drops: every change is tested and reviewed before it is committed.
