@@ -59,7 +59,7 @@ How to apply it:
 
 - **Code:** all the code is in `zoomies/`: plain ES modules plus vendored three.js, with no build step. Serve `zoomies/` statically (the test runner does this on port 8000).
 - **Before every commit:** run `node zoomies/tools/stamp.mjs`. It stamps file hashes so phones never mix old and new files.
-- **Branch:** `main` holds the released game. Do new work on the branch the session gives you, push it and open a pull request into `main`. The owner says when to merge, and once a pull request is merged the game on GitHub Pages updates.
+- **Branch:** `main` holds the released game. Do new work on a branch, push it and open a pull request into `main`. Once the checks pass (`run.mjs` quick suite, plus the suite for the area touched), merge the pull request yourself without asking; the owner approved automatic merging. Then the game on GitHub Pages updates. Still no PR watching or check-ins.
 - **Model names:** keep model names out of repo files, commit messages and PR text.
 - **README:** `zoomies/README.md` is the player-facing feature list. Keep it accurate when features change.
 - **Playable single-file build:** `node zoomies/tools/build-single.mjs <out.html> --fragment`.
