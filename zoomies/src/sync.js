@@ -11,7 +11,8 @@
 
 import qrcode from '../vendor/qrcode.mjs';
 import { PeerTransport, LocalTransport, NetSession, makeCode } from './net.js';
-import { saveCareer, loadCareer, newCareer } from './career.js';
+import { saveCareer, loadCareer, newCareer, cleanCareer, MAX_COUNT } from './career.js';
+import { parseGhost, ghostJSON } from './ghost.js';
 import { saveRecords } from './settings.js';
 import { levelOf, oldLevel } from './profile.js';
 import { ownedCount } from './cosmetics.js';
@@ -23,17 +24,38 @@ const GHOST = 'zoomies.ghost.v1.';
 
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : 0);
 const union = (a, b) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])])];
+// The other device's data is checked before it is merged or stored.
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
+const GHOST_KEY = /^[a-z0-9-]{1,48}$/i; // track id, '-r' for reverse
+
+// Records: { trackKey: { tt, lap }, 'cup:id': '1st', battle: { arena: wins }, found: { track: [names] } }.
+function cleanRecords(r) {
+  const out = {};
+  if (!isObj(r)) return out;
+  const field = (x) => x === null || Number.isFinite(x) || (Array.isArray(x) && x.length <= 100 && x.every((y) => (typeof y === 'string' && y.length <= 64) || Number.isFinite(y)));
+  for (const [k, v] of Object.entries(r).slice(0, 2000)) {
+    if (UNSAFE.has(k) || k.length > 64) continue;
+    if (typeof v === 'string' && v.length <= 16) out[k] = v;
+    else if (isObj(v)) {
+      out[k] = {};
+      for (const [f, x] of Object.entries(v).slice(0, 500)) if (!UNSAFE.has(f) && f.length <= 64 && field(x)) out[k][f] = x;
+    }
+  }
+  return out;
+}
 
 // Numbers that go up and down with play: merged three-way when both saves
 // share a sync base, otherwise the higher one wins.
 function mergeNum(a, b, base) {
   a = num(a); b = num(b);
-  if (base === undefined) return Math.max(a, b);
+  if (base === undefined) return Math.min(MAX_COUNT, Math.max(a, b));
   base = num(base);
-  return Math.max(0, base + (a - base) + (b - base));
+  return Math.min(MAX_COUNT, Math.max(0, base + (a - base) + (b - base)));
 }
 
 export function mergeCareer(A, B) {
+  A = cleanCareer(A) || newCareer(); B = cleanCareer(B) || newCareer();
   const a = { ...newCareer(), ...A }, b = { ...newCareer(), ...B };
   const shared = a.sync && b.sync && a.sync.id === b.sync.id ? a.sync.base : null;
   const base = (k) => (shared ? shared[k] : undefined);
@@ -87,7 +109,7 @@ export function mergeCareer(A, B) {
   if (!m.bodies.includes(m.body)) m.body = m.bodies[0];
   if (!m.paints.includes(m.paint)) m.paint = 'stock';
   delete m.sync;
-  return m;
+  return cleanCareer(m);
 }
 
 // Stamp both devices with the shared totals after a sync.
@@ -101,6 +123,7 @@ function stamp(c, id) {
 export function mergeRecords(A = {}, B = {}) {
   const m = {};
   for (const k of union(Object.keys(A), Object.keys(B))) {
+    if (UNSAFE.has(k)) continue;
     const a = A[k], b = B[k];
     if (k === 'found') {
       m.found = {};
@@ -135,13 +158,12 @@ function readGhost(key) {
 }
 
 function writeGhost(key, raw) {
-  try {
-    const g = JSON.parse(raw);
-    if (typeof g.time !== 'number' || typeof g.data !== 'string') return;
-    const old = readGhost(key);
-    if (old && JSON.parse(old).time <= g.time) return;
-    localStorage.setItem(GHOST + key, raw);
-  } catch (e) { /* ignore bad data or a full storage */ }
+  if (typeof key !== 'string' || !GHOST_KEY.test(key)) return;
+  const g = parseGhost(raw);
+  if (!g) return;
+  const old = parseGhost(readGhost(key));
+  if (old && old.time <= g.time) return;
+  try { localStorage.setItem(GHOST + key, ghostJSON(g)); } catch (e) { /* storage full or blocked */ }
 }
 
 export class Sync {
@@ -230,13 +252,14 @@ export class Sync {
   _hostMsg(id, m) {
     if (!m || id !== this.peer) return;
     const app = this.app;
-    if (m.t === 'sync' && m.career && typeof m.career === 'object') {
-      const merged = stamp(mergeCareer(app.career, m.career), Math.random().toString(36).slice(2, 10));
-      const records = mergeRecords(app.records, m.records || {});
+    const theirCareer = m.t === 'sync' ? cleanCareer(m.career) : null;
+    if (theirCareer) {
+      const merged = stamp(mergeCareer(app.career, theirCareer), Math.random().toString(36).slice(2, 10));
+      const records = mergeRecords(app.records, cleanRecords(m.records));
       this._apply(merged, records);
       // Ghosts: send ours where they're faster, ask for theirs where they are.
-      const mine = ghostTimes(), theirs = m.ghosts || {};
-      const want = Object.keys(theirs).filter((k) => !(k in mine) || theirs[k] < mine[k]);
+      const mine = ghostTimes(), theirs = isObj(m.ghosts) ? m.ghosts : {};
+      const want = Object.keys(theirs).filter((k) => GHOST_KEY.test(k) && Number.isFinite(theirs[k]) && (!(k in mine) || theirs[k] < mine[k])).slice(0, 200);
       this.t.send(id, { t: 'synced', career: merged, records, want });
       for (const k of Object.keys(mine)) if (!(k in theirs) || mine[k] < theirs[k]) {
         const raw = readGhost(k);
@@ -273,10 +296,11 @@ export class Sync {
 
   _guestMsg(m) {
     if (!m) return;
-    if (m.t === 'synced' && m.career && typeof m.career === 'object') {
-      this._apply({ ...newCareer(), ...m.career }, m.records || {});
-      for (const k of m.want || []) {
-        const raw = readGhost(k);
+    const merged = m.t === 'synced' ? cleanCareer(m.career) : null;
+    if (merged) {
+      this._apply(merged, cleanRecords(m.records));
+      for (const k of Array.isArray(m.want) ? m.want.slice(0, 200) : []) {
+        const raw = typeof k === 'string' && GHOST_KEY.test(k) ? readGhost(k) : null;
         if (raw) this.t.send('host', { t: 'ghost', k, g: raw });
       }
       this._done();

@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Content-Security-Policy: tools/stamp.mjs fills in the hashes of the inline scripts (script-src). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-wPwDdnWmlRU2C0boIIufUn9gPwaxb9VomftY8db+ra8='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="0a355f1">
+<meta name="zoomies-version" content="157ae48">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,10 +16,14 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Bungee&display=swap">
+<link rel="preload" href="vendor/fonts/bungee-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="vendor/fonts/baloo2-latin.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+/* Self-hosted fonts (vendor/fonts, SIL OFL 1.1): Baloo 2 (variable weight) and Bungee. */
+@font-face { font-family: "Baloo 2"; font-style: normal; font-weight: 400 800; font-display: swap; src: url(vendor/fonts/baloo2-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Baloo 2"; font-style: normal; font-weight: 400 800; font-display: swap; src: url(vendor/fonts/baloo2-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Bungee"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/bungee-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Bungee"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/bungee-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 :root {
   --ink: #1d1537;
   --ink-2: #2c2352;
@@ -1221,7 +1227,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=08ab71c4", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=2ee8ef6b", "./src/battle.js": "./src/battle.js?v=c02279a6", "./src/career.js": "./src/career.js?v=d6417c31", "./src/careerui.js": "./src/careerui.js?v=c7966754", "./src/characters.js": "./src/characters.js?v=3ce17da4", "./src/cosmetics.js": "./src/cosmetics.js?v=2a076158", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=893ae0e7", "./src/gumballui.js": "./src/gumballui.js?v=9d8dd641", "./src/hud.js": "./src/hud.js?v=69420cf5", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=2fc83512", "./src/kart.js": "./src/kart.js?v=57b1f7a6", "./src/karts.js": "./src/karts.js?v=b2d6dcc5", "./src/main.js": "./src/main.js?v=55c2fe20", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=91a98b43", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=bb25e2b6", "./src/profile.js": "./src/profile.js?v=9a8d66a5", "./src/race.js": "./src/race.js?v=f79b6cfd", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=b1e2dc15", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=16e720b2", "./src/ui.js": "./src/ui.js?v=976a3928", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=0fc12b12", "./src/world.js": "./src/world.js?v=ef92b5c0", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=08ab71c4", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=2ee8ef6b", "./src/battle.js": "./src/battle.js?v=c02279a6", "./src/career.js": "./src/career.js?v=2b763715", "./src/careerui.js": "./src/careerui.js?v=c7966754", "./src/characters.js": "./src/characters.js?v=3ce17da4", "./src/cosmetics.js": "./src/cosmetics.js?v=2a076158", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=b0517012", "./src/gumballui.js": "./src/gumballui.js?v=9d8dd641", "./src/hud.js": "./src/hud.js?v=69420cf5", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=f85a001e", "./src/kart.js": "./src/kart.js?v=57b1f7a6", "./src/karts.js": "./src/karts.js?v=b2d6dcc5", "./src/main.js": "./src/main.js?v=55c2fe20", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=718499b7", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=bb25e2b6", "./src/profile.js": "./src/profile.js?v=9a8d66a5", "./src/race.js": "./src/race.js?v=a06f1d74", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=6bf418c3", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=77e81b5e", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=16e720b2", "./src/ui.js": "./src/ui.js?v=976a3928", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/world.js": "./src/world.js?v=ef92b5c0", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
 <script type="module" src="./src/main.js?v=55c2fe20"></script>
 </body>
 </html>

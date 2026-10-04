@@ -4,7 +4,8 @@
 //
 //   node tools/stamp.mjs
 //
-// It rewrites the import map and main script tag in index.html, and writes
+// It rewrites the import map, main script tag and the CSP's inline-script
+// hashes in index.html, and writes
 // version.json, which the game checks on startup to reload itself once when
 // a newer version is live.
 import { createHash } from 'node:crypto';
@@ -31,6 +32,11 @@ html = html.replace(/<script type="importmap">[\s\S]*?<\/script>/, `<script type
 html = html.replace(/<script type="module" src="\.\/src\/main\.js[^"]*"><\/script>/, `<script type="module" src="./src/main.js?v=${v['src/main.js']}"></script>`);
 html = html.replace(/<meta name="zoomies-version" content="[^"]*">/, `<meta name="zoomies-version" content="${version}">`);
 if (!html.includes('name="zoomies-version"')) html = html.replace('<title>', `<meta name="zoomies-version" content="${version}">\n<title>`);
+// The Content-Security-Policy only runs inline scripts (the import map and the
+// loading watchdog) whose exact text it lists, so re-hash them every time.
+const sha = (s) => `'sha256-${createHash('sha256').update(s, 'utf8').digest('base64')}'`;
+const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => sha(m[1]));
+html = html.replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?script-src )[^;"]*/, `$1'self' ${inline.join(' ')}`);
 writeFileSync(`${root}/index.html`, html);
 writeFileSync(`${root}/version.json`, `${JSON.stringify({ v: version })}\n`);
 console.log(`version ${version}, ${files.length} files stamped`);

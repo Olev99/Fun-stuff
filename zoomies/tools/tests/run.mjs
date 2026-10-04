@@ -7,8 +7,8 @@
 //
 // It serves zoomies/ on http://localhost:8000 (or uses a server already
 // running there) and runs each script in zoomies/test-out/, where the
-// screenshots land. A suite fails on a non-zero exit, a page error or a
-// non-zero "errors N" line.
+// screenshots land. A suite fails on a non-zero exit, a page error, a
+// non-zero "errors N" line or a logged Content Security Policy violation.
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -35,7 +35,7 @@ const SUITES = {
 };
 const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];
 
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 
 function serve() {
   return new Promise((ok) => {
@@ -65,7 +65,7 @@ function run(name, script, args, mins) {
     const kill = setTimeout(() => { log += '\n[timeout]'; p.kill('SIGKILL'); }, mins * 60000);
     p.on('close', (code) => {
       clearTimeout(kill);
-      const bad = code !== 0 || /\[pageerror\]|\[timeout\]|errors [1-9]/.test(log);
+      const bad = code !== 0 || /\[pageerror\]|\[timeout\]|errors [1-9]|Content Security Policy/.test(log);
       ok({ name, ok: !bad, secs: Math.round((Date.now() - t0) / 1000), log });
     });
   });
