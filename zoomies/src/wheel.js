@@ -123,7 +123,7 @@ export class WheelHost {
       if (typeof m.is === 'number' && m.is !== this.itemSeq) {
         const first = this.itemSeq === 0 && this.firstIn === undefined;
         this.itemSeq = m.is;
-        if (!first) this.app.input.itemPulse = m.ia || 0;
+        if (!first) this.app.input.itemPulse = Number.isFinite(m.ia) ? Math.max(-1, Math.min(1, m.ia)) : 0;
       }
       if (typeof m.us === 'number' && m.us !== this.uiSeq) {
         const first = this.firstIn === undefined;
@@ -327,7 +327,8 @@ export class WheelPad {
     if (m.t === 'fb') {
       this.fbAt = performance.now();
       $('wp-state').classList.remove('lost');
-      $('wp-place').innerHTML = m.place ? `${m.place}<sup>${ordinal(m.place)}</sup>` : '';
+      const place = Number.isInteger(m.place) && m.place > 0 && m.place < 100 ? m.place : 0; // goes into innerHTML
+      $('wp-place').innerHTML = place ? `${place}<sup>${ordinal(place)}</sup>` : '';
       $('wp-lap').textContent = m.lap ? `LAP ${m.lap}/${m.laps}` : m.scr ? 'MENU' : '';
       $('wp-item').querySelector('i').textContent = m.item || '';
       $('wp-ok').textContent = m.ok || 'OK';

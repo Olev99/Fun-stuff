@@ -1109,22 +1109,26 @@ export class ItemSystem {
     };
   }
 
+  // Online guests: mirror the host's boxes, gems, projectiles and hazards.
+  // Entries that aren't the shape snapshot() sends are skipped.
   applySnapshot(s, time) {
     const karts = this.race.karts;
-    if (s.b) for (let i = 0; i < this.boxes.length; i++) {
+    if (typeof s.b === 'string') for (let i = 0; i < this.boxes.length; i++) {
       const on = s.b[i] === '1';
       const b = this.boxes[i];
       if (on && !b.active) { b.active = true; b.pop = 0.35; }
       else if (!on && b.active) this._popBox(i);
     }
-    if (s.g) for (let i = 0; i < this.gems.length; i++) {
+    if (typeof s.g === 'string') for (let i = 0; i < this.gems.length; i++) {
       const on = s.g[i] === '1';
       if (on) this.gems[i].active = true;
       else if (this.gems[i].active) this._popGem(i);
     }
     // projectiles
     const seen = new Set();
-    for (const [id, type, x, y, z, ry, oi] of s.p || []) {
+    for (const e of Array.isArray(s.p) ? s.p.slice(0, 200) : []) {
+      if (!Array.isArray(e) || e.length < 6 || typeof e[1] !== 'string' || !e.slice(2, 6).every(Number.isFinite)) continue;
+      const [id, type, x, y, z, ry, oi] = e;
       seen.add(id);
       let p = this.projectiles.find((q) => q.id === id);
       if (!p) {
@@ -1143,7 +1147,9 @@ export class ItemSystem {
       this.removeProjectile(p);
     }
     const hseen = new Set();
-    for (const [id, x, y, z, oi, type = 'honey'] of s.h || []) {
+    for (const e of Array.isArray(s.h) ? s.h.slice(0, 200) : []) {
+      if (!Array.isArray(e) || e.length < 4 || !e.slice(1, 4).every(Number.isFinite)) continue;
+      const [id, x, y, z, oi, type = 'honey'] = e;
       hseen.add(id);
       if (!this.hazards.find((h) => h.id === id)) {
         const oil = type === 'oil';

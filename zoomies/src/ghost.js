@@ -32,13 +32,32 @@ function fromB64(b64) {
   return new Int16Array(u8.buffer);
 }
 
+// The recorder stops after 12 minutes; that bounds a real ghost's size.
+const MAX_SAMPLES = 4 * HZ * 60 * 12 + 4;
+const MAX_B64 = Math.ceil((MAX_SAMPLES * 2) / 3) * 4;
+
+// Check a saved (or synced) ghost's JSON. Returns the ghost with its decoded
+// samples, or null for anything that isn't a well-formed ghost.
+export function parseGhost(raw) {
+  try {
+    const g = typeof raw === 'string' ? JSON.parse(raw) : null;
+    if (!g || typeof g !== 'object' || !Number.isFinite(g.time) || g.time <= 0 || g.time > 86400) return null;
+    if (typeof g.data !== 'string' || g.data.length > MAX_B64) return null;
+    if (g.splits != null && !(Array.isArray(g.splits) && g.splits.length <= 100 && g.splits.every((v) => v === null || Number.isFinite(v)))) return null;
+    for (const k of ['char', 'body', 'paint', 'hat']) if (g[k] != null && typeof g[k] !== 'string') return null;
+    g.samples = fromB64(g.data); // throws on bad base64 or an odd byte count
+    return g.samples.length >= 8 && g.samples.length % 4 === 0 ? g : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// The fields a ghost is stored with (drops anything else a synced copy carried).
+export const ghostJSON = (g) => JSON.stringify({ time: g.time, splits: g.splits, char: g.char, body: g.body, paint: g.paint ?? null, hat: g.hat ?? null, data: g.data });
+
 export function loadGhost(key) {
   try {
-    const raw = localStorage.getItem(KEY + key);
-    if (!raw) return null;
-    const g = JSON.parse(raw);
-    g.samples = fromB64(g.data);
-    return g.samples.length >= 8 ? g : null;
+    return parseGhost(localStorage.getItem(KEY + key));
   } catch (e) {
     return null;
   }

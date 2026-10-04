@@ -224,14 +224,67 @@ export function newCareer() {
   };
 }
 
+// Saves come from this phone's storage or from another device (sync), so
+// every field is type-checked: counters become whole numbers from 0 to 1e9,
+// lists keep only short strings, unknown objects are dropped. Returns null
+// for something that isn't a save at all.
+export const MAX_COUNT = 1e9;
+const count = (v, max = MAX_COUNT) => (Number.isFinite(v) ? Math.min(max, Math.max(0, Math.round(v))) : 0);
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const isStr = (v) => typeof v === 'string' && v.length <= 64;
+const strList = (v) => [...new Set(v.filter(isStr))].slice(0, 1000);
+const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
+// Copy an object's entries through f (undefined = drop that entry).
+function mapObj(o, f) {
+  const out = {};
+  if (isObj(o)) for (const [k, v] of Object.entries(o).slice(0, 2000)) {
+    if (UNSAFE.has(k) || k.length > 64) continue;
+    const w = f(v);
+    if (w !== undefined) out[k] = w;
+  }
+  return out;
+}
+const counts = (o) => mapObj(o, (v) => (Number.isFinite(v) ? count(v) : undefined));
+
+export function cleanCareer(saved) {
+  if (!isObj(saved)) return null;
+  const c = newCareer();
+  // Unknown fields from newer versions: keep plain values only.
+  for (const [k, v] of Object.entries(saved)) {
+    if (k in c || k === 'sync' || UNSAFE.has(k)) continue;
+    if (typeof v === 'boolean' || Number.isFinite(v) || (typeof v === 'string' && v.length <= 200)) c[k] = v;
+  }
+  for (const k of ['coins', 'xp', 'earned', 'freeCaps']) c[k] = count(saved[k]);
+  // Saves from before the steeper level curve: their old level's rewards were paid.
+  c.lvlPaid = saved.lvlPaid === undefined ? oldLevel(c.xp) : count(saved.lvlPaid, 10000);
+  for (const k of ['racer', 'body', 'paint', 'hat', 'trail', 'horn']) if (isStr(saved[k])) c[k] = saved[k];
+  for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) if (Array.isArray(saved[k])) c[k] = strList(saved[k]);
+  c.champion = !!saved.champion;
+  if (isObj(saved.upgrades)) c.upgrades = mapObj(saved.upgrades, (u) => (isObj(u) ? mapObj(u, (v) => (Number.isFinite(v) ? count(v, MAX_UPGRADE) : undefined)) : undefined));
+  c.stars = mapObj(saved.stars, (v) => (Number.isFinite(v) ? count(v, 3) : undefined));
+  const flag = (v) => (typeof v === 'boolean' || Number.isFinite(v) || isStr(v) ? v : undefined);
+  c.done = mapObj(saved.done, flag);
+  c.seen = mapObj(saved.seen, flag);
+  c.best = mapObj(saved.best, (v) => (Number.isFinite(v) && v > 0 ? v : undefined));
+  c.ach = mapObj(saved.ach, (v) => (v === true || (Number.isFinite(v) && v > 0) ? v : undefined));
+  // Lifetime stats: counters, or lists of ids.
+  c.stats = mapObj(saved.stats, (v) => (Array.isArray(v) ? v.filter((x) => isStr(x) || Number.isFinite(x)).slice(0, 1000) : Number.isFinite(v) ? count(v) : undefined));
+  const d = isObj(saved.daily) ? saved.daily : {};
+  c.daily = { done: isStr(d.done) ? d.done : '', streak: count(d.streak), best: count(d.best) };
+  const sy = saved.sync;
+  if (isObj(sy) && isStr(sy.id) && isObj(sy.base)) {
+    const b = sy.base;
+    c.sync = { id: sy.id, at: Number.isFinite(sy.at) ? sy.at : 0, base: { xp: count(b.xp), coins: count(b.coins), earned: count(b.earned), freeCaps: count(b.freeCaps), stats: counts(b.stats) } };
+  }
+  return c;
+}
+
 export function loadCareer() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const saved = JSON.parse(raw);
-      const c = Object.assign(newCareer(), saved);
-      // Saves from before the steeper level curve: their old level's rewards were paid.
-      if (saved.lvlPaid === undefined) c.lvlPaid = oldLevel(c.xp || 0);
+      const c = cleanCareer(JSON.parse(raw));
+      if (!c) return null;
       if (!BODIES[c.body]) c.body = 'buggy';
       if (!c.bodies.includes(c.body)) c.bodies.push(c.body);
       if (!c.racers.includes(c.racer)) c.racer = c.racers[0] || 'mochi';

@@ -5,13 +5,13 @@ import { Kart } from './kart.js';
 import { NameTags } from './nametags.js';
 import { GhostRecorder, GhostPlayer, loadGhost } from './ghost.js';
 import { AIDriver, DIFFICULTY } from './ai.js';
-import { ItemSystem } from './items.js';
+import { ItemSystem, ITEMS } from './items.js';
 import { FX } from './particles.js';
 import { charById } from './characters.js';
 import { wheelGeometry } from './karts.js';
 import { clamp, damp, dampAngle, pbrMat, GeoBuilder, ordinal } from './util.js';
 import { SkidMarks } from './skids.js';
-import { Battle, BattleAI } from './battle.js';
+import { Battle, BattleAI, MAX_BALLOONS } from './battle.js';
 import * as TX from './textures.js';
 
 export const SPEED_CLASSES = {
@@ -37,6 +37,27 @@ function kartState(k) {
     r(k.steerS), k.laps, r(k.total), k.place, k.gems, r(k.spinTime), r(k.starTime), r(k.shrinkTime), r(k.shield), r(k.rocketTime),
     k.path && k.path.id !== undefined ? k.path.id : -1, r(k.finishTime || 0), k.balloons ?? -1];
 }
+
+// A kart state from another phone (same layout as kartState): dropped unless
+// it has every field as a finite number, and each field is kept to a sane
+// range so a bad packet can't put NaN or a wild value into the physics.
+const STATE_RANGE = [
+  [-1e5, 1e5], [-1e5, 1e5], [-1e5, 1e5], [-1e6, 1e6], [-500, 500], [-500, 500], [-500, 500], [0, 4095], [-1, 1], [0, 5],
+  [-2, 2], [-1, 999], [-1e7, 1e7], [0, 99], [0, 99], [0, 60], [0, 60], [0, 60], [0, 60], [0, 60],
+  [-1, 999], [0, 1e5], [-1, MAX_BALLOONS],
+];
+const STATE_INT = new Set([7, 8, 9, 11, 13, 14, 20, 22]); // flags, drift, laps, place, gems, path, balloons
+function cleanState(a) {
+  if (!Array.isArray(a) || a.length !== STATE_RANGE.length) return null;
+  const out = new Array(a.length);
+  for (let i = 0; i < a.length; i++) {
+    if (!Number.isFinite(a[i])) return null;
+    out[i] = clamp(STATE_INT.has(i) ? Math.round(a[i]) : a[i], STATE_RANGE[i][0], STATE_RANGE[i][1]);
+  }
+  return out;
+}
+const fin = (...v) => v.every(Number.isFinite);
+const isItem = (it) => it === 'chili3' || (typeof it === 'string' && Object.prototype.hasOwnProperty.call(ITEMS, it)); // chili3: a triple chili
 
 // Glue between the item system and the network session.
 class RaceNet {
@@ -1086,21 +1107,29 @@ export class Race {
       const slot = this.peerSlot.get(from);
       const k = slot !== undefined ? this.karts[slot] : null;
       switch (msg.t) {
-        case 'st':
-          if (k && k.remote) this._applyState(k, msg.s);
+        case 'st': {
+          const a = cleanState(msg.s);
+          if (k && k.remote && a) this._applyState(k, a);
           break;
+        }
         case 'box': {
+          if (!Number.isInteger(msg.i)) break;
           const b = items.boxes[msg.i];
           if (b && b.active) items._popBox(msg.i);
           if (k && msg.want) this.session.sendTo(from, { t: 'grant', item: items.roll(k) });
           break;
         }
         case 'gem':
-          if (items.gems[msg.i]) items._popGem(msg.i);
+          if (Number.isInteger(msg.i) && items.gems[msg.i]) items._popGem(msg.i);
           break;
-        case 'use':
-          if (k) items.use(k, msg.it, { x: msg.x, z: msg.z, yaw: msg.yaw, speed: msg.sp }, msg.aim || 0);
+        case 'use': {
+          if (!k || !isItem(msg.it)) break;
+          // Spawn where the guest says, unless that is far from where its kart is.
+          const near = fin(msg.x, msg.z, msg.yaw, msg.sp) && (msg.x - k.pos.x) ** 2 + (msg.z - k.pos.z) ** 2 < 40 * 40;
+          const src = near ? { x: msg.x, z: msg.z, yaw: msg.yaw, speed: clamp(msg.sp, 0, 200) } : { x: k.pos.x, z: k.pos.z, yaw: k.yaw, speed: Math.max(0, k.fwdSpeed) };
+          items.use(k, msg.it, src, Number.isFinite(msg.aim) ? clamp(msg.aim, -1, 1) : 0);
           break;
+        }
         case 'hitobj':
           if (msg.kind === 'h') {
             const h = items.hazards.find((q) => q.id === msg.id);
@@ -1112,10 +1141,10 @@ export class Race {
           }
           break;
         case 'finish':
-          if (k && !k.finished) {
+          if (k && !k.finished && Number.isFinite(msg.time) && msg.time > 0) {
             k.finished = true;
             k.finishTime = msg.time;
-            k.lapTimes = msg.laps || [];
+            k.lapTimes = Array.isArray(msg.laps) ? msg.laps.filter(Number.isFinite).slice(0, 99) : [];
           }
           break;
       }
@@ -1124,27 +1153,31 @@ export class Race {
     // guest
     switch (msg.t) {
       case 'snap':
-        this.netClock = msg.rt;
-        msg.k.forEach((a, i) => {
-          const k = this.karts[i];
-          if (!k) return;
+        if (!Array.isArray(msg.k) || msg.k.length > this.karts.length) break;
+        if (Number.isFinite(msg.rt)) this.netClock = msg.rt;
+        msg.k.forEach((raw, i) => {
+          const k = this.karts[i], a = cleanState(raw);
+          if (!k || !a) return;
           if (k === this.player) k.place = a[13];
           else this._applyState(k, a);
         });
-        items.applySnapshot(msg.it, this.time);
+        if (msg.it && typeof msg.it === 'object') items.applySnapshot(msg.it, this.time);
         break;
       case 'grant':
-        if (this.player) this.player.pendingItem = msg.item;
+        if (this.player && isItem(msg.item)) this.player.pendingItem = msg.item;
         break;
       case 'blast':
-        items.blast(msg.x, msg.y, msg.z, msg.r, msg.kind, this.karts[msg.o] || null, msg.sp, false);
+        if (!fin(msg.x, msg.y, msg.z, msg.r) || typeof msg.kind !== 'string') break;
+        items.blast(msg.x, msg.y, msg.z, clamp(msg.r, 0, 40), msg.kind, this.karts[msg.o] || null, !!msg.sp, false);
         break;
       case 'hit':
-        if (this.player) this.player.hit(msg.kind);
+        if (this.player && typeof msg.kind === 'string') this.player.hit(msg.kind);
         break;
       case 'results': {
-        const rows = msg.rows.map((r) => ({ ch: charById(r.id), nick: this.karts[r.slot] && this.karts[r.slot].nick, time: r.time, finished: r.finished, place: r.place, isPlayer: r.slot === this.mySlot, slot: r.slot, lapTimes: [],
-          balloons: r.b || 0, hits: r.h || 0, out: !!r.out }));
+        if (!Array.isArray(msg.rows) || msg.rows.length > this.karts.length) break;
+        const num = (v) => (Number.isFinite(v) ? v : 0);
+        const rows = msg.rows.filter((r) => r && typeof r === 'object' && Number.isInteger(r.slot)).map((r) => ({ ch: charById(r.id), nick: this.karts[r.slot] && this.karts[r.slot].nick, time: num(r.time), finished: !!r.finished, place: num(r.place), isPlayer: r.slot === this.mySlot, slot: r.slot, lapTimes: [],
+          balloons: num(r.b), hits: num(r.h), out: !!r.out }));
         this.results = rows;
         this.app.onRaceComplete(this, rows);
         break;

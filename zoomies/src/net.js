@@ -30,6 +30,27 @@ function clientId() {
   return id;
 }
 
+// Messages come from other people's phones: check their shape before use.
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const charId = (v) => (typeof v === 'string' && v.length <= 32 ? v : null);
+
+// A guest's copy of the host's player list.
+function cleanPlayers(list) {
+  if (!Array.isArray(list) || list.length > MAX_PLAYERS) return null;
+  const out = [];
+  for (const p of list) {
+    if (!isObj(p) || typeof p.id !== 'string' || p.id.length > 64) return null;
+    out.push({ id: p.id, char: charId(p.char), name: typeof p.name === 'string' ? p.name.slice(0, 8) : '', nick: cleanNick(p.nick), look: cleanLook(p.look) });
+  }
+  return out;
+}
+
+// The race setup a guest receives from the host.
+function validStart(cfg) {
+  if (!isObj(cfg) || !Array.isArray(cfg.grid) || cfg.grid.length > 16 || !Array.isArray(cfg.humans) || cfg.humans.length > MAX_PLAYERS) return false;
+  return cfg.humans.every((h) => isObj(h) && typeof h.id === 'string' && Number.isInteger(h.slot) && h.slot >= 0 && h.slot < cfg.grid.length);
+}
+
 const HEARTBEAT_MS = 1500;
 const PEER_TIMEOUT_MS = 9000;
 
@@ -48,9 +69,15 @@ function loadPeerJS() {
   return peerLoad;
 }
 
+// Debug-only URL switches (a self-hosted broker, PeerJS logging) are honoured
+// only when the game is served from this computer, so a crafted link can't
+// point real players at someone else's matchmaking server. (?net=local never
+// uses PeerJS, so it needs neither.)
+const devMode = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+
 function peerOptions() {
   const o = {
-    debug: 1,
+    debug: devMode && params.has('debug') ? 2 : 0,
     config: {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -59,8 +86,8 @@ function peerOptions() {
       ],
     },
   };
-  // Optional self-hosted broker: ?peerhost=example.com&peerport=443&peerpath=/
-  if (params.get('peerhost')) {
+  // Optional self-hosted broker (dev only): ?peerhost=example.com&peerport=443&peerpath=/
+  if (devMode && params.get('peerhost')) {
     o.host = params.get('peerhost');
     o.port = +(params.get('peerport') || 443);
     o.path = params.get('peerpath') || '/';
@@ -374,31 +401,33 @@ export class NetSession {
           const used = new Set(this.players.map((p) => p.name));
           let n = 2;
           while (used.has(`P${n}`)) n++;
-          this.players.push({ id: from, cid: msg.cid, char: msg.char, name: `P${n}`, nick: cleanNick(msg.nick), look: cleanLook(msg.look) });
+          this.players.push({ id: from, cid: typeof msg.cid === 'string' ? msg.cid.slice(0, 16) : null, char: charId(msg.char), name: `P${n}`, nick: cleanNick(msg.nick), look: cleanLook(msg.look) });
         }
         this.broadcastLobby();
         return;
       }
       if (msg.t === 'pick') {
         const p = this.players.find((q) => q.id === from);
-        if (p) p.char = msg.char;
+        if (p && charId(msg.char)) p.char = msg.char;
         this.broadcastLobby();
         return;
       }
       if (msg.t === 'ready' && this.onReady) { this.onReady(from); return; }
     } else {
       if (msg.t === 'lobby') {
-        this.players = msg.players;
+        const players = cleanPlayers(msg.players);
+        if (!players || !isObj(msg.cfg)) return;
+        this.players = players;
         this.lobby = msg.cfg;
         if (this.onLobby) this.onLobby();
         return;
       }
       if (msg.t === 'full') {
         this.closed = true;
-        if (this.onClosed) this.onClosed(msg.reason);
+        if (this.onClosed) this.onClosed(typeof msg.reason === 'string' ? msg.reason.slice(0, 200) : '');
         return;
       }
-      if (msg.t === 'start') { if (this.onStart) this.onStart(msg.cfg); return; }
+      if (msg.t === 'start') { if (this.onStart && validStart(msg.cfg)) this.onStart(msg.cfg); return; }
       if (msg.t === 'go') { if (this.race) this.race.netGo(); return; }
       if (msg.t === 'toLobby') { if (this.onToLobby) this.onToLobby(); return; }
     }
