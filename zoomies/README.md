@@ -33,11 +33,20 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   | Moonbase Loop | Long | Low gravity, craters, hairpins, Earth overhead | **Crater Hop** (floaty jump) and **Rover Tracks** |
 
 - **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels, moon rovers, and on the adventures floating logs, crocodiles and storm clouds. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
-- **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer.
-  - 7 chapters, 35 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel.
-  - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team.
+- **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer, and take on Boost Corp.
+  - **The story:** Gramps Gearbox (once the champion "Gearbox Gus") and you against **Baron Von Boost**, the owner of Boost Corp. The company sponsors the Zoomies Circuit and sells every team the same "approved" kart. Years ago the Baron took the Starbolt design Gramps built with him. Each chapter drops a clue (fine print in a sponsor deal, a statue with the wrong name on it, a rigged boost pad, a locked garage), rivals react to how you are doing, and one by one some of them change sides. A prologue, a mid-story twist (the Baron offers you a golden seat), a final cup against the Baron himself on the moon and an epilogue that opens the door to the next league ("coming soon").
+  - A prologue and 7 chapters, 36 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel. The prologue is a one-lap race on Easy with hints that teach drifting and boosting; the first part drops with the first clear.
+  - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team. The hub shows your story progress and the latest clue.
   - Events pay coins by finishing place and gems, plus a first-clear bonus. Each event also has 3 stars to earn.
-  - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt) and 4 motorbikes (Zoom Bike, Zip Scooter, Hog Wild and the Vortex), 4 upgrades per vehicle with 5 levels each, paint jobs and new racers.
+  - **A slow start:** the Rust Bucket is clearly the weakest ride and the first chapter's computer racers run old buggies too. Power comes from earned parts and sockets, not from buying levels.
+  - **Event cards show what to expect:** the track's traits (ice, mud, sand, oil, jumps, glide ramps, low gravity, shortcuts, narrow shortcuts), what the event drops, and a "Gramps says" tip about which parts suit it.
+  - **Gramps's Workshop:** every vehicle has a few **sockets** (Rust Bucket 2; Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter 3; Comet, Stomper, Hog Wild and Vortex 4; Starbolt 5). Each socket holds one part, and swapping is free, so you can tune your ride for each track. A **Chassis Mod** (coins, once per vehicle) adds one more socket.
+    - **Stat parts:** Engine (top speed), Turbo Coil (acceleration and drift-boost power), Tyres (steering and grip) and Armour (heavier bumps, shorter spin-outs), in Tier I, II and III. Tier III is "race-spec": a big bonus with a real drawback (Engine: slower acceleration, Turbo Coil: a little less top speed, Tyres: slower on sand and mud, Armour: slower acceleration). Only one part of each family fits at a time.
+    - **Special parts:** Drift Spring (drift charges faster), Slip Sail (a longer, stronger slipstream), Scout Lamp (shortcut gems count double, shortcut entrances glow, sand and candy shortcuts slow you less), Gem Vac (gems from further away and a hit costs 1 gem, not 3), Mud Boots (mud, sand, grass and oil barely slow you), Ice Studs (snow and ice grip like tarmac, a small cost on dry roads), Rocket Pill (a stronger rocket start and a free boost off the grid), Wing Kit (glide further, bigger landing boost), Bumper Plate (your bumps shove rivals harder), Item Pouch (hold a second item) and Comeback Spring (a free boost after every hit when you are last). Each suits some tracks.
+    - **Getting parts:** buy them in Gramps's Workshop (the stock grows with your chapter; Tier III only after the Golden Wheel), earn them (a 3-star clear drops that event's part, bosses drop a Blueprint, shown on the results screen) or win a free one from the gumball machine. Parts sell back for what you paid; earned parts sell for 40 coins, so there is no coin trick.
+    - **Loadouts:** three saved presets per vehicle (Grip, Speed, Allround). Tap one to fit it, or tap Save and then a preset to store what you have fitted. The stat panel previews every change ("Handling 2.9 → 2.3") before you commit. A NEW PART badge on the hub tells you when something is waiting.
+    - Parts are used in Career races. Old saves keep everything: each upgrade level you had became the matching part (levels 1-2 Tier I, 3-4 Tier II, 5 Tier III) and was fitted best first.
+  - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt) and 4 motorbikes (Zoom Bike, Zip Scooter, Hog Wild and the Vortex), paint jobs and new racers. The Garage's Workshop tab opens Gramps's Workshop.
   - Bikes turn sharper and grip harder in drifts, lean into corners and pop a wheelie when boosting. Pick **Kart** or **Bike** on the racer screen for quick races, cups and online.
   - Progress is saved on the phone. Settings has a reset.
 - **Modes:**
@@ -60,7 +69,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
 - **Gumball machine (🍬 Prizes):**
   - Spend 600 coins, or a free capsule, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary.
-  - **Jackpots (8%):** real prizes instead of a cosmetic. A paint job (3%), a free upgrade level on your current ride (2.5%), 1,500 coins (1.5%), a kart or bike you don't own (0.7%) or a racer you haven't hired (0.3%). Jackpot karts, bikes and racers work everywhere, like ones bought in the Career.
+  - **Jackpots (8%):** real prizes instead of a cosmetic. A paint job (3%), a free random Tier I or II part for the Workshop (2.5%), 1,500 coins (1.5%), a kart or bike you don't own (0.7%) or a racer you haven't hired (0.3%). Jackpot karts, bikes and racers work everywhere, like ones bought in the Career.
   - Hats show on your racer everywhere, even to friends online. Trails colour your boost flames, and your horn honks when you overtake someone.
   - Duplicates pay coins back.
 - **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.
@@ -107,7 +116,7 @@ It's the same game, and it notices when it's opened on a Mac or another computer
 
 Your progress lives on each device, with no account needed. To bring two devices in step, open **Settings → Sync progress** (or the 🏆 screen) on both. Tap **Show code** on one and scan or type the code on the other. The two saves are combined, and nothing is lost:
 
-- Karts, racers, paint, prizes, trophies, stars and found shortcuts from both devices are kept.
+- Karts, racers, paint, prizes, trophies, stars and found shortcuts from both devices are kept. Parts: the higher count of each, extra sockets and earned drops from both; what is fitted and the presets come from the more played save.
 - Time trial records and ghosts: the faster one wins.
 - Coins, XP and stats: the first sync takes the higher value. After that, both devices remember the shared totals, so later syncs add up what each device earned or spent in between.
 
@@ -168,8 +177,10 @@ How it works:
 zoomies/
   index.html          UI, HUD and styles
   src/main.js         app shell, menus, Grand Prix, career and multiplayer flow, dynamic resolution
-  src/career.js       career chapters, events, story, prices, scoring and save data
-  src/careerui.js     career hub, garage, story dialogue and career results
+  src/career.js       career chapters, events, story, event hints, scoring and save data
+  src/careerui.js     career hub, garage, Gramps's Workshop, story dialogue and career results
+  src/parts.js        stat parts, special parts, sockets and the kart-stats maths
+  src/workshop.js     owning, fitting, buying, selling and migrating parts
   src/profile.js      player level, race rewards, achievements and the daily challenge
   src/cosmetics.js    gumball machine prizes: hats, boost trails and horns
   src/gumballui.js    the gumball machine and collection screens
@@ -189,7 +200,7 @@ zoomies/
   src/battle.js       Balloon Battle rules, balloons and the battle AI
   src/world.js        sky, terrain, lakes, walls, scenery and landmarks per theme
   src/characters.js   racers and their procedural models
-  src/karts.js        kart bodies, upgrades and kart stats
+  src/karts.js        kart bodies and kart stats
   src/nametags.js     name and place tags floating over the karts
   src/ghost.js        time trial ghost recording and replay
   src/ai.js           computer drivers and difficulty levels

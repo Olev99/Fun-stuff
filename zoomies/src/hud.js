@@ -12,6 +12,7 @@ export class HUD {
     this.itemSlot = $('hud-item');
     this.itemIcon = $('hud-item-icon');
     this.itemCount = $('hud-item-count');
+    this.item2El = $('hud-item2');
     this.btnItem = $('btn-item');
     this.btnItemIc = $('btn-item-ic');
     this.gems = $('hud-gems').querySelector('b');
@@ -273,7 +274,7 @@ export class HUD {
     }
 
     // Item slot
-    if (p.rolling > 0) {
+    if (p.rolling > 0 && !p.rollingExtra) {
       this.rollTimer -= dt;
       if (this.rollTimer <= 0) {
         this.rollTimer = 0.07;
@@ -286,7 +287,7 @@ export class HUD {
         this.itemCount.hidden = true;
       });
     } else {
-      const key = p.item ? `${p.item}:${p.itemCount}` : '';
+      const key = p.item ? `${p.item}:${p.itemCount}:${p.item2 || ''}` : '';
       this._set('slot', key, () => {
         const ic = p.item ? ITEMS[p.item].icon : '';
         this.itemIcon.textContent = ic;
@@ -298,6 +299,9 @@ export class HUD {
         if (tb) tb.classList.toggle('show', !!AIM_DEFAULT[p.item]);
         this.itemCount.hidden = !(p.itemCount > 1);
         this.itemCount.textContent = `×${p.itemCount}`;
+        // Item Pouch: the spare item waits behind the first.
+        this.item2El.hidden = !(p.item && p.item2);
+        this.item2El.textContent = p.item2 ? ITEMS[p.item2].icon : '';
       });
     }
 

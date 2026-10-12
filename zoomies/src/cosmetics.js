@@ -8,7 +8,7 @@ export const RARITY = {
   rare: { name: 'Rare', weight: 28, refund: 80, color: '#7dff9a' },
   epic: { name: 'Epic', weight: 10, refund: 150, color: '#c77dff' },
   legendary: { name: 'Legendary', weight: 2, refund: 300, color: '#ffd23f' },
-  // Real prizes (racers, rides, paint, upgrades, coins): rolled first, see prizes.js.
+  // Real prizes (racers, rides, paint, parts, coins): rolled first, see prizes.js.
   jackpot: { name: 'Jackpot', weight: 0, refund: 0, color: '#ff5ad8' },
 };
 

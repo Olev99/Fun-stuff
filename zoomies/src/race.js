@@ -69,8 +69,10 @@ class RaceNet {
   }
   claimBox(i) {
     const k = this.race.player;
-    const want = !(k.item || k.rolling > 0);
+    const pouch = !!(k.perks && k.perks.itemPouch && k.item && !k.item2) && !(k.rolling > 0); // Item Pouch: a spare slot
+    const want = pouch || !(k.item || k.rolling > 0);
     if (want) {
+      k.rollingExtra = pouch;
       k.rolling = 1.25;
       k.pendingItem = null;
       k.awaitGrant = 1.8;
@@ -405,8 +407,9 @@ export class Race {
         continue;
       }
       const pt = this.rocket.pressT;
+      const pill = !!(k.perks && k.perks.rocketPill); // Rocket Pill: a stronger rocket start and a free little boost
       if (pt >= 1.85 && pt <= 2.8) {
-        k.startBoost(1.2, 14);
+        k.startBoost(pill ? 2 : 1.2, pill ? 22 : 14);
         this.style('PERFECT START', 50, 'gold');
         this.app.audio.play('boost');
       } else if (pt >= 0 && pt < 1.85) {
@@ -414,6 +417,9 @@ export class Race {
         k.spinDur = 0.7;
         this.app.hud.toast('Too early... engine stalled!');
         this.app.audio.play('burnout');
+      } else if (pill) {
+        k.startBoost(0.6, 7);
+        this.app.hud.toast('Rocket Pill!');
       }
     }
   }
@@ -755,7 +761,7 @@ export class Race {
         const d = Math.sqrt(d2) || 0.01;
         const nx = dx / d, nz = dz / d;
         const ov = R - d;
-        const heavy = (k) => (k.starTime > 0 || k.rocketTime > 0 ? 4 : 1);
+        const heavy = (k) => (k.starTime > 0 || k.rocketTime > 0 ? 4 : 1) * (k.perks && k.perks.bumperPlate ? 1.5 : 1); // Bumper Plate
         const ma = a.weight * heavy(a) * a.root.scale.x;
         const mb = b.weight * heavy(b) * b.root.scale.x;
         let wa = mb / (ma + mb), wb = ma / (ma + mb);
@@ -966,22 +972,24 @@ export class Race {
     for (const k of this.karts) {
       if (k.remote) continue;
       let tucked = false;
+      // Slip Sail (special part): the slipstream starts sooner, reaches further and boosts harder.
+      const sail = !!(k.perks && k.perks.slipSail);
       if (k.fwdSpeed > 16 && k.grounded && k.boostTime <= 0 && k.spinTime <= 0) {
         const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw);
         for (const o of this.karts) {
           if (o === k || o.fwdSpeed < 10) continue;
           const dx = o.pos.x - k.pos.x, dz = o.pos.z - k.pos.z;
           const ahead = dx * fx + dz * fz;
-          if (ahead < 3 || ahead > 15) continue;
-          if (Math.abs(dx * fz - dz * fx) > 2.3 || Math.abs(o.pos.y - k.pos.y) > 2) continue;
+          if (ahead < 3 || ahead > (sail ? 21 : 15)) continue;
+          if (Math.abs(dx * fz - dz * fx) > (sail ? 2.8 : 2.3) || Math.abs(o.pos.y - k.pos.y) > 2) continue;
           tucked = true;
           break;
         }
       }
       if (tucked) {
         k.draftT = (k.draftT || 0) + dt;
-        if (k.draftT > 1.2) {
-          k.startBoost(0.8, 4);
+        if (k.draftT > (sail ? 0.7 : 1.2)) {
+          k.startBoost(sail ? 1.3 : 0.8, sail ? 6 : 4);
           k.draftT = -1.5;
           if (k.isPlayer) {
             this.app.audio.play('miniturbo');
