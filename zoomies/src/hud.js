@@ -65,9 +65,10 @@ export class HUD {
     this.pos.style.visibility = tt ? 'hidden' : 'visible';
     $('hud-gems').style.visibility = tt || race.battle ? 'hidden' : 'visible';
     this.lap.classList.toggle('balloons', !!race.battle);
+    this.lap.classList.remove('down');
     this.timeEl.classList.remove('low');
     this.showTrackName(race);
-    if (race.battle) this.hint('Pop everyone else\'s balloons! Ram a rival with a 🌶️ Chili Boost to steal one.', 6);
+    if (race.battle) this.hint('Pop everyone else\'s balloons! Ram a rival with a 🌶️ Chili Boost to steal one. Lose them all and you get one comeback.', 6);
     else if (race.mode !== 'demo') this.hint(this.controlsHint(), 5.5);
     if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
   }
@@ -239,9 +240,12 @@ export class HUD {
     const laps = race.laps;
     const legs = race.track.legs;
     if (race.battle) {
-      // Balloons left instead of laps, and the battle clock counting down.
-      this._set('lap', `b${p.out ? -1 : p.balloons}`, () => {
-        this.lap.innerHTML = p.out ? 'OUT' : '<i>🎈</i>'.repeat(p.balloons);
+      // Balloons left instead of laps (or the comeback countdown while
+      // down), and the battle clock counting down.
+      const back = p.down ? Math.max(1, Math.ceil(p.downT)) : 0;
+      this._set('lap', `b${p.down ? `d${back}` : p.out ? -1 : p.balloons}`, () => {
+        this.lap.innerHTML = p.down ? `BACK IN <b>${back}</b>` : p.out ? 'OUT' : '<i>🎈</i>'.repeat(p.balloons);
+        this.lap.classList.toggle('down', !!p.down);
       });
       const tl = Math.ceil(race.battle.timeLeft);
       this._set('time', `b${tl}`, () => {

@@ -48,13 +48,14 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Time Trial, with saved records.
   - Balloon Battle (see below).
   - Multiplayer.
-- **🎈 Balloon Battle:** six racers in an open arena, three balloons each, two and a half minutes on the clock.
-  - Every hit pops a balloon, followed by a few safe seconds. Ram a rival with a 🌶️ Chili Boost (or while on a Rainbow Rush) to steal one of theirs, up to five.
-  - Lose your last balloon and you're out. The last racer left wins, or whoever holds the most balloons when time runs out (most hits breaks a tie).
+- **🎈 Balloon Battle:** six racers in an open arena, four balloons each, two and a half minutes on the clock.
+  - Every hit pops a balloon, followed by a few safe seconds. Ram a rival with a 🌶️ Chili Boost (or while on a Rainbow Rush) to steal one of theirs, up to six.
+  - Lose your last balloon and you're down, not out: everyone gets one comeback per battle. You watch for 5 seconds (the HUD counts down), then come back at a quiet spot with one balloon and 3 safe seconds ("COMEBACK!"). Lose that one too and you're out. A racer waiting to come back still counts as in the fight, and computer racers leave them alone.
+  - The last racer left wins, or whoever holds the most balloons when time runs out (most hits breaks a tie).
   - The orbs hold battle items only (no warps, rockets or gems), and a racer down to one balloon gets more shields and rainbows. The arena's moving obstacles knock you aside but don't pop balloons.
   - Five arenas, each a bowl round a central island: **Barnyard Bowl** (hay bales and mud), **Snowglobe Rink** (slippery ice and snowballs), **Neon Pinball** (a long oval with boost strips and laser sweepers), **Sandcastle Cove** (rolling dunes and crabs) and **Moon Crater** (low gravity and big bumps).
   - Computer racers hunt the leader, grab orbs, line up their shots (faster on Hard) and drop traps on whoever is chasing them. Winning a battle earns the Balloon Buster trophy, and the arena cards count your wins.
-  - Online too: every phone pops its own balloons, steals and knock-outs sync between phones, and the host calls the end and sends everyone the results. A friend who is knocked out watches the rest of the fight.
+  - Online too: every phone pops its own balloons, and steals, comebacks and knock-outs sync between phones. A ram is decided once, on the phone of the racer who was rammed, so a steal always takes a balloon from someone, even with lag. The host calls the end and sends everyone the results. A friend who is knocked out watches the rest of the fight.
 - **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Style points count for half. Each level takes longer than the last: a good racer needs about 25 races for level 10 and 100 for level 18. Each level-up shows what it unlocks: racers you can now hire, and a free prize capsule every 5th level. The daily reward also gives a free capsule. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
 - **Trophies:** 35 achievements with progress bars, from your first win to beating every rival, finding every shortcut and winning online. Each pays coins and XP. Tap 🏆 on the title screen.
@@ -64,7 +65,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Hats show on your racer everywhere, even to friends online. Trails colour your boost flames, and your horn honks when you overtake someone.
   - Duplicates pay coins back.
 - **Style points:** stylish driving pops up bonuses that feed your XP: perfect starts, drift turbos, overtakes, hits, tricks, glides, slipstreams, shortcuts and clean laps.
-- **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter.
+- **AI difficulty:** Easy, Normal or Hard. This is separate from the speed class (Chill, Zoom or Turbo). Hard racers take shortcuts, drift more and use items smarter. Normal and Hard racers keep a Chili Boost or Rainbow Rush for a sandy or snowy cut coming up.
 - **Driving:** drift boosts with mint, gold and hot pink sparks (spark, blaze and nova boosts), rocket starts, ramp tricks, and falling off gaps (a quick respawn puts you back).
 - **22 items:** Chili Boost 🌶️, Honey Pot 🍯, Bumper Ball 🥎, Buzz Bee 🐝, Bubble Shield 🫧, Rainbow Rush 🌈, Zap Cloud ⛈️, Boomerang 🪃, Gem Magnet 🧲, Warp Swirl 🌀, Rocket Ride 🚀, Gum Bomb 💣, Oil Slick 🛢️, Honk Blast 📯, Firework 🎆, Twister 🌪️, Spook Mask 👻, and the new ones:
   - Pogo Spring 🦘: a huge hop over everything, with a trick and a landing boost.
@@ -148,7 +149,7 @@ How it works:
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
 - **Steering assist:** Off, Light or Strong in Settings. It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
 - **Name tags:** the other karts show their name and current place above them, so you can see when you pass someone. In online races, friends get big tags in their kart colour that show from far away; computer racers get small tags up close. Settings switches tags between Everyone, Friends and Off.
-- **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are slow unless you hit them with a boost.
+- **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are mostly slow unless you hit them with a boost (Snowmobile Trail, and Dune Surf driven forwards, still pay off without one).
 - **Gems:** each one adds a little top speed, up to 10. Getting hit drops 3.
 
 ## Tech

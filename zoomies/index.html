@@ -647,6 +647,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #hud-lap.balloons { font-size: 24px; letter-spacing: -4px; min-height: 30px; }
 #hud-lap.balloons i { font-style: normal; display: inline-block; animation: bob 1.8s ease-in-out infinite; }
 #hud-lap.balloons i:nth-child(2) { animation-delay: .3s; } #hud-lap.balloons i:nth-child(3) { animation-delay: .6s; } #hud-lap.balloons i:nth-child(4) { animation-delay: .9s; }
+#hud-lap.balloons i:nth-child(5) { animation-delay: 1.2s; } #hud-lap.balloons i:nth-child(6) { animation-delay: 1.5s; }
+#hud-lap.balloons.down { font-size: 20px; letter-spacing: 0; animation: pop .35s ease-out; }
 @keyframes bob { 50% { transform: translateY(-3px) rotate(-6deg); } }
 #hud-time.low { color: #ff6b6b; font-size: 18px; }
 .hud-tr { position: absolute; top: calc(2px + var(--sat)); right: calc(14px + var(--sar)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
@@ -1155,7 +1157,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
         <div><b>Drift + turbo</b>Hold DRIFT while turning. Sparks go mint, gold, then hot pink. Let go for a boost.</div>
         <div><b>Tricks</b>Tap DRIFT just after launching off a ramp. You get a boost when you land.</div>
         <div><b>Slipstream</b>Tuck in right behind another kart for a moment and you get a free boost.</div>
-        <div><b>🎈 Balloon Battle</b>Five arenas, six racers, three balloons each. Every hit pops one; ram a rival with a 🌶️ Chili Boost to steal one. Lose them all and you're out. Last one standing wins, or the most balloons when the clock runs out.</div>
+        <div><b>🎈 Balloon Battle</b>Five arenas, six racers, four balloons each. Every hit pops one; ram a rival with a 🌶️ Chili Boost to steal one (up to six). Lose them all and you come back once, after a few seconds, with one balloon; lose that too and you're out. Last one standing wins, or the most balloons when the clock runs out.</div>
         <div><b>Look back</b>Hold the 👀 button (or the minimap, or Q on a keyboard) to see what's behind you.</div>
         <div><b>Boats and planes</b>On the Epic adventures your ride turns into a boat on water (it slides, so drift early) and a plane in the sky. Fly through the gold rings for a boost and dodge the storm clouds.</div>
         <div><b>Stuck on a wall?</b>Steer away and the kart swings back round. If you're pinned, the drone lifts you out after a few seconds, or pause and tap <i>Back on the road</i>.</div>

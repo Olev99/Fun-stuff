@@ -4,6 +4,8 @@ import { arenaById } from './arenas.js';
 // are fractions of a lap (0 = start line); lateral offsets are metres (+ = right).
 // Shortcuts leave the main road through a gap in the wall on `side` at `from`
 // and rejoin at `to`; `pts` are [lapFraction, lateralOffset, height?] waypoints.
+// Computer racers treat an all-offroad cut as a boost cut; `aiNoBoost` ('fwd',
+// 'rev' or 'both') marks one that is quicker than the road even without a boost.
 
 export const TRACKS = [
   {
@@ -68,7 +70,7 @@ export const TRACKS = [
     shortcuts: [
       { name: 'Mesa Cave', lead: 25, from: 0.39, to: 0.57, side: 1, surface: 'road', width: 10, deco: 'cave',
         wpts: [[200, 28, 9], [180, -5, 9.5], [160, -38, 9.5], [140, -70, 9]], gems: [{ at: 0.35, n: 5 }] },
-      { name: 'Dune Surf', lead: 45, from: 0.66, to: 0.91, side: 1, surface: 'offroad', width: 11, deco: 'cacti', crates: true,
+      { name: 'Dune Surf', lead: 45, from: 0.66, to: 0.91, side: 1, surface: 'offroad', width: 11, deco: 'cacti', crates: true, aiNoBoost: 'fwd',
         wpts: [[50, -207, 1.1], [22, -221, 1], [-5, -234, 0.9], [-33, -248, 0.8]], gems: [{ at: 0.5, n: 5 }] },
     ],
   },
@@ -94,7 +96,7 @@ export const TRACKS = [
     shortcuts: [
       { name: 'Ice Shelf', lead: 25, from: 0.33, to: 0.52, side: -1, surface: 'ice', width: 10, deco: 'iceArch', crates: true,
         wpts: [[-138, 82, 9], [-150, 55, 9.5], [-146, 28, 9.5], [-162, -4, 9]], gems: [{ at: 0.3, n: 5 }] },
-      { name: 'Snowmobile Trail', lead: 45, from: 0.71, to: 0.97, side: 1, surface: 'offroad', width: 11, deco: 'pines',
+      { name: 'Snowmobile Trail', lead: 45, from: 0.71, to: 0.97, side: 1, surface: 'offroad', width: 11, deco: 'pines', aiNoBoost: 'both',
         wpts: [[-83, -175, 0.6], [-58, -172, 0.5], [-32, -169, 0.4], [-7, -166, 0.3]], gems: [{ at: 0.45, n: 5 }] },
     ],
   },
