@@ -109,6 +109,9 @@ export class UI {
       case 'garage':
         app.careerUI.garageAction(action);
         break;
+      case 'workshop':
+        app.careerUI.workshopAction(action);
+        break;
       case 'story':
         if (action === 'skip') app.careerUI.endStory();
         break;

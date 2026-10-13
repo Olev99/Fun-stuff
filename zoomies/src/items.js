@@ -334,7 +334,7 @@ export class ItemSystem {
         const s = g.s + n * 3.2;
         if (g.path.voids.length && g.path.isVoid(s)) continue;
         g.path.pointAt(s, g.d, v);
-        this.gems.push({ pos: v.clone().setY(v.y + 0.9), active: true, t: 0 });
+        this.gems.push({ pos: v.clone().setY(v.y + 0.9), active: true, t: 0, shortcut: g.path !== this.track });
       }
     }
     const geo = new THREE.OctahedronGeometry(0.5, 0);
@@ -399,8 +399,15 @@ export class ItemSystem {
     return weighted(table);
   }
 
+  // Item Pouch (special part): a kart already holding an item can pick up a second one.
+  canPick(kart) {
+    if (kart.rolling > 0) return false;
+    return !kart.item || !!(kart.perks && kart.perks.itemPouch && !kart.item2);
+  }
+
   give(kart, forced) {
-    if (kart.item || kart.rolling > 0) return;
+    if (!this.canPick(kart)) return;
+    kart.rollingExtra = !!kart.item;
     kart.pendingItem = forced || this.roll(kart);
     kart.rolling = kart.isPlayer ? 1.25 : 0.5;
   }
@@ -408,13 +415,24 @@ export class ItemSystem {
   settle(kart) {
     const it = kart.pendingItem;
     kart.pendingItem = null;
+    kart.rollingExtra = false;
     if (!it) return;
-    if (it === 'chili3') {
-      kart.item = 'chili';
-      kart.itemCount = 3;
+    const [name, n] = it === 'chili3' ? ['chili', 3] : [it, 1];
+    if (kart.item) {
+      kart.item2 = name;
+      kart.item2Count = n;
     } else {
-      kart.item = it;
-      kart.itemCount = 1;
+      kart.item = name;
+      kart.itemCount = n;
+    }
+  }
+
+  // The spare item steps up when the first one is gone.
+  _promote(kart) {
+    if (!kart.item && kart.item2 && !(kart.rolling > 0)) {
+      kart.item = kart.item2;
+      kart.itemCount = kart.item2Count || 1;
+      kart.item2 = null;
     }
   }
 
@@ -425,9 +443,9 @@ export class ItemSystem {
     const it = forcedItem || kart.item;
     if (!it) return null;
     if (!forcedItem) {
-      if (kart.rolling > 0 || kart.spinTime > 0) return null;
+      if ((kart.rolling > 0 && !kart.rollingExtra) || kart.spinTime > 0) return null;
       kart.itemCount--;
-      if (kart.itemCount <= 0) { kart.item = null; kart.itemCount = 0; }
+      if (kart.itemCount <= 0) { kart.item = null; kart.itemCount = 0; this._promote(kart); }
     }
     if (this.race.net && this.race.net.isGuest && !remoteSpawn) {
       // Guests apply self effects locally and ask the host to spawn the rest.
@@ -644,12 +662,36 @@ export class ItemSystem {
     return !k.remote;
   }
 
+  // Scout Lamp: a soft glowing beam marks every shortcut entrance, just off the road.
+  _scoutBeacons(time) {
+    const p = this.race.player;
+    if (!p || !(p.perks && p.perks.scoutLamp) || this.race.mode === 'demo') return;
+    if (!this._beacons) {
+      this._beacons = [];
+      const fr = {};
+      const geo = new THREE.CylinderGeometry(0.35, 0.8, 7, 10, 1, true);
+      for (const sc of this.track.shortcuts) {
+        this.track.frame(sc.fromS + 4, fr);
+        const d = sc.side * (fr.hw + 1.6);
+        const mat = new THREE.MeshBasicMaterial({ color: '#7dffd6', transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(fr.x + fr.rx * d, this.track.heightAtFrame(fr, d) + 3.5, fr.z + fr.rz * d);
+        m.renderOrder = 5;
+        this.group.add(m);
+        this._beacons.push(m);
+      }
+    }
+    this._beacons.forEach((m, i) => { m.material.opacity = 0.25 + 0.15 * Math.sin(time * 3 + i * 1.7); });
+  }
+
   update(dt, time) {
     const race = this.race;
     const karts = race.karts;
     const fx = race.fx;
     const authority = !this.replica;
     this._updEffects(dt);
+    for (const k of karts) if (!k.item && k.item2) this._promote(k);
+    this._scoutBeacons(time);
 
     // Item boxes
     for (let i = 0; i < this.boxes.length; i++) {
@@ -713,10 +755,14 @@ export class ItemSystem {
       for (const k of karts) {
         if (k.remote || (!authority && !k.isPlayer)) continue;
         const dx = k.pos.x - g.pos.x, dz = k.pos.z - g.pos.z, dy = k.pos.y + 0.7 - g.pos.y;
-        const R = k.magnetTime > 0 ? 110 : 3.2;
-        if (dx * dx + dz * dz < R && Math.abs(dy) < (k.magnetTime > 0 ? 5 : 2)) {
+        // Gem Vac (special part) widens the pickup range a little.
+        const vac = k.perks && k.perks.gemVac;
+        const R = k.magnetTime > 0 ? 110 : vac ? 16 : 3.2;
+        if (dx * dx + dz * dz < R && Math.abs(dy) < (k.magnetTime > 0 ? 5 : vac ? 3 : 2)) {
           this._popGem(i);
           if (k.gems < 10) k.gems++;
+          // Scout Lamp: gems on a shortcut count double.
+          if (k.perks && k.perks.scoutLamp && g.shortcut && k.gems < 10) k.gems++;
           if (!authority) race.net.claimGem(i);
           race.onGem(k);
           break;

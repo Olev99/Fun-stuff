@@ -28,10 +28,16 @@ export const CHARACTERS = [
   { id: 'boris', name: 'Boris', species: 'Yeti', tagline: 'Big, fluffy and absolutely thrilled to be here.', color: '#5fa8ff', accent: '#ffffff', lvl: 18, price: 2200, stats: { speed: 4, accel: 2, handling: 2, weight: 4 } },
 ];
 
+// Story characters: not in the picker or the random grids, only the Career
+// uses them (the Baron is the final rival).
+export const STORY_CHARS = [
+  { id: 'baron', name: 'Baron Von Boost', species: 'Lion', tagline: 'Owns Boost Corp, the Circuit and a very shiny moustache.', color: '#d9a520', accent: '#1d1537', story: true, stats: { speed: 4, accel: 3, handling: 3, weight: 2 } },
+];
+
 // How big each racer sits in the kart: tiny bees and slimes, huge golems and yetis.
 const SIZE = {
   pip: 0.8, hopper: 0.9, fizz: 0.68, lulu: 0.86, gloop: 0.82, nimbus: 0.84, mochi: 0.95, ember: 0.97, zorp: 0.95,
-  bruno: 1.12, rexi: 1.1, bao: 1.16, gus: 1.24, pebble: 1.42, boris: 1.4,
+  baron: 1.04, bruno: 1.12, rexi: 1.1, bao: 1.16, gus: 1.24, pebble: 1.42, boris: 1.4,
 };
 export const charSize = (id) => SIZE[id] || 1;
 
@@ -44,7 +50,7 @@ export function charLocked(id, level = 1, career = null) {
 }
 
 export function charById(id) {
-  return CHARACTERS.find((c) => c.id === id) || CHARACTERS[0];
+  return CHARACTERS.find((c) => c.id === id) || STORY_CHARS.find((c) => c.id === id) || CHARACTERS[0];
 }
 
 const DARK = '#2a2438';
@@ -127,6 +133,29 @@ function driver(ch, hat) {
       B.add(sphere(0.22), '#e2b07a', [0, H.y - 0.12, H.z + 0.38], [0, 0, 0], [1.1, 0.8, 0.8]);
       B.add(sphere(0.08, 12, 8), '#1b1530', [0, H.y - 0.04, H.z + 0.56], [0, 0, 0], [1.3, 1, 1], 'gloss');
       eyes(B, 0, H.y + 0.1, H.z + 0.42, 0.18, 0.075);
+      break;
+    }
+    case 'baron': {
+      // A gold-suited lion: shaggy mane, monocle, curled moustache and a top hat.
+      const fur = '#e8b84a', mane = '#a8691f';
+      torso('#1d1537', '#d9a520');
+      armL('#1d1537');
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2;
+        B.add(new THREE.ConeGeometry(0.12, 0.3, 5), mane, [Math.cos(a) * 0.4, H.y + Math.sin(a) * 0.4, H.z - 0.08], [0, 0, a - Math.PI / 2]);
+      }
+      B.add(sphere(0.44), fur, [H.x, H.y, H.z]);
+      B.add(sphere(0.22), '#f6e3b0', [0, H.y - 0.12, H.z + 0.36], [0, 0, 0], [1.1, 0.8, 0.8]);
+      B.add(sphere(0.07, 12, 8), '#1b1530', [0, H.y - 0.04, H.z + 0.54], [0, 0, 0], [1.3, 1, 1], 'gloss');
+      for (const s of [-1, 1]) {
+        B.add(new THREE.CapsuleGeometry(0.03, 0.2, 3, 6), '#3a2410', [s * 0.14, H.y - 0.14, H.z + 0.5], [0, 0, Math.PI / 2 + s * 0.35]);
+        B.add(sphere(0.12, 8, 6), fur, [s * 0.3, H.y + 0.3, H.z - 0.05]);
+      }
+      eyes(B, 0, H.y + 0.1, H.z + 0.4, 0.17, 0.07);
+      B.add(new THREE.TorusGeometry(0.1, 0.018, 6, 16), '#ffd23f', [0.17, H.y + 0.1, H.z + 0.45], [0, 0, 0], 1, 'metal');
+      B.add(new THREE.CylinderGeometry(0.2, 0.22, 0.32, 14), '#15102a', [0, H.y + 0.62, H.z - 0.04], [0, 0, 0], 1, 'plastic');
+      B.add(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 16), '#15102a', [0, H.y + 0.47, H.z - 0.04], [0, 0, 0], 1, 'plastic');
+      B.add(new THREE.CylinderGeometry(0.205, 0.225, 0.07, 14), '#ffd23f', [0, H.y + 0.52, H.z - 0.04], [0, 0, 0], 1, 'metal');
       break;
     }
     case 'rexi': {
