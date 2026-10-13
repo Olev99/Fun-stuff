@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { GeoBuilder } from './util.js';
 import { driverGeometry } from './characters.js';
+import { statsFrom } from './parts.js';
 
 // Kart bodies. Each has its own shape, wheel layout and stat modifiers that
 // add to the driver's stats. Quick races, Grand Prix and multiplayer use the
-// Zoom Classic; career players buy and upgrade the others.
+// Zoom Classic; career players buy and fit parts to the others.
 
 const DARK = '#2a2438';
 const METAL = '#9aa3b5';
@@ -43,7 +44,7 @@ export const BODIES = {
   buggy: {
     id: 'buggy', name: 'Rust Bucket', price: 0,
     blurb: 'Your first kart. Held together by tape, hope and one headlight.',
-    stats: { speed: -0.8, accel: -0.3, handling: -0.4, weight: -0.3 },
+    stats: { speed: -1.5, accel: -0.9, handling: -0.7, weight: -0.5 },
     wheels: std({ r: 0.31, z: 0.92, w: 0.26 }, { r: 0.37, z: -0.82, w: 0.34 }, 0.78), seat: 0,
   },
   classic: {
@@ -112,32 +113,13 @@ export function bodyLocked(id, career) {
 }
 export const bodyIcon = (b) => (b.id === 'scooter' ? '🛵' : b.kind === 'bike' ? '🏍️' : b.id === 'stomper' ? '🛻' : '🏎️');
 
-// Garage upgrades, 5 levels each. Costs are per level.
-export const UPGRADES = {
-  engine: { id: 'engine', name: 'Engine', icon: '🔧', blurb: 'Higher top speed.', costs: [180, 360, 620, 950, 1400] },
-  turbo: { id: 'turbo', name: 'Turbo', icon: '💨', blurb: 'Quicker acceleration and stronger drift boosts.', costs: [160, 320, 560, 860, 1250] },
-  tyres: { id: 'tyres', name: 'Tyres', icon: '🛞', blurb: 'Sharper steering and more grip, especially on ice.', costs: [150, 300, 520, 800, 1150] },
-  armor: { id: 'armor', name: 'Armour', icon: '🛡️', blurb: 'Heavier bumps and shorter spin-outs.', costs: [140, 280, 480, 740, 1100] },
-};
-export const MAX_UPGRADE = 5;
-
-// Effective stats for a racer in a body with upgrades. Speed/accel/handling/
-// weight are on the same scale as the racers' 1-5 stats (they can go past 5);
-// the rest are multipliers.
-export function kartStats(ch, bodyId = 'classic', up = {}) {
+// Effective stats for a racer in a body with a kit of parts (see parts.js).
+// Speed/accel/handling/weight are on the same scale as the racers' 1-5 stats
+// (they can go past 5); the rest are multipliers. stats.perks lists the
+// special parts that change how the kart behaves.
+export function kartStats(ch, bodyId = 'classic', kit = {}) {
   const body = bodyById(bodyId);
-  const b = body.stats;
-  const lv = (k) => Math.max(0, Math.min(MAX_UPGRADE, up[k] || 0));
-  return {
-    speed: ch.stats.speed + b.speed + lv('engine') * 0.32,
-    accel: ch.stats.accel + b.accel + lv('turbo') * 0.3,
-    handling: ch.stats.handling + b.handling + lv('tyres') * 0.28,
-    weight: ch.stats.weight + b.weight + lv('armor') * 0.3,
-    grip: 1 + lv('tyres') * 0.06,
-    turbo: 1 + lv('turbo') * 0.05,
-    armor: 1 - lv('armor') * 0.07,
-    offroad: body.offroad ?? 0.5,
-  };
+  return statsFrom(ch.stats, body.stats, kit, body.offroad ?? 0.5);
 }
 export const bodyById = (id) => BODIES[id] || BODIES.classic;
 

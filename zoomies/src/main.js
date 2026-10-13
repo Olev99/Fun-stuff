@@ -66,6 +66,7 @@ class App {
     // One save for career progress, the wallet, XP, stats and achievements.
     this.career = loadCareer() || newCareer();
     this.careerRun = null;
+    this.pendingStories = []; // story scenes the hub plays next (career.js applyResult)
     this.canvas = $('gl');
     installHeightFog();
     const r = (this.renderer = new THREE.WebGLRenderer({
@@ -392,7 +393,7 @@ class App {
     if (!byId && cfg.mode !== 'tt') loadouts = grid.map((id) => (id === cfg.player ? cfg.playerLoadout || null : Math.random() < 0.35 ? { body: 'bike' } : null));
     this.race = new Race(this, {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
-      difficulty: cfg.difficulty || this.settings.difficulty, laps: trackById(cfg.trackId).laps || 3,
+      difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
       look: lookOf(this.career),
     });
@@ -711,6 +712,9 @@ class App {
       case 'garage':
         this.openCareer(true);
         break;
+      case 'workshop':
+        this.openCareer('workshop');
+        break;
       case 'lobby':
         this.backToLobby();
         break;
@@ -775,7 +779,8 @@ class App {
     saveCareer(this.career);
     if (!this.race || this.race.mode !== 'demo') this.disposeRace();
     this.applyControls();
-    if (garage) this.careerUI.openGarage();
+    if (garage === 'workshop') this.careerUI.openWorkshop();
+    else if (garage) this.careerUI.openGarage();
     else this.careerUI.open();
   }
 
@@ -791,13 +796,14 @@ class App {
     const player = c.racer;
     const rival = rivalFor(c, chapter);
     const lo = playerLoadout(c);
-    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev };
+    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0 };
+    this._coachAt = 0;
     this.careerRun = { evId };
     if (ev.type === 'cup') {
       this.gp = {
         cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: chapter.cls, player, careerEv: ev, wins: 0, gems: 0,
       };
-      this._gpField(this.gp, [rival]);
+      this._gpField(this.gp, [rival, ...(chapter.field || [])]);
       const others = this.gp.field.filter((id) => id !== player);
       this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev };
       this.startGPRace();
@@ -811,6 +817,25 @@ class App {
     }
   }
 
+  // The prologue race teaches drifting and boosting with a few hints.
+  _coach() {
+    const r = this.race, run = this.careerRun;
+    if (!r || !run || r.mode === 'demo' || r.state !== 'race') return;
+    const ev = eventById(run.evId).ev;
+    if (!ev.tutorial) return;
+    const steps = [
+      [1, 'Tilt or steer to follow the road. Stay off the grass!'],
+      [6, 'Hold DRIFT in a bend, steer into it, and let go when the sparks glow for a BOOST.'],
+      [16, 'Drive through item boxes, then press ITEM to use what you get.'],
+      [26, 'Nearly there. Keep drifting to build speed for the finish!'],
+    ];
+    const i = this._coachAt || 0;
+    if (i < steps.length && r.raceTime >= steps[i][0]) {
+      this.hud.hint(steps[i][1], 4.5);
+      this._coachAt = i + 1;
+    }
+  }
+
   onCareerComplete(race, rows) {
     const me = rows.find((r) => r.isPlayer);
     const { ev } = eventById(this.careerRun.evId);
@@ -819,7 +844,7 @@ class App {
     const next = rows.find((r) => r.place === me.place + 1);
     res.margin = me.place === 1 && next ? next.time - me.time : 0;
     const out = applyResult(this.career, ev.id, res);
-    if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    this.pendingStories.push(...out.stories);
     const rw = this.profileAward(race, me, { coins: 0, xpBonus: out.pass ? 50 : 0 });
     let extra = '';
     if (ev.type === 'time') extra = `<div class="big-msg"><em>${fmtTime(me.time)}</em></div><div class="car-goal">Target ${fmtTime(ev.target)}</div>`;
@@ -831,7 +856,7 @@ class App {
     const gp = this.gp;
     const res = { place: me.place, wins: gp.wins || 0, gems: gp.gems || 0, finished: true };
     const out = applyResult(this.career, gp.careerEv.id, res);
-    if (out.chapterDone) this.pendingStory = { key: `${out.chapter.id}-outro`, lines: out.chapter.outro, title: out.chapter.name };
+    this.pendingStories.push(...out.stories);
     if (me.place === 1) addToSet(this.career, 'cups', gp.careerEv.id);
     const rw = this.rewardsFinish(grant(this.career, 0, me.place <= 3 ? 200 : 60));
     this.audio.play(me.place === 1 ? 'finish' : 'lose');
@@ -1061,6 +1086,7 @@ class App {
     if (!this.paused && this.view) {
       this.renderer.info.reset();
       this.view.update(dt);
+      if (this.careerRun) this._coach();
       this._checkTilt();
       this._frameStats(dt);
       if (this.post.active) this.post.render(this.view.scene, this.view.camera, this.view.grade, dt);

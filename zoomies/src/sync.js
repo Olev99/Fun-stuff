@@ -70,13 +70,30 @@ export function mergeCareer(A, B) {
   m.lvlPaid = Math.max(...[A, B].map((x) => (x && x.lvlPaid) || oldLevel(num(x && x.xp))));
   for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) m[k] = union(a[k], b[k]);
   m.champion = !!(a.champion || b.champion);
-  // Upgrades: the higher level of each, per kart.
-  m.upgrades = {};
-  for (const id of union(Object.keys(a.upgrades || {}), Object.keys(b.upgrades || {}))) {
-    const ua = (a.upgrades || {})[id] || {}, ub = (b.upgrades || {})[id] || {};
-    m.upgrades[id] = {};
-    for (const u of union(Object.keys(ua), Object.keys(ub))) m.upgrades[id][u] = Math.max(num(ua[u]), num(ub[u]));
+  // Parts (Gramps's Workshop): the higher count of each part, extra sockets
+  // from Chassis Mods, earned drops combined. Loadouts (what is fitted and the
+  // saved presets) come from the more played save, with the other save's
+  // vehicles and empty presets filled in; cleanCareer then drops anything that
+  // no longer fits (more fitted than owned, more parts than sockets).
+  const maxOf = (x, y) => {
+    const out = {};
+    for (const k of union(Object.keys(x || {}), Object.keys(y || {}))) out[k] = Math.max(num((x || {})[k]), num((y || {})[k]));
+    return out;
+  };
+  m.parts = maxOf(a.parts, b.parts);
+  m.bought = maxOf(a.bought, b.bought);
+  m.sockets = maxOf(a.sockets, b.sockets);
+  m.drops = { ...(b.drops || {}), ...(a.drops || {}) };
+  m.pnew = !!(a.pnew || b.pnew);
+  const other = main === a ? b : a;
+  m.loadouts = {};
+  for (const id of union(Object.keys(main.loadouts || {}), Object.keys(other.loadouts || {}))) {
+    const lm = (main.loadouts || {})[id], lo = (other.loadouts || {})[id];
+    if (!lm || !lo) { const l = lm || lo; m.loadouts[id] = { cur: [...l.cur], pre: l.pre.map((p) => [...p]) }; continue; }
+    m.loadouts[id] = { cur: [...lm.cur], pre: [0, 1, 2].map((i) => [...((lm.pre[i] && lm.pre[i].length ? lm.pre[i] : lo.pre[i]) || [])]) };
   }
+  m.upgrades = {};
+  m.pv = 2;
   // Career events: most stars, first clears, best times.
   m.stars = {};
   for (const k of union(Object.keys(a.stars || {}), Object.keys(b.stars || {}))) m.stars[k] = Math.max(num((a.stars || {})[k]), num((b.stars || {})[k]));

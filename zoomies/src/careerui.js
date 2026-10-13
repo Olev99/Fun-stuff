@@ -1,19 +1,41 @@
 import { CHARACTERS, charById } from './characters.js';
-import { BODY_LIST, UPGRADES, MAX_UPGRADE, bodyById, kartStats } from './karts.js';
+import { BODY_LIST, bodyById, kartStats } from './karts.js';
 import {
   CHAPTERS, TYPE_ICON, SPEAKERS, PAINTS, RACER_PRICE, paintById, eventStars, chapterStars, totalStars, MAX_STARS, chapterUnlocked,
-  eventUnlocked, currentChapter, rivalFor, goalLabel, starHints, trackLabel, upgradesFor, upgradeCost, racerAvailable, saveCareer, BOSS_NEEDS,
+  eventUnlocked, currentChapter, rivalFor, goalLabel, starHints, trackLabel, racerAvailable, saveCareer, BOSS_NEEDS,
+  trackTraits, grampsTip, chaptersDone, storyClues,
 } from './career.js';
+import { PART_LIST, partById, TIER_NAME } from './parts.js';
+import {
+  loadout, socketsOf, owned, freeCopies, fittedCount, equip, unequip, savePreset, loadPreset, buy, sell, sellValue, inStock,
+  chassisCost, buyChassis, PRESET_NAMES,
+} from './workshop.js';
 import { fmtTime } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const CLASS_NAME = { chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' };
 const DIFF_NAME = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 const STATS = [['speed', 'Speed'], ['accel', 'Accel'], ['handling', 'Handling'], ['weight', 'Weight']];
+const FX_LABEL = { speed: 'top speed', accel: 'acceleration', handling: 'handling', weight: 'weight' };
 const coins = (n) => `🪙 ${n.toLocaleString('en-US')}`;
 const starRow = (n, prev = 3) => [1, 2, 3].map((i) => `<i class="${i <= n ? 'on' : ''}${i > prev && i <= n ? ' new' : ''}">★</i>`).join('');
+const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
-// Career screens: the chapter hub, the garage, story dialogue and results.
+// What a stat part does, as short coloured lines: [text, isGood].
+function fxLines(p) {
+  const out = [];
+  for (const [k, v] of Object.entries(p.fx || {})) {
+    if (k in FX_LABEL) out.push([`${v > 0 ? '+' : '-'}${Math.abs(v).toFixed(2).replace(/0$/, '')} ${FX_LABEL[k]}`, v > 0]);
+    else if (k === 'grip') out.push([`+${Math.round(v * 100)}% grip`, true]);
+    else if (k === 'turbo') out.push([`+${Math.round(v * 100)}% drift boost`, true]);
+    else if (k === 'armor') out.push([`${Math.round(-v * 100)}% shorter spin-outs`, true]);
+    else if (k === 'soft') out.push([`${Math.round((v - 1) * 100)}% on sand and mud`, false]);
+  }
+  return out;
+}
+
+// Career screens: the chapter hub, the garage, Gramps's Workshop, story
+// dialogue and results.
 export class CareerUI {
   constructor(app, ui) {
     this.app = app;
@@ -23,6 +45,8 @@ export class CareerUI {
     this.tab = 'karts';
     this.pick = {};
     this.story = null;
+    // Workshop: tab (fit / shop), selected socket and part, "save preset" mode.
+    this.ws = { tab: 'fit', slot: 0, sel: null, save: false };
     $('ev-list').addEventListener('click', (e) => {
       const b = e.target.closest('[data-ev]');
       if (!b) return;
@@ -33,6 +57,7 @@ export class CareerUI {
       const b = e.target.closest('[data-tab]');
       if (!b) return;
       this.app.audio.play('select');
+      if (b.dataset.tab === 'workshop') { this.openWorkshop(); return; }
       this.tab = b.dataset.tab;
       this.renderGarage();
     });
@@ -40,15 +65,45 @@ export class CareerUI {
       const b = e.target.closest('[data-pick]');
       if (!b) return;
       this.app.audio.play('select');
-      if (this.tab === 'upgrades') this.buyUpgrade(b.dataset.pick);
-      else {
-        this.pick[this.tab] = b.dataset.pick;
-        this.renderGarage();
-      }
+      this.pick[this.tab] = b.dataset.pick;
+      this.renderGarage();
     });
     $('scr-story').addEventListener('click', (e) => {
       if (e.target.closest('[data-go]')) return;
       this.nextLine();
+    });
+    $('ws-tabs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tab]');
+      if (!b) return;
+      this.app.audio.play('select');
+      this.ws.tab = b.dataset.tab;
+      this.ws.sel = null;
+      this.renderWorkshop();
+    });
+    $('ws-sockets').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-slot]');
+      if (!b) return;
+      this.app.audio.play('select');
+      const i = +b.dataset.slot;
+      this.ws.slot = i;
+      const id = loadout(this.c, this.c.body).cur[i];
+      if (id) { this.ws.tab = 'fit'; this.ws.sel = id; } else if (this.ws.sel && owned(this.c, this.ws.sel) < 1 && this.ws.tab === 'fit') this.ws.sel = null;
+      this.renderWorkshop();
+    });
+    $('ws-list').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pid]');
+      if (!b) return;
+      this.app.audio.play('select');
+      this.ws.sel = this.ws.sel === b.dataset.pid ? null : b.dataset.pid;
+      this.renderWorkshop();
+    });
+    $('ws-presets').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pre]');
+      if (!b) return;
+      this.workshopPreset(b.dataset.pre);
+    });
+    $('ws-detail').addEventListener('click', (e) => {
+      if (e.target.closest('[data-sell]')) this.workshopSell();
     });
   }
 
@@ -59,13 +114,15 @@ export class CareerUI {
     const c = this.c;
     if (this.ci === null || !chapterUnlocked(c, this.ci)) this.ci = currentChapter(c);
     const stories = [];
-    if (this.app.pendingStory) {
-      stories.push(this.app.pendingStory);
-      this.app.pendingStory = null;
+    const pending = this.app.pendingStories.splice(0);
+    if (pending.length) {
+      stories.push(...pending);
       this.ci = currentChapter(c);
       this.sel = null;
     }
     const ch = CHAPTERS[currentChapter(c)];
+    // The very first visit starts with the scrapyard scene (not for saves that are already under way).
+    if (ch.prologue && !c.seen[`${ch.id}-prologue`] && !c.seen[`${ch.id}-intro`] && !totalStars(c)) stories.push({ key: `${ch.id}-prologue`, lines: ch.prologue, title: 'Prologue' });
     if (!c.seen[`${ch.id}-intro`]) {
       stories.push({ key: `${ch.id}-intro`, lines: ch.intro, title: ch.name });
       this.ci = currentChapter(c);
@@ -89,10 +146,15 @@ export class CareerUI {
     $('chap-rival').innerHTML = `Rival <b>${charById(rival).name}</b>`;
     const cleared = ch.events.filter((e) => c.done[e.id]).length;
     $('chap-meta').innerHTML = `${CLASS_NAME[ch.cls]} class · ${DIFF_NAME[ch.diff]} racers<br>${cleared}/${ch.events.length} cleared · ★ ${chapterStars(c, ch)}/${ch.events.length * 3}`;
+    if (c.champion) $('chap-meta').innerHTML += '<br><b class="champ">🏆 Golden Wheel champion</b>';
+    // Story progress: one pip per finished chapter and the latest clue.
+    const done = chaptersDone(c);
+    const clues = storyClues(c);
+    $('chap-story').innerHTML = `<span class="pips">${CHAPTERS.map((_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('')}</span><span class="clue">${clues.length ? `<b>Clue:</b> ${esc(clues[clues.length - 1])}` : 'Win races to uncover the story.'}</span>`;
     $('chap-prev').disabled = this.ci === 0;
     $('chap-next').disabled = this.ci >= CHAPTERS.length - 1;
     $('scr-career').classList.toggle('locked', !unlocked);
-    if (c.champion) $('chap-meta').innerHTML += '<br><b class="champ">🏆 Golden Wheel champion</b>';
+    $('car-ws-badge').hidden = !c.pnew;
 
     if (!this.sel || !ch.events.some((e) => e.id === this.sel)) {
       const firstOpen = ch.events.findIndex((e, i) => eventUnlocked(c, this.ci, i) && !c.done[e.id]);
@@ -110,6 +172,7 @@ export class CareerUI {
       if (sel && open) {
         more = `<span class="hints">${starHints(ev).map((h, k) => `<span class="${k < st ? 'got' : ''}">${'★'.repeat(k + 1)} ${h}</span>`).join('')}</span>`;
         if (ev.type === 'time' && c.best[ev.id]) more += `<span class="best">Best ${fmtTime(c.best[ev.id])}</span>`;
+        more += this._eventHints(ev);
       }
       return `<button class="ev${sel ? ' sel' : ''}${open ? '' : ' off'}${ev.boss ? ' boss' : ''}" data-ev="${ev.id}">
         <span class="ic">${TYPE_ICON[ev.type]}</span>
@@ -121,6 +184,20 @@ export class CareerUI {
     $('car-go').disabled = !canGo;
     $('car-go').classList.toggle('dim', !canGo);
     this._previewSel();
+  }
+
+  // Track traits, what the event drops and a tip from Gramps about which parts suit it.
+  _eventHints(ev) {
+    const c = this.c;
+    const traits = trackTraits(ev.type === 'cup' ? ev.tracks[0] : ev.track);
+    let h = traits.length ? `<span class="traits">${traits.map((t) => `<i>${t.icon} ${t.label}</i>`).join('')}</span>` : '';
+    const p = ev.drop && partById(ev.drop);
+    if (p) {
+      const got = !!c.drops[ev.id];
+      h += `<span class="dropl${got ? ' got' : ''}">${got ? 'Earned' : ev.bp ? 'Blueprint' : ev.dropAny ? 'First clear drops' : '3 stars drop'}: ${p.icon} ${p.name}</span>`;
+    }
+    h += `<span class="gtip"><b>Gramps says:</b> ${esc(grampsTip(ev))}</span>`;
+    return h;
   }
 
   _previewSel() {
@@ -140,6 +217,7 @@ export class CareerUI {
     const c = this.c;
     if (a === 'back') this.app.toTitle();
     else if (a === 'garage') this.openGarage();
+    else if (a === 'workshop') this.openWorkshop();
     else if (a === 'gumball') this.app.gumballUI.open('career');
     else if (a === 'prev' && this.ci > 0) { this.ci--; this.sel = null; this.render(); }
     else if (a === 'next' && this.ci < CHAPTERS.length - 1) { this.ci++; this.sel = null; this.render(); }
@@ -210,6 +288,7 @@ export class CareerUI {
   openGarage() {
     const c = this.c;
     this.app.showShowroom();
+    if (this.tab === 'workshop') this.tab = 'karts';
     this.pick = { karts: c.body, racers: c.racer, paint: c.paint };
     this.renderGarage();
     this.ui.show('garage');
@@ -236,22 +315,11 @@ export class CareerUI {
       list.innerHTML = BODY_LIST.map((k) => {
         const own = c.bodies.includes(k.id);
         const tag = k.id === c.body ? 'Driving' : own ? 'Owned' : coins(k.price);
-        return `<button class="gcard${k.id === body ? ' sel' : ''}${own ? ' own' : ''}" data-pick="${k.id}"><span class="gn">${k.name}</span><span class="gt">${tag}</span>${this._upPips(c.upgrades[k.id])}</button>`;
+        return `<button class="gcard${k.id === body ? ' sel' : ''}${own ? ' own' : ''}" data-pick="${k.id}"><span class="gn">${k.name}</span><span class="gt">${tag}</span>${this._partPips(k.id)}</button>`;
       }).join('');
       if (!c.bodies.includes(body)) act = [`Buy ${coins(b.price)}`, c.coins >= b.price, 'buy-body'];
       else if (body !== c.body) act = ['Drive this kart', true, 'equip-body'];
       else act = ['Driving', false, ''];
-    } else if (this.tab === 'upgrades') {
-      const b = bodyById(c.body);
-      name = b.name; blurb = 'Upgrades belong to this kart. Every level makes a real difference.'; kind = 'Upgrades';
-      const up = upgradesFor(c);
-      list.innerHTML = Object.values(UPGRADES).map((u) => {
-        const lv = up[u.id] || 0;
-        const cost = upgradeCost(u.id, lv);
-        const pips = [...Array(MAX_UPGRADE)].map((_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
-        const btn = cost === null ? '<span class="gt max">MAX</span>' : `<span class="gt${c.coins >= cost ? '' : ' poor'}">${coins(cost)}</span>`;
-        return `<button class="urow${cost === null ? ' maxed' : ''}" data-pick="${u.id}"><span class="uic">${u.icon}</span><span class="umid"><span class="gn">${u.name}<span class="pips">${pips}</span></span><span class="ub">${u.blurb}</span></span>${btn}</button>`;
-      }).join('');
     } else if (this.tab === 'racers') {
       racer = this.pick.racers;
       const ch = charById(racer);
@@ -265,7 +333,7 @@ export class CareerUI {
       if (!c.racers.includes(racer)) {
         if (racerAvailable(c, racer)) act = [`Hire ${coins(RACER_PRICE[racer])}`, c.coins >= RACER_PRICE[racer], 'buy-racer'];
         else {
-          const chap = CHAPTERS.findIndex((x) => x.rival === racer);
+          const chap = CHAPTERS.findIndex((x) => x.rival === racer || (x.joins || []).includes(racer));
           act = [chap >= 0 ? `Beat in chapter ${chap + 1}` : charById(racer).lvl ? `Reach level ${charById(racer).lvl}` : 'Locked', false, ''];
         }
       } else if (racer !== c.racer) act = [`Drive as ${ch.name}`, true, 'equip-racer'];
@@ -287,8 +355,8 @@ export class CareerUI {
     $('gar-kind').textContent = kind;
     $('gar-name').textContent = name;
     $('gar-blurb').textContent = blurb;
-    const st = kartStats(charById(racer), body, upgradesFor(c, body));
-    const cur = kartStats(charById(c.racer), c.body, upgradesFor(c));
+    const st = kartStats(charById(racer), body, { parts: loadout(c, body).cur });
+    const cur = kartStats(charById(c.racer), c.body, { parts: loadout(c, c.body).cur });
     $('gar-stats').innerHTML = STATS.map(([k, n]) => {
       const v = st[k], w = Math.max(4, Math.min(100, (v / 8) * 100));
       const d = v - cur[k];
@@ -306,10 +374,10 @@ export class CareerUI {
     app.showroom.setChar(charById(racer), { body, paint: paintById(paint).color });
   }
 
-  _upPips(up) {
-    if (!up) return '';
-    const n = Object.values(up).reduce((a, b) => a + b, 0);
-    return n ? `<span class="gu">+${n}</span>` : '';
+  // "3/4": parts fitted over sockets, on a vehicle's garage card.
+  _partPips(body) {
+    const n = loadout(this.c, body).cur.length;
+    return n ? `<span class="gu">🔩${n}</span>` : '';
   }
 
   garageAction(a) {
@@ -325,7 +393,7 @@ export class CareerUI {
     let ok = true;
     if (op === 'buy-body') {
       const b = bodyById(this.pick.karts);
-      if ((ok = spend(b.price))) { c.bodies.push(b.id); c.body = b.id; upgradesFor(c, b.id); }
+      if ((ok = spend(b.price))) { c.bodies.push(b.id); c.body = b.id; loadout(c, b.id); }
     } else if (op === 'equip-body') c.body = this.pick.karts;
     else if (op === 'buy-racer') {
       const id = this.pick.racers;
@@ -341,20 +409,193 @@ export class CareerUI {
     this.renderGarage();
   }
 
-  buyUpgrade(key) {
+  // ---------------- Gramps's Workshop ----------------
+  openWorkshop() {
     const c = this.c;
-    const up = upgradesFor(c);
-    const cost = upgradeCost(key, up[key] || 0);
-    if (cost === null || c.coins < cost) {
-      this.app.audio.play('uiBack');
-      if (cost !== null) this.app.hud.toast('Not enough coins');
+    this.app.showShowroom();
+    this.ws = { tab: 'fit', slot: 0, sel: null, save: false };
+    const l = loadout(c, c.body);
+    this.ws.slot = Math.min(l.cur.length, socketsOf(c, c.body) - 1);
+    this.renderWorkshop();
+    this.ui.show('workshop');
+    // Looking at the Workshop clears the NEW PART badge.
+    if (c.pnew) { c.pnew = false; saveCareer(c); }
+  }
+
+  // The part ids the stat panel previews: the current ones, or what they would be after the selected action.
+  _previewFit() {
+    const c = this.c, body = c.body, ws = this.ws;
+    const cur = loadout(c, body).cur.slice();
+    const id = ws.sel;
+    if (!id || !partById(id)) return cur;
+    if (cur[ws.slot] === id) return cur.filter((_, i) => i !== ws.slot); // would be removed
+    const t = { parts: { ...c.parts }, bought: {}, loadouts: JSON.parse(JSON.stringify(c.loadouts)), sockets: { ...c.sockets }, body };
+    if (owned(t, id) < 1) t.parts[id] = 1;
+    const r = equip(t, body, ws.slot, id);
+    return r.ok ? loadout(t, body).cur : cur;
+  }
+
+  renderWorkshop() {
+    const c = this.c, ws = this.ws, body = c.body, b = bodyById(body);
+    const l = loadout(c, body), cap = socketsOf(c, body);
+    ws.slot = Math.max(0, Math.min(ws.slot, cap - 1));
+    $('ws-coins').textContent = c.coins.toLocaleString('en-US');
+    $('ws-name').textContent = b.name;
+    $('ws-kind').textContent = `${cap} socket${cap > 1 ? 's' : ''}${c.sockets[body] ? ' · modded' : ''}`;
+    document.querySelectorAll('#ws-tabs [data-tab]').forEach((t) => t.classList.toggle('on', t.dataset.tab === ws.tab));
+    // sockets
+    $('ws-sockets').innerHTML = [...Array(cap)].map((_, i) => {
+      const p = partById(l.cur[i]);
+      const sel = i === ws.slot ? ' sel' : '';
+      return p
+        ? `<button class="sock${sel}" data-slot="${i}"><span class="si">${p.icon}</span><span class="sn">${p.name}</span></button>`
+        : `<button class="sock empty${sel}" data-slot="${i}"><span class="si">+</span><span class="sn">Empty</span></button>`;
+    }).join('');
+    // stats with a preview of the change
+    const racer = charById(c.racer);
+    const now = kartStats(racer, body, { parts: l.cur });
+    const after = kartStats(racer, body, { parts: this._previewFit() });
+    $('ws-stats').innerHTML = STATS.map(([k, n]) => {
+      const v = now[k], w = after[k], d = w - v;
+      const shown = Math.abs(d) > 0.005
+        ? `${v.toFixed(1)} <u>→</u> <em class="${d > 0 ? 'up' : 'down'}">${w.toFixed(1)}</em>`
+        : v.toFixed(1);
+      const pct = Math.max(4, Math.min(100, (w / 8) * 100));
+      return `<span>${n}</span><div class="sbar"><i style="width:${pct}%"></i></div><b>${shown}</b>`;
+    }).join('');
+    // presets
+    $('ws-presets').innerHTML = PRESET_NAMES.map((n, i) => {
+        const ids = l.pre[i] || [];
+        return `<button class="pre${ws.save ? ' saving' : ''}" data-pre="${i}"><b>${n}</b><span>${ids.length ? ids.map((id) => partById(id).icon).join('') : '–'}</span></button>`;
+    }).join('')
+      + `<button class="pre savebtn${ws.save ? ' on' : ''}" data-pre="save">${ws.save ? 'Pick one' : 'Save'}</button>`;
+    // chassis mod
+    const cc = chassisCost(c, body);
+    const cb = $('ws-chassis');
+    cb.textContent = cc === null ? 'Chassis modded' : `Chassis Mod ${coins(cc)}`;
+    cb.disabled = cc === null;
+    cb.classList.toggle('dim', cc === null || c.coins < cc);
+    // the list on the right
+    const list = $('ws-list');
+    const chap = currentChapter(c);
+    if (ws.tab === 'fit') {
+      const mine = PART_LIST.filter((p) => owned(c, p.id) > 0);
+      list.innerHTML = mine.length ? mine.map((p) => this._partCard(p, { chap, shop: false })).join('') : '<p class="ws-empty">No parts yet. Win 3-star clears for drops, or check the Shop.</p>';
+    } else {
+      list.innerHTML = PART_LIST.map((p) => this._partCard(p, { chap, shop: true })).join('');
+    }
+    this._renderDetail(chap);
+    this.app.showroom.setChar(racer, { body, paint: paintById(c.paint).color });
+  }
+
+  _partCard(p, { chap, shop }) {
+    const c = this.c, ws = this.ws;
+    const n = owned(c, p.id), fit = fittedCount(c, p.id);
+    const stock = inStock(c, p.id, chap);
+    let tag;
+    if (!shop) tag = fit ? `<span class="pt on">${fit === 1 ? 'Fitted' : `Fitted ×${fit}`}${n > fit ? ` +${n - fit}` : ''}</span>` : `<span class="pt">×${n}</span>`;
+    else if (!stock) tag = `<span class="pt lock">${p.kind === 'stat' && p.tier === 3 ? 'After the Wheel' : `Chapter ${p.from + 1}`}</span>`;
+    else tag = `<span class="pt${c.coins < p.price ? ' poor' : ''}">${coins(p.price)}</span>`;
+    const mark = shop && n ? `<span class="ow">×${n}</span>` : '';
+    return `<button class="wpart${p.id === ws.sel ? ' sel' : ''}${shop && !stock ? ' off' : ''}${p.kind === 'special' ? ' sp' : ''}" data-pid="${p.id}"><span class="pi">${p.icon}</span><span class="pn">${p.name}</span>${tag}${mark}</button>`;
+  }
+
+  _renderDetail(chap) {
+    const c = this.c, ws = this.ws, p = partById(ws.sel);
+    const det = $('ws-detail'), act = $('ws-act');
+    const l = loadout(c, c.body);
+    let label = '', enabled = false, op = '';
+    if (!p) {
+      det.innerHTML = ws.tab === 'fit'
+        ? '<span class="wd-hint">Tap a socket, then pick a part to fit. Swapping is free, so tune it for every track.</span>'
+        : '<span class="wd-hint">Tap a part to see what it does. Stock grows as you win chapters.</span>';
+      act.hidden = true;
       return;
     }
-    c.coins -= cost;
-    up[key] = (up[key] || 0) + 1;
+    const n = owned(c, p.id);
+    const lines = p.kind === 'stat' ? fxLines(p).map(([t, good]) => `<em class="${good ? 'up' : 'down'}">${t}</em>`).join('') : `<em class="sp">${esc(p.blurb)}</em>`;
+    const drawback = p.drawback ? `<em class="down">Race-spec drawback: ${p.drawback.toLowerCase()}</em>` : '';
+    const suits = p.suits ? `<span class="suits">Suits: ${p.suits}</span>` : '';
+    const where = [];
+    for (const [bd, lo] of Object.entries(c.loadouts)) if (lo.cur && lo.cur.includes(p.id)) where.push(bodyById(bd).name);
+    const have = n ? `Owned ×${n}${where.length ? ` · fitted on ${where.join(', ')}` : ''}` : 'Not owned';
+    let sellBtn = '';
+    if (ws.tab === 'fit' && n > 0 && freeCopies(c, p.id) > 0) sellBtn = `<button class="btn ghost tiny" data-sell="1">Sell +${coins(sellValue(c, p.id))}</button>`;
+    det.innerHTML = `<span class="wd-head"><b>${p.icon} ${p.name}</b><small>${p.kind === 'stat' ? `Tier ${TIER_NAME[p.tier]}` : 'Special'} · ${have}</small></span><span class="wd-fx">${lines}${drawback}</span>${suits}${sellBtn}`;
+    act.hidden = false;
+    if (ws.tab === 'fit') {
+      if (n < 1) { label = 'Not owned'; }
+      else if (l.cur[ws.slot] === p.id) { label = 'Take off'; enabled = true; op = 'off'; }
+      else { label = `Fit in socket ${ws.slot + 1}`; enabled = true; op = 'fit'; }
+    } else if (!inStock(c, p.id, chap)) label = p.kind === 'stat' && p.tier === 3 ? 'After the Golden Wheel' : `Chapter ${p.from + 1}`;
+    else { label = `Buy ${coins(p.price)}`; enabled = c.coins >= p.price; op = 'buy'; }
+    act.textContent = label;
+    act.disabled = !enabled;
+    act.classList.toggle('dim', !enabled);
+    act.dataset.op = op;
+  }
+
+  workshopPreset(which) {
+    const c = this.c, ws = this.ws, body = c.body;
+    if (which === 'save') { ws.save = !ws.save; this.app.audio.play('select'); this.renderWorkshop(); return; }
+    const i = +which;
+    if (ws.save) {
+      savePreset(c, body, i);
+      ws.save = false;
+      this.app.audio.play('coin');
+      this.app.hud.toast(`Saved to ${PRESET_NAMES[i]}`);
+    } else {
+      loadPreset(c, body, i);
+      this.app.audio.play('select');
+    }
     saveCareer(c);
-    this.app.audio.play('coin');
-    this.renderGarage();
+    this.renderWorkshop();
+  }
+
+  workshopSell() {
+    const c = this.c, ws = this.ws;
+    const r = sell(c, ws.sel);
+    this.app.audio.play(r.ok ? 'coin' : 'uiBack');
+    if (!r.ok) this.app.hud.toast(r.why);
+    else if (owned(c, ws.sel) < 1) ws.sel = null;
+    saveCareer(c);
+    this.renderWorkshop();
+  }
+
+  workshopAction(a) {
+    const c = this.c, ws = this.ws;
+    if (a === 'back') { this.app.careerUI.open(); return; }
+    if (a === 'garage') { this.openGarage(); return; }
+    let ok = true, snd = 'select';
+    if (a === 'chassis') {
+      const r = buyChassis(c, c.body);
+      ok = r.ok;
+      snd = r.ok ? 'coin' : 'uiBack';
+      if (!r.ok) this.app.hud.toast(r.why);
+    } else if (a === 'act') {
+      const op = $('ws-act').dataset.op;
+      if (op === 'fit') {
+        const r = equip(c, c.body, ws.slot, ws.sel);
+        ok = r.ok;
+        if (r.moved) this.app.hud.toast(`Moved from ${bodyById(r.moved).name}`);
+        ws.slot = Math.min(socketsOf(c, c.body) - 1, loadout(c, c.body).cur.length);
+      } else if (op === 'off') unequip(c, c.body, ws.slot);
+      else if (op === 'buy') {
+        const r = buy(c, ws.sel, currentChapter(c));
+        ok = r.ok;
+        snd = r.ok ? 'coin' : 'uiBack';
+        if (!r.ok) this.app.hud.toast(r.why);
+        else {
+          // Bought parts go straight on the kart when there is room.
+          ws.tab = 'fit';
+          const at = loadout(c, c.body).cur.indexOf(ws.sel);
+          if (at >= 0) ws.slot = at;
+        }
+      } else return;
+    } else return;
+    this.app.audio.play(ok ? snd : 'uiBack');
+    saveCareer(c);
+    this.renderWorkshop();
   }
 
   // ---------------- results ----------------
@@ -364,24 +605,32 @@ export class CareerUI {
     const lines = out.lines.map(([l, v]) => `<div><span>${l}</span><b>+${v}</b></div>`).join('');
     const tip = out.pass ? '' : `<p class="car-tip">${this._tip(out)}</p>`;
     const unlock = out.unlocked ? `<p class="car-unlock"><img alt="" src="${this.app.portraits[out.unlocked] || ''}"><span><b>${charById(out.unlocked).name}</b> can now join your team. Hire them in the garage.</span></p>` : '';
+    let drop = '';
+    if (out.drop) {
+      const p = out.drop.part;
+      drop = `<p class="car-drop"><span class="di">${p.icon}</span><span><b>${out.drop.blueprint ? 'Blueprint' : 'New part'}: ${p.name}</b><small>${esc(p.blurb)} It is waiting in the Workshop.</small></span></p>`;
+    } else if (ev.drop && out.pass && !this.c.drops[ev.id]) {
+      const p = partById(ev.drop);
+      drop = `<p class="car-drop dim"><span class="di">${p.icon}</span><span><b>3 stars drops ${p.name}</b><small>Win bigger to earn it.</small></span></p>`;
+    }
+    if (out.blueprint) drop += '<p class="car-drop gold"><span class="di">📜</span><span><b>Starbolt Blueprint recovered!</b><small>Gramps now sells race-spec Tier III parts in the Workshop.</small></span></p>';
     this.ui.results({
       title,
       sub: `${out.chapter.name} · ${ev.title}`,
       html: `<div class="car-res"><div class="car-stars">${starRow(out.stars, out.prevStars)}</div>
         <div class="car-goal">${goalLabel(ev, this.c)}</div>${extraHtml}
-        <div class="car-coins">${lines}<div class="tot"><span>Total</span><b>${coins(out.coins)}</b></div></div></div>${unlock}${tip}${rowsHtml}`,
+        <div class="car-coins">${lines}<div class="tot"><span>Total</span><b>${coins(out.coins)}</b></div></div></div>${drop}${unlock}${tip}${rowsHtml}`,
       buttons: out.pass
-        ? [['garage', 'Garage', 'ghost small'], ['retry', 'Retry', 'alt small'], ['career', 'Continue', 'hot']]
+        ? [[out.drop ? 'workshop' : 'garage', out.drop ? 'Workshop' : 'Garage', 'ghost small'], ['retry', 'Retry', 'alt small'], ['career', 'Continue', 'hot']]
         : [['career', 'Career', 'ghost small'], ['garage', 'Garage', 'alt small'], ['retry', 'Retry', 'hot']],
     });
   }
 
   _tip(out) {
     const c = this.c;
-    const up = upgradesFor(c);
-    const total = Object.values(up).reduce((a, b) => a + b, 0);
-    if (out.ev.type === 'gems') return 'Gems sit in rows on the racing line and in shortcuts. The Gem Magnet item pulls in everything nearby.';
-    if (c.coins >= 300 && total < 12) return 'You have coins to spend: engine and turbo upgrades in the garage make a big difference.';
+    const fitted = loadout(c, c.body).cur.length;
+    if (out.ev.type === 'gems') return 'Gems sit in rows on the racing line and in shortcuts. The Gem Magnet item pulls in everything nearby, and a Gem Vac part pulls them in from further away.';
+    if (c.coins >= 150 && fitted < socketsOf(c, c.body)) return 'You have coins and a free socket: Gramps\'s Workshop sells parts that make a real difference.';
     if (out.ev.type === 'time') return 'Drift through long corners and let go on hot pink sparks for a nova boost, the biggest there is. Shortcuts help too.';
     return 'Hold DRIFT through corners for drift boosts, and look for the shortcut on this track.';
   }

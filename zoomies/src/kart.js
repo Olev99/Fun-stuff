@@ -56,6 +56,9 @@ export class Kart {
     this.look = opts.look || null;
     this.trailDef = trailById(this.look && this.look.trail);
     const st = (this.stats = opts.stats || kartStats(ch, this.bodyDef.id, opts.upgrades));
+    // Special parts from the Workshop (parts.js): perks change how this kart behaves. Only the
+    // kart that carries them uses them, so there is nothing to send over the network.
+    this.perks = st.perks || {};
     const cls = race.speedClass;
     this.baseTop = cls.top * (0.93 + st.speed * 0.022);
     this.accelK = 0.55 + st.accel * 0.12;
@@ -69,11 +72,18 @@ export class Kart {
       this.driftTurn *= 1.06;
     }
     const mods = race.mods || {};
-    const trackGrip = Math.min(race.trackDef.grip ?? 1, mods.grip ?? 1);
-    this.grip = 9 * trackGrip * (st.grip ?? 1);
-    this.driftGrip = 2.6 * trackGrip * (st.grip ?? 1) * (this.isBike ? 1.15 : 1);
+    let trackGrip = Math.min(race.trackDef.grip ?? 1, mods.grip ?? 1);
     // How well the tyres put power down (snow and ice tracks are below 1).
     this.traction = Math.min(race.trackDef.traction ?? 1, mods.traction ?? 1);
+    if (this.perks.iceStuds) {
+      // Studs: slippery tracks grip almost like tarmac; dry roads cost a little speed.
+      if (trackGrip < 1 || this.traction < 1) {
+        trackGrip = 1 - (1 - trackGrip) * 0.15;
+        this.traction = 1 - (1 - this.traction) * 0.3;
+      } else this.baseTop *= 0.97;
+    }
+    this.grip = 9 * trackGrip * (st.grip ?? 1);
+    this.driftGrip = 2.6 * trackGrip * (st.grip ?? 1) * (this.isBike ? 1.15 : 1);
     // Low gravity on the moon: longer, floatier jumps.
     this.gravityK = Math.min(race.trackDef.gravity ?? 1, mods.gravity ?? 1);
     this.patch = null;
@@ -232,7 +242,13 @@ export class Kart {
     if (this.starTime > 0) top *= 1.14;
     if (this.magnetTime > 0) top *= 1.08;
     if (this.rocketTime > 0) top *= 1.5;
-    if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) top *= this.stats.offroad ?? 0.5;
+    if (this.offroad && this.boostTime <= 0 && this.starTime <= 0 && this.rocketTime <= 0) {
+      let off = this.stats.offroad ?? 0.5;
+      // Scout Lamp: sand and candy shortcuts are fast ground. Mud Boots: grass and mud hardly slow you.
+      if (this.perks.scoutLamp && this.path.offroadAll) off = Math.max(off, 0.82);
+      if (this.perks.mudBoots) off = 1 - (1 - off) * 0.35;
+      top *= off * (this.stats.soft ?? 1);
+    }
     if (this.boostTime > 0) top *= 1.32;
     // Planes are the quickest way around; boats hold their speed well.
     if (this.mode === 2) top *= 1.08;
@@ -242,7 +258,7 @@ export class Kart {
   // Ran over an oil slick: slide for a moment. Returns true if it took.
   slip(t) {
     if (this.starTime > 0 || this.rocketTime > 0 || this.ghostTime > 0 || this.slipTime > 0.3) return false;
-    this.slipTime = t;
+    this.slipTime = this.perks.mudBoots ? t * 0.35 : t;
     this.slipSpin = (Math.random() < 0.5 ? -1 : 1) * (1.6 + Math.random());
     this.drifting = false;
     this.driftCharge = 0;
@@ -311,8 +327,10 @@ export class Kart {
     this.boostTime = 0;
     this.hitFlash = 1;
     if (kind === 'zap') this.shrinkTime = 4;
-    const lost = Math.min(this.gems, 3);
+    const lost = Math.min(this.gems, this.perks.gemVac ? 1 : 3);
     this.gems -= lost;
+    // Comeback Spring: last place gets a free boost when the spin ends.
+    if (this.perks.comebackSpring && this.race.karts.length > 1 && this.place >= this.race.karts.length) this.comeback = true;
     this.emit('hit', lost);
     if (this.grounded) {
       this.vy = kind === 'spin' ? 6 : 3;
@@ -410,9 +428,28 @@ export class Kart {
 
     // Longitudinal
     const patch = (this.patch = this._patchAt());
-    const trac = this.traction * (patch ? patch.traction : 1);
+    // What the patch does to this kart: Mud Boots shrug off mud, sand and oil, Ice Studs ice and snow,
+    // and race-spec tyres are worse on soft ground.
+    let pSpeed = 1, pTrac = 1, pGrip = 1;
+    if (patch) {
+      pSpeed = patch.speed; pTrac = patch.traction; pGrip = patch.grip;
+      const soft = patch === PATCHES.mud || patch === PATCHES.sand;
+      if (soft) {
+        if (this.perks.mudBoots) { pSpeed = 1 - (1 - pSpeed) * 0.25; pTrac = 1 - (1 - pTrac) * 0.3; pGrip = 1 - (1 - pGrip) * 0.3; }
+        pSpeed *= this.stats.soft ?? 1;
+      } else if (patch === PATCHES.oil && this.perks.mudBoots) {
+        pTrac = 1 - (1 - pTrac) * 0.3; pGrip = 1 - (1 - pGrip) * 0.4;
+      } else if ((patch === PATCHES.ice || patch === PATCHES.snow) && this.perks.iceStuds) {
+        pTrac = 1 - (1 - pTrac) * 0.3; pGrip = 1 - (1 - pGrip) * 0.15; pSpeed = Math.max(pSpeed, 1);
+      }
+    }
+    const trac = this.traction * pTrac;
     if (spinning) {
       this.spinTime -= dt;
+      if (this.spinTime <= 0 && this.comeback) {
+        this.comeback = false;
+        this.startBoost(1.1, 9);
+      }
       vf *= Math.exp(-2.4 * dt);
       vl *= Math.exp(-3 * dt);
     } else if (c.brake && !this.gliding) {
@@ -420,8 +457,8 @@ export class Kart {
       else vf = Math.max(vf - 14 * dt * trac, -9);
     } else if (c.throttle > 0) {
       // Gliding is quick, and diving (BRAKE in the air) quicker still.
-      const glideK = this.gliding ? (c.brake ? 1.18 : 1.06) : 1;
-      const tgt = top * c.throttle * (patch ? patch.speed : 1) * glideK;
+      const glideK = this.gliding ? (c.brake ? 1.18 : this.perks.wingKit ? 1.1 : 1.06) : 1;
+      const tgt = top * c.throttle * pSpeed * glideK;
       if (vf < tgt) {
         vf += (tgt - vf) * (1 - Math.exp(-this.accelK * trac * dt)) + 2.5 * trac * dt;
         if (vf > tgt) vf = tgt;
@@ -445,7 +482,7 @@ export class Kart {
     if (this.drifting) {
       const rel = clamp(this.steerS * this.driftDir, -1, 1);
       yawRate = -this.driftDir * this.driftTurn * (0.56 + 0.44 * rel) * sf;
-      if (this.grounded) this.driftCharge += dt * (0.7 + 0.8 * Math.max(0, rel));
+      if (this.grounded) this.driftCharge += dt * (0.7 + 0.8 * Math.max(0, rel)) * (this.perks.driftSpring ? 1.35 : 1);
       let lvl = 0;
       for (let k = 3; k >= 1; k--) if (this.driftCharge >= DRIFT_THRESH[k]) { lvl = k; break; }
       if (lvl > this.driftLevel) {
@@ -469,7 +506,7 @@ export class Kart {
     rxk = -fz; rzk = fx;
     vf = vx * fx + vz * fz;
     vl = vx * rxk + vz * rzk;
-    const gm = this.path.gripMul * (patch ? patch.grip : 1) * (this.slipTime > 0 ? 0.12 : 1);
+    const gm = this.path.gripMul * pGrip * (this.slipTime > 0 ? 0.12 : 1);
     // Boats slide through turns, planes float round them.
     const zg = this.mode === 1 ? (this.drifting ? 0.85 : 0.5) : this.mode === 2 ? (this.drifting ? 0.9 : 0.6) : 1;
     const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm * zg;
@@ -585,8 +622,9 @@ export class Kart {
       if (this.gliding) {
         // Hold BRAKE to fold the wings and dive, to land where you want.
         this.diving = !!c.brake;
-        this.vy -= GRAVITY * this.gravityK * (this.diving ? 1.15 : 0.28) * dt;
-        if (!this.diving && this.vy < -5) this.vy = -5;
+        const wing = this.perks.wingKit;
+        this.vy -= GRAVITY * this.gravityK * (this.diving ? 1.15 : wing ? 0.19 : 0.28) * dt;
+        if (!this.diving && this.vy < (wing ? -3.4 : -5)) this.vy = wing ? -3.4 : -5;
       } else this.vy -= GRAVITY * this.gravityK * dt;
       this.pos.y += this.vy * dt;
       this.airTime += dt;
@@ -693,7 +731,7 @@ export class Kart {
     this.grounded = true;
     // Touching down from a glide gives a kick, so gliding never costs places.
     if (this.gliding && this.airTime > 0.6) {
-      this.startBoost(0.7, 4);
+      this.startBoost(this.perks.wingKit ? 1.4 : 0.7, this.perks.wingKit ? 8 : 4);
       this.emit('glideLand');
     }
     this.gliding = false;

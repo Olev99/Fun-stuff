@@ -9,7 +9,7 @@ const BALLS = ['#ff5a8a', '#ffd23f', '#36a9ff', '#19e3b1', '#c77dff', '#ff8a3a',
 
 // The gumball machine: spend coins (or free capsules from levelling up) on
 // random hats, boost trails and horns, then pick what to wear. A rare
-// jackpot gives a real prize instead: a racer, a ride, paint, an upgrade
+// jackpot gives a real prize instead: a racer, a ride, paint, a part
 // or a pile of coins.
 export class GumballUI {
   constructor(app) {
@@ -126,7 +126,7 @@ export class GumballUI {
     const L = this.last;
     if (!L) {
       el.className = 'greveal idle';
-      el.innerHTML = `<b>Win hats, boost trails and horns!</b><small>Rare jackpots hold real prizes: racers, karts, bikes, paint, upgrades and coins. Every 5th level and the daily reward give a free turn.</small>`;
+      el.innerHTML = `<b>Win hats, boost trails and horns!</b><small>Rare jackpots hold real prizes: racers, karts, bikes, paint, parts and coins. Every 5th level and the daily reward give a free turn.</small>`;
       return;
     }
     const it = L.item, r = RARITY[it.rarity];

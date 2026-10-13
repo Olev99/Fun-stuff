@@ -12,6 +12,7 @@ export class HUD {
     this.itemSlot = $('hud-item');
     this.itemIcon = $('hud-item-icon');
     this.itemCount = $('hud-item-count');
+    this.item2El = $('hud-item2');
     this.btnItem = $('btn-item');
     this.btnItemIc = $('btn-item-ic');
     this.gems = $('hud-gems').querySelector('b');
@@ -65,9 +66,10 @@ export class HUD {
     this.pos.style.visibility = tt ? 'hidden' : 'visible';
     $('hud-gems').style.visibility = tt || race.battle ? 'hidden' : 'visible';
     this.lap.classList.toggle('balloons', !!race.battle);
+    this.lap.classList.remove('down');
     this.timeEl.classList.remove('low');
     this.showTrackName(race);
-    if (race.battle) this.hint('Pop everyone else\'s balloons! Ram a rival with a 🌶️ Chili Boost to steal one.', 6);
+    if (race.battle) this.hint('Pop everyone else\'s balloons! Ram a rival with a 🌶️ Chili Boost to steal one. Lose them all and you get one comeback.', 6);
     else if (race.mode !== 'demo') this.hint(this.controlsHint(), 5.5);
     if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
   }
@@ -239,9 +241,12 @@ export class HUD {
     const laps = race.laps;
     const legs = race.track.legs;
     if (race.battle) {
-      // Balloons left instead of laps, and the battle clock counting down.
-      this._set('lap', `b${p.out ? -1 : p.balloons}`, () => {
-        this.lap.innerHTML = p.out ? 'OUT' : '<i>🎈</i>'.repeat(p.balloons);
+      // Balloons left instead of laps (or the comeback countdown while
+      // down), and the battle clock counting down.
+      const back = p.down ? Math.max(1, Math.ceil(p.downT)) : 0;
+      this._set('lap', `b${p.down ? `d${back}` : p.out ? -1 : p.balloons}`, () => {
+        this.lap.innerHTML = p.down ? `BACK IN <b>${back}</b>` : p.out ? 'OUT' : '<i>🎈</i>'.repeat(p.balloons);
+        this.lap.classList.toggle('down', !!p.down);
       });
       const tl = Math.ceil(race.battle.timeLeft);
       this._set('time', `b${tl}`, () => {
@@ -273,7 +278,7 @@ export class HUD {
     }
 
     // Item slot
-    if (p.rolling > 0) {
+    if (p.rolling > 0 && !p.rollingExtra) {
       this.rollTimer -= dt;
       if (this.rollTimer <= 0) {
         this.rollTimer = 0.07;
@@ -286,7 +291,7 @@ export class HUD {
         this.itemCount.hidden = true;
       });
     } else {
-      const key = p.item ? `${p.item}:${p.itemCount}` : '';
+      const key = p.item ? `${p.item}:${p.itemCount}:${p.item2 || ''}` : '';
       this._set('slot', key, () => {
         const ic = p.item ? ITEMS[p.item].icon : '';
         this.itemIcon.textContent = ic;
@@ -298,6 +303,9 @@ export class HUD {
         if (tb) tb.classList.toggle('show', !!AIM_DEFAULT[p.item]);
         this.itemCount.hidden = !(p.itemCount > 1);
         this.itemCount.textContent = `×${p.itemCount}`;
+        // Item Pouch: the spare item waits behind the first.
+        this.item2El.hidden = !(p.item && p.item2);
+        this.item2El.textContent = p.item2 ? ITEMS[p.item2].icon : '';
       });
     }
 

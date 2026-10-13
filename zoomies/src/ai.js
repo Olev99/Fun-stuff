@@ -8,6 +8,13 @@ export const DIFFICULTY = {
   hard: { id: 'hard', name: 'Hard', speed: 1.0, skill: [0.95, 1.0], rubberUp: 0.14, rubberDown: 0.035, drift: 0.95, dodge: 0.9, shortcut: 0.8, items: 1, rocketStart: 0.6 },
 };
 
+// Whether an all-offroad cut is quicker than the road even without a boost
+// (the track's `aiNoBoost`: 'fwd', 'rev' or 'both').
+function paysOff(sc, reverse) {
+  const w = sc.def.aiNoBoost;
+  return w === 'both' || w === (reverse ? 'rev' : 'fwd');
+}
+
 // Computer driver: follows the racing line with its own lane preference,
 // drifts through long corners, dodges hazards, takes shortcuts and uses items.
 export class AIDriver {
@@ -82,18 +89,27 @@ export class AIDriver {
       // Shortcut planning
       if (!this.pilot) for (const sc of main.shortcuts) {
         const dist = this._ahead(k.trk.s, sc.fromS);
-        if (dist > 150 || dist < -60) { this.plan[sc.id] = undefined; continue; }
+        if (dist > 150 || dist < -60) {
+          this.plan[sc.id] = undefined;
+          if (this.boostAt === sc.id) this.boostAt = -1;
+          continue;
+        }
         if (this.plan[sc.id] === undefined) {
           if (dist <= 0) continue;
           const boost = ['chili', 'rainbow', 'rocket'].includes(k.item);
-          let p = this.diff.shortcut * (sc.offroadAll ? (boost ? 1 : 0.1) : 1) * (sc.voids.length ? 0.85 : 1);
+          // An all-offroad cut is a boost cut, unless the track marks it as
+          // quicker even without one in this direction.
+          const worth = boost || paysOff(sc, main.reverse);
+          let p = this.diff.shortcut * (sc.offroadAll ? (worth ? 1 : 0.1) : 1) * (sc.voids.length ? 0.85 : 1);
           if (k.shrinkTime > 0) p *= 0.3;
           this.plan[sc.id] = Math.random() < p;
-          this.boostAt = sc.offroadAll && boost ? sc.id : -1;
+          // Only hang on to the boost for a cut we are actually taking.
+          this.boostAt = this.plan[sc.id] && sc.offroadAll && boost ? sc.id : -1;
         }
         // Missed the turn-in: give up instead of grinding along the wall.
         if (this.plan[sc.id] && dist < -4 && !(main.gapOwners[sc.side > 0 ? 1 : 0][k.trk.idx] || []).includes(sc.id)) {
           this.plan[sc.id] = false;
+          if (this.boostAt === sc.id) this.boostAt = -1;
           continue;
         }
         // Commit early and keep aiming into the branch until we are on it.
@@ -193,6 +209,19 @@ export class AIDriver {
     return !ahead && behind && this.diff.items > 0.5 ? -1 : 1;
   }
 
+  // Normal and Hard racers keep a Chili or Rainbow for an offroad cut just
+  // ahead, so they can blast through it (unless they already passed it up).
+  _saveBoost() {
+    const k = this.k, main = this.race.track;
+    if (!this.diff.shortcut || k.path !== main) return false;
+    for (const sc of main.shortcuts) {
+      if (!sc.offroadAll || this.plan[sc.id] === false) continue;
+      const dist = this._ahead(k.trk.s, sc.fromS);
+      if (dist > 0 && dist < 420) return true;
+    }
+    return false;
+  }
+
   _shouldUse(item) {
     const k = this.k;
     const race = this.race;
@@ -218,8 +247,10 @@ export class AIDriver {
       case 'ghost':
         return incoming() || Math.random() < 0.012;
       case 'chili':
-        if (this.boostAt >= 0) return false;
+        if (this.boostAt >= 0 || this._saveBoost()) return false;
         return Math.abs(k.path.curvWide[k.trk.idx ?? 0]) < 0.015 || Math.random() < 0.02;
+      case 'rainbow':
+        return !this._saveBoost();
       case 'honey': {
         const behind = race.karts.some((o) => o !== k && k.total - o.total > 3 && k.total - o.total < 20);
         return behind || Math.random() < 0.01;

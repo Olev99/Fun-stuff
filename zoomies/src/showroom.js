@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CHARACTERS } from './characters.js';
+import { CHARACTERS, STORY_CHARS } from './characters.js';
 import { kartGeometry, wheelGeometry, WHEELS, bodyById } from './karts.js';
 import { GeoBuilder, pbrMat } from './util.js';
 import { studioEnvironment } from './env.js';
@@ -154,7 +154,7 @@ export class Showroom {
     this.turn.position.y = 0;
     this.turn.rotation.y = 0.5;
     this.podium.visible = false;
-    for (const ch of CHARACTERS) {
+    for (const ch of [...CHARACTERS, ...STORY_CHARS]) {
       this.setChar(ch, { hat: null });
       this.bounce = 0;
       this.driver.position.y = 0;

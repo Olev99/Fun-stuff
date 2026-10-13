@@ -2,13 +2,16 @@ import * as THREE from 'three';
 import { clamp, wrapAngle, stdMat } from './util.js';
 import { AIM_DEFAULT } from './items.js';
 
-// Balloon Battle: everyone starts with three balloons. Any hit pops one,
+// Balloon Battle: everyone starts with four balloons. Any hit pops one,
 // ramming someone while boosting steals one, and losing the last balloon
-// knocks you out. The last racer left wins, or whoever holds the most
-// balloons when the clock runs out.
+// takes you down: once per battle you come back after a few seconds with one
+// balloon, the second time you're out. The last racer left wins, or whoever
+// holds the most balloons when the clock runs out.
 export const BATTLE_TIME = 150;
-export const START_BALLOONS = 3;
-export const MAX_BALLOONS = 5;
+export const START_BALLOONS = 4;
+export const MAX_BALLOONS = 6;
+export const COMEBACK_WAIT = 5; // seconds spent down before the comeback
+const COMEBACK_SAFE = 3; // safe seconds after coming back
 export const BATTLE_FIELD = 6;
 const COLORS = ['#ff5a5f', '#ffd23f', '#36a9ff', '#19e3b1', '#c77dff'];
 
@@ -47,6 +50,9 @@ export class Battle {
     this.outOrder = [];
     this.done = false;
     this.endAt = -1;
+    // Ram steals: each pop is granted once, under an id nobody else uses.
+    this.ramSeq = 0;
+    this.granted = new Set();
     this._tmp = new THREE.Vector3();
     geos();
   }
@@ -61,7 +67,11 @@ export class Battle {
   setup() {
     for (const k of this.race.karts) {
       k.balloons = START_BALLOONS;
+      // out: not in play (down or knocked out); down: waiting to come back.
       k.out = false;
+      k.down = false;
+      k.downT = 0;
+      k.comeback = false; // used the one comeback
       k.hitsLanded = 0;
       k.balloonGroup = new THREE.Group();
       k.balloonMeshes = [];
@@ -86,9 +96,10 @@ export class Battle {
   // Balloons on strings behind the driver's seat, fanned out.
   _layout(k) {
     const n = k.balloons;
+    const gap = n > 4 ? 0.5 : 0.62;
     k.balloonMeshes.forEach((g, i) => {
       g.visible = i < n;
-      const x = (i - (n - 1) / 2) * 0.62;
+      const x = (i - (n - 1) / 2) * gap;
       g.userData.x = x;
       g.userData.y = 1.9 + Math.abs(x) * -0.1 + (i % 2) * 0.16;
     });
@@ -153,8 +164,10 @@ export class Battle {
     const near = k.isPlayer || (race.player && k.pos.distanceToSquared(race.player.pos) < 900);
     if (near) race.app.audio.play('pop');
     this._layout(k);
-    if (k.balloons <= 0) this._knockOut(k);
-    else if (k.isPlayer) race.app.hud.toast(k.balloons === 1 ? 'LAST BALLOON!' : 'POP!');
+    if (k.balloons <= 0) {
+      if (k.comeback) this._knockOut(k);
+      else this._goDown(k);
+    } else if (k.isPlayer) race.app.hud.toast(k.balloons === 1 ? 'LAST BALLOON!' : 'POP!');
   }
 
   // Ramming with a Chili Boost (or a Rainbow Rush) steals a balloon.
@@ -170,26 +183,55 @@ export class Battle {
     const fx = Math.sin(att.yaw), fz = Math.cos(att.yaw);
     const dx = vic.pos.x - att.pos.x, dz = vic.pos.z - att.pos.z;
     if ((dx * fx + dz * fz) / (Math.hypot(dx, dz) || 1) < 0.35) return false;
-    // Online, each device pops its own karts' balloons: the host tells a
-    // friend's phone about the hit, and a friend's phone sees the ram itself.
+    // Online, only the victim's own device pops its balloon, and the steal is
+    // decided right there, once: a ram on a friend's kart goes to their phone
+    // as a claim, and the rammer gets a balloon only when one really popped.
     if (vic.remote) {
       if (att.remote) return true;
       const now = this.race.time;
       if (vic.invuln > 0 || vic.spinTime > 0 || vic.shield > 0 || now < (vic.ramCool || 0)) return true;
       vic.ramCool = now + 3;
-      const net = this.race.net;
-      if (net && net.isHost) net.sendHit(vic, 'spin');
-    } else if (!vic.hit('spin')) return true;
-    if (att.remote) return true;
-    att.hitsLanded++;
-    if (att.balloons < MAX_BALLOONS) {
-      att.balloons++;
-      this._layout(att);
-      const hud = this.race.app.hud;
-      if (att.isPlayer) { hud.toast('STOLEN! +1 🎈'); this.race.style('BALLOON STEAL', 30, 'gold'); this.race.app.audio.play('gem'); }
-      else if (vic.isPlayer) hud.toast(`${att.nick || att.ch.name} stole a balloon!`);
+      if (this.race.net) this.race.net.sendRam(att, vic);
+      return true;
     }
+    this.rammed(vic, att);
     return true;
+  }
+
+  // vic (simulated on this device) was rammed by att: pop one of vic's
+  // balloons and, only if that worked, hand att the steal.
+  rammed(vic, att) {
+    if (this.done || vic === att || vic.remote || !vic.hit('spin')) return false;
+    if (vic.isPlayer) this.race.app.hud.toast(`${att.nick || att.ch.name} stole a balloon!`);
+    const net = this.race.net;
+    // The host grants directly; a friend's phone reports the pop to the host.
+    if (!net || net.isHost) this.grant(att, `h${++this.ramSeq}`);
+    else net.sendStolen(att, ++this.ramSeq);
+    return true;
+  }
+
+  // Another device says att rammed vic (simulated here): check it is
+  // plausible here before popping anything.
+  claimRam(vic, att) {
+    if (!vic || !att || vic.out || att.out || this.race.state !== 'race') return false;
+    if (vic.pos.distanceToSquared(att.pos) > 14 * 14) return false;
+    return this.rammed(vic, att);
+  }
+
+  // Apply a steal exactly once per id. On the host, a steal for a friend's
+  // kart is passed on to their phone, which applies it to its own balloons.
+  grant(att, id) {
+    if (!att || this.granted.has(id)) return;
+    this.granted.add(id);
+    att.hitsLanded++;
+    if (att.remote) {
+      if (this.race.net && this.race.net.isHost) this.race.net.sendSteal(att, id);
+      return;
+    }
+    if (att.out || att.balloons >= MAX_BALLOONS) return;
+    att.balloons++;
+    this._layout(att);
+    if (att.isPlayer) { this.race.app.hud.toast('STOLEN! +1 🎈'); this.race.style('BALLOON STEAL', 30, 'gold'); this.race.app.audio.play('gem'); }
   }
 
   // Credit for a hit landed with an item.
@@ -197,13 +239,85 @@ export class Battle {
     if (owner && owner !== victim && !owner.out) owner.hitsLanded++;
   }
 
+  // Still in the battle: has balloons, or is waiting to come back.
+  _alive(k) {
+    return !k.out || k.down;
+  }
+
+  // Lost the last balloon with the comeback still unused: sit out a few
+  // seconds (still counted as in the battle), then come back.
+  _goDown(k) {
+    const race = this.race;
+    k.out = true;
+    k.down = true;
+    k.downT = COMEBACK_WAIT;
+    if (k.ai) k.downAi = k.ai;
+    race.fx.burst(k.pos.x, k.pos.y + 1.5, k.pos.z, ['#ffffff', '#cfd8e6', '#1d1537'], 30, 9, 1, 0.9, 3, false);
+    if (k.isPlayer) {
+      race.app.hud.banner(`POPPED!<small>Back in ${COMEBACK_WAIT} seconds</small>`, 'final');
+      race.app.audio.play('lose');
+      race.flash = 0.5;
+    } else if (race.player && !race.player.out) {
+      race.app.hud.toast(`${k.nick || k.ch.name} is down! Back soon…`);
+    }
+    this._park(k);
+  }
+
+  // The comeback: one balloon and a few safe seconds, somewhere quiet. The
+  // kart's own device places it; elsewhere its position arrives by network.
+  _comeBack(k) {
+    const race = this.race;
+    k.down = false;
+    k.out = false;
+    k.comeback = true;
+    k.balloons = 1;
+    if (!k.remote) {
+      const spot = this._safeSpot(k);
+      k.placeAt(spot.s, 0);
+      if (spot.flip) k.yaw += Math.PI;
+      k.vy = 0;
+      k.spinTime = 0;
+      k.boostTime = 0;
+      k.ramT = 0;
+      k.respawnT = 0;
+      k.invuln = COMEBACK_SAFE;
+      if (!k.ai && (k.downAi || !k.isPlayer)) k.ai = k.downAi || new BattleAI(k, race, 0.9, race.diff);
+    }
+    k.downAi = null;
+    this._layout(k);
+    if (!k.remote) race.fx.burst(k.pos.x, k.pos.y + 1.5, k.pos.z, COLORS, 26, 8, 0.6, 0.8, 4);
+    if (k.isPlayer) {
+      race.app.hud.banner('COMEBACK!<small>One balloon. Make it count!</small>', 'lap');
+      race.app.audio.play('boost');
+    } else if (race.player && !race.player.out) {
+      race.app.hud.toast(`${k.nick || k.ch.name} is back!`);
+    }
+  }
+
+  // The spot round the ring furthest from everyone still racing.
+  _safeSpot(k) {
+    const tr = this.race.track;
+    let best = 0, bestD = -1;
+    for (let i = 0; i < 24; i++) {
+      const s = ((i + 0.5) / 24) * tr.length;
+      tr.pointAt(s, 0, this._tmp);
+      let near = Infinity;
+      for (const o of this.race.karts) if (o !== k && !o.out) near = Math.min(near, o.pos.distanceToSquared(this._tmp));
+      for (const h of this.race.items.hazards) near = Math.min(near, h.pos.distanceToSquared(this._tmp) * 4);
+      if (near > bestD) { bestD = near; best = s; }
+    }
+    return { s: best, flip: Math.random() < 0.5 };
+  }
+
   _knockOut(k) {
     const race = this.race;
     k.out = true;
+    k.down = false;
+    k.downAi = null;
     k.outAt = this._clock();
     this.outOrder.push(k);
     race.fx.burst(k.pos.x, k.pos.y + 1.5, k.pos.z, ['#ffffff', '#cfd8e6', '#1d1537'], 30, 9, 1, 0.9, 3, false);
-    const alive = race.karts.filter((o) => !o.out).length;
+    const alive = race.karts.filter((o) => this._alive(o)).length;
     if (k.isPlayer) {
       race.app.hud.banner('OUT!<small>No balloons left</small>', 'final');
       race.app.audio.play('lose');
@@ -224,9 +338,11 @@ export class Battle {
     return this.race.net ? this.race.netClock : this.race.raceTime;
   }
 
-  // Online: balloons and knock-outs of karts simulated on another device.
-  applyNet(k, n, out, ram) {
+  // Online: balloons, comebacks and knock-outs of karts simulated on another
+  // device (that device decides them; here we follow).
+  applyNet(k, n, out, ram, down) {
     k.ramT = ram ? 0.2 : 0;
+    if (!out && k.out && k.down) this._comeBack(k);
     if (n >= 0 && n !== k.balloons && !k.out) {
       if (n < k.balloons && k.balloonMeshes) {
         const g = k.balloonMeshes[n];
@@ -239,7 +355,8 @@ export class Battle {
       k.balloons = n;
       this._layout(k);
     }
-    if (out && !k.out) this._knockOut(k);
+    if (out && down && !k.out) this._goDown(k);
+    else if (out && !down && (!k.out || k.down)) this._knockOut(k);
   }
 
   // Knocked-out karts leave the arena.
@@ -268,19 +385,22 @@ export class Battle {
     }
     for (const k of race.karts) {
       if (k.ramT > 0) k.ramT -= dt;
-      if (k.out && k.pos.y > -300) this._park(k);
+      // Each device runs the comeback clock for its own karts.
+      if (k.down && !k.remote && (k.downT -= dt) <= 0) this._comeBack(k);
+      else if (k.out && k.pos.y > -300) this._park(k);
     }
     // Online, the host calls the end and sends everyone the results.
     if (race.net && race.net.isGuest) return;
     if (this.timeLeft <= 0 || (this.endAt >= 0 && race.raceTime >= this.endAt)) this._end();
   }
 
-  // Standings: survivors by balloons then hits landed; knocked-out karts by
-  // how long they lasted.
+  // Standings: survivors (including anyone waiting to come back) by balloons
+  // then hits landed; knocked-out karts by how long they lasted.
   standings() {
     return [...this.race.karts].sort((a, b) => {
-      if (a.out !== b.out) return a.out ? 1 : -1;
-      if (a.out) return b.outAt - a.outAt;
+      const ia = this._alive(a), ib = this._alive(b);
+      if (ia !== ib) return ia ? -1 : 1;
+      if (!ia) return b.outAt - a.outAt;
       return b.balloons - a.balloons || b.hitsLanded - a.hitsLanded || a.index - b.index;
     });
   }
@@ -296,17 +416,17 @@ export class Battle {
     const won = p && p.place === 1;
     const timeUp = this.timeLeft <= 0;
     race.setState('finished');
-    if (p && !p.out) {
+    if (p && this._alive(p)) {
       race.app.hud.banner(won ? `YOU WIN!<small>${timeUp ? 'Most balloons when time ran out' : 'Last one standing'}</small>` : `TIME!<small>${p.place}${['st', 'nd', 'rd'][p.place - 1] || 'th'} place</small>`, 'finish');
       race.app.audio.play(won ? 'finish' : 'lose');
-      if (won) race.fx.burst(p.pos.x, p.pos.y + 2, p.pos.z, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], 60, 14, 0.6, 1.4, 12);
-      p.ai = new BattleAI(p, race, 0.9);
+      if (won && !p.out) race.fx.burst(p.pos.x, p.pos.y + 2, p.pos.z, ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], 60, 14, 0.6, 1.4, 12);
+      if (!p.out) p.ai = new BattleAI(p, race, 0.9);
     }
     race.app.input.resetButtons();
     race.app.applyControls();
     this.rows = order.map((k) => ({
       ch: k.ch, nick: k.nick, isPlayer: k.isPlayer, slot: k.index, place: k.place, time: 0, finished: true,
-      balloons: k.out ? 0 : k.balloons, hits: k.hitsLanded, out: k.out, lapTimes: [],
+      balloons: k.out ? 0 : k.balloons, hits: k.hitsLanded, out: !this._alive(k), lapTimes: [],
     }));
     setTimeout(() => {
       if (race.app.race === race && !race.results) {

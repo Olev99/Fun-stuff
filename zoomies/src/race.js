@@ -26,13 +26,14 @@ const STATE_HZ = 30;
 
 // Compact kart state for the network. Flags: 1 grounded, 2 drifting,
 // 4 boosting, 8 offroad, 16 gliding, 32 finished, 64 trick, 128 respawning,
-// 256 ghost, 512 out of a battle, 1024 ramming (battle), 2048 can't be hit.
+// 256 ghost, 512 out of a battle, 1024 ramming (battle), 2048 can't be hit,
+// 4096 down in a battle and waiting to come back (sent with 512).
 // a[22]: balloons.
 function kartState(k) {
   const r = (v) => Math.round(v * 100) / 100;
   const flags = (k.grounded ? 1 : 0) | (k.drifting ? 2 : 0) | (k.boostTime > 0 ? 4 : 0) | (k.offroad ? 8 : 0) |
     (k.gliding ? 16 : 0) | (k.finished ? 32 : 0) | (k.trickAnim > 0 ? 64 : 0) | (k.respawnT > 0 ? 128 : 0) | (k.ghostTime > 0 ? 256 : 0) |
-    (k.out ? 512 : 0) | (k.ramT > 0 ? 1024 : 0) | (k.invuln > 0 ? 2048 : 0);
+    (k.out ? 512 : 0) | (k.ramT > 0 ? 1024 : 0) | (k.invuln > 0 ? 2048 : 0) | (k.down ? 4096 : 0);
   return [r(k.pos.x), r(k.pos.y), r(k.pos.z), r(k.yaw), r(k.vel.x), r(k.vel.z), r(k.vy), flags, k.driftDir, k.driftLevel,
     r(k.steerS), k.laps, r(k.total), k.place, k.gems, r(k.spinTime), r(k.starTime), r(k.shrinkTime), r(k.shield), r(k.rocketTime),
     k.path && k.path.id !== undefined ? k.path.id : -1, r(k.finishTime || 0), k.balloons ?? -1];
@@ -42,7 +43,7 @@ function kartState(k) {
 // it has every field as a finite number, and each field is kept to a sane
 // range so a bad packet can't put NaN or a wild value into the physics.
 const STATE_RANGE = [
-  [-1e5, 1e5], [-1e5, 1e5], [-1e5, 1e5], [-1e6, 1e6], [-500, 500], [-500, 500], [-500, 500], [0, 4095], [-1, 1], [0, 5],
+  [-1e5, 1e5], [-1e5, 1e5], [-1e5, 1e5], [-1e6, 1e6], [-500, 500], [-500, 500], [-500, 500], [0, 8191], [-1, 1], [0, 5],
   [-2, 2], [-1, 999], [-1e7, 1e7], [0, 99], [0, 99], [0, 60], [0, 60], [0, 60], [0, 60], [0, 60],
   [-1, 999], [0, 1e5], [-1, MAX_BALLOONS],
 ];
@@ -69,8 +70,10 @@ class RaceNet {
   }
   claimBox(i) {
     const k = this.race.player;
-    const want = !(k.item || k.rolling > 0);
+    const pouch = !!(k.perks && k.perks.itemPouch && k.item && !k.item2) && !(k.rolling > 0); // Item Pouch: a spare slot
+    const want = pouch || !(k.item || k.rolling > 0);
     if (want) {
+      k.rollingExtra = pouch;
       k.rolling = 1.25;
       k.pendingItem = null;
       k.awaitGrant = 1.8;
@@ -87,6 +90,22 @@ class RaceNet {
   sendHit(k, kind) {
     const id = this.race.slotPeer.get(k.index);
     if (id) this.s.sendTo(id, { t: 'hit', kind });
+  }
+  // Balloon Battle rams (see Battle.ram). A claim that att rammed vic goes to
+  // the phone that simulates vic (through the host); only that phone pops
+  // the balloon.
+  sendRam(att, vic) {
+    if (!this.isHost) { this.s.send({ t: 'ram', v: vic.index }); return; }
+    const id = this.race.slotPeer.get(vic.index);
+    if (id) this.s.sendTo(id, { t: 'ram', by: att.index });
+  }
+  // A friend's phone tells the host a ram by att popped its kart (n: its own
+  // count of ram pops, which makes the steal's id).
+  sendStolen(att, n) { this.s.send({ t: 'stole', by: att.index, n }); }
+  // The host hands a friend's kart its stolen balloon, once per id.
+  sendSteal(att, id) {
+    const peer = this.race.slotPeer.get(att.index);
+    if (peer) this.s.sendTo(peer, { t: 'steal', id });
   }
 }
 
@@ -405,8 +424,9 @@ export class Race {
         continue;
       }
       const pt = this.rocket.pressT;
+      const pill = !!(k.perks && k.perks.rocketPill); // Rocket Pill: a stronger rocket start and a free little boost
       if (pt >= 1.85 && pt <= 2.8) {
-        k.startBoost(1.2, 14);
+        k.startBoost(pill ? 2 : 1.2, pill ? 22 : 14);
         this.style('PERFECT START', 50, 'gold');
         this.app.audio.play('boost');
       } else if (pt >= 0 && pt < 1.85) {
@@ -414,6 +434,9 @@ export class Race {
         k.spinDur = 0.7;
         this.app.hud.toast('Too early... engine stalled!');
         this.app.audio.play('burnout');
+      } else if (pill) {
+        k.startBoost(0.6, 7);
+        this.app.hud.toast('Rocket Pill!');
       }
     }
   }
@@ -755,7 +778,7 @@ export class Race {
         const d = Math.sqrt(d2) || 0.01;
         const nx = dx / d, nz = dz / d;
         const ov = R - d;
-        const heavy = (k) => (k.starTime > 0 || k.rocketTime > 0 ? 4 : 1);
+        const heavy = (k) => (k.starTime > 0 || k.rocketTime > 0 ? 4 : 1) * (k.perks && k.perks.bumperPlate ? 1.5 : 1); // Bumper Plate
         const ma = a.weight * heavy(a) * a.root.scale.x;
         const mb = b.weight * heavy(b) * b.root.scale.x;
         let wa = mb / (ma + mb), wb = ma / (ma + mb);
@@ -966,22 +989,24 @@ export class Race {
     for (const k of this.karts) {
       if (k.remote) continue;
       let tucked = false;
+      // Slip Sail (special part): the slipstream starts sooner, reaches further and boosts harder.
+      const sail = !!(k.perks && k.perks.slipSail);
       if (k.fwdSpeed > 16 && k.grounded && k.boostTime <= 0 && k.spinTime <= 0) {
         const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw);
         for (const o of this.karts) {
           if (o === k || o.fwdSpeed < 10) continue;
           const dx = o.pos.x - k.pos.x, dz = o.pos.z - k.pos.z;
           const ahead = dx * fx + dz * fz;
-          if (ahead < 3 || ahead > 15) continue;
-          if (Math.abs(dx * fz - dz * fx) > 2.3 || Math.abs(o.pos.y - k.pos.y) > 2) continue;
+          if (ahead < 3 || ahead > (sail ? 21 : 15)) continue;
+          if (Math.abs(dx * fz - dz * fx) > (sail ? 2.8 : 2.3) || Math.abs(o.pos.y - k.pos.y) > 2) continue;
           tucked = true;
           break;
         }
       }
       if (tucked) {
         k.draftT = (k.draftT || 0) + dt;
-        if (k.draftT > 1.2) {
-          k.startBoost(0.8, 4);
+        if (k.draftT > (sail ? 0.7 : 1.2)) {
+          k.startBoost(sail ? 1.3 : 0.8, sail ? 6 : 4);
           k.draftT = -1.5;
           if (k.isPlayer) {
             this.app.audio.play('miniturbo');
@@ -1067,7 +1092,7 @@ export class Race {
     if (want && k.path !== want) { k.path = want; k.seg = -1; }
     if (f & 32 && !k.finished) { k.finished = true; k.finishTime = a[21]; }
     k.invuln = f & 2048 ? 0.2 : 0;
-    if (this.battle) this.battle.applyNet(k, a[22], !!(f & 512), !!(f & 1024));
+    if (this.battle) this.battle.applyNet(k, a[22], !!(f & 512), !!(f & 1024), !!(f & 4096));
   }
 
   _updateRemote(k, dt) {
@@ -1140,6 +1165,25 @@ export class Race {
             else if (p && k) p.hitSet.add(k);
           }
           break;
+        case 'ram': {
+          // A friend's kart k rammed kart v: decide it here if v is ours,
+          // otherwise pass the claim on to v's phone.
+          const v = Number.isInteger(msg.v) ? this.karts[msg.v] : null;
+          if (!this.battle || !k || !v || v === k) break;
+          if (v.remote) this.net.sendRam(k, v);
+          else this.battle.claimRam(v, k);
+          break;
+        }
+        case 'stole': {
+          // A ram popped friend k's balloon on their phone: k's rammer gets
+          // the steal (at most one a second per victim, and only up close).
+          const att = Number.isInteger(msg.by) ? this.karts[msg.by] : null;
+          if (!this.battle || !k || !att || att === k || !Number.isInteger(msg.n)) break;
+          if (this.time - (k.stoleAt ?? -9) < 1 || (att.pos.x - k.pos.x) ** 2 + (att.pos.z - k.pos.z) ** 2 > 400) break;
+          k.stoleAt = this.time;
+          this.battle.grant(att, `g${k.index}.${msg.n}`);
+          break;
+        }
         case 'finish':
           if (k && !k.finished && Number.isFinite(msg.time) && msg.time > 0) {
             k.finished = true;
@@ -1172,6 +1216,12 @@ export class Race {
         break;
       case 'hit':
         if (this.player && typeof msg.kind === 'string') this.player.hit(msg.kind);
+        break;
+      case 'ram':
+        if (this.battle && this.player && Number.isInteger(msg.by)) this.battle.claimRam(this.player, this.karts[msg.by]);
+        break;
+      case 'steal':
+        if (this.battle && this.player && typeof msg.id === 'string' && msg.id.length <= 24) this.battle.grant(this.player, msg.id);
         break;
       case 'results': {
         if (!Array.isArray(msg.rows) || msg.rows.length > this.karts.length) break;
