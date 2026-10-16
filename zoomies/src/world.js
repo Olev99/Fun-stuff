@@ -734,7 +734,7 @@ export class World {
 
   // Undersides get no light from above: a little emissive keeps them from reading as a black slab.
   _underMat(c) {
-    return stdMat({ color: c, emissive: new THREE.Color(c), emissiveIntensity: 0.4, roughness: 0.9 });
+    return stdMat({ color: c, emissive: new THREE.Color(c).lerp(new THREE.Color('#9a9088'), 0.5), emissiveIntensity: 0.4, roughness: 0.9 });
   }
 
   _underside(path, i0, i1, mat) {
