@@ -32,6 +32,7 @@ const SUITES = {
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
   shortcuts: ['shortcuts.mjs', [], 25],
+  'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
 };
 const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];
 
@@ -74,7 +75,7 @@ function run(name, script, args, mins) {
 const argv = process.argv.slice(2);
 let plan;
 if (argv[0] && SUITES[argv[0]]) plan = [[argv[0], argv.length > 1 ? argv.slice(1) : null]];
-else plan = (argv[0] === 'full' ? Object.keys(SUITES) : QUICK).map((n) => [n, null]);
+else plan = (argv[0] === 'full' ? Object.keys(SUITES).filter((n) => n !== 'visual-audit') : QUICK).map((n) => [n, null]);
 
 for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv']) await mkdir(join(out, d), { recursive: true });
 const srv = await serve();
