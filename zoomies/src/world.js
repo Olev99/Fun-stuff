@@ -144,7 +144,7 @@ export const THEME_FX = {
   },
   factory: {
     grade: { saturation: 1.0, contrast: 0.16, tint: '#fff4ea', bloom: 0.9, flare: 0.8 }, weather: 'sparks', roadRough: 0.42, clouds: 0.55,
-    cloudCol: ['#9a8a88', '#4a4048'], hills: 0, env: 1.0,
+    cloudCol: ['#9a8a88', '#4a4048'], hills: 9, env: 1.0,
   },
   moon: {
     grade: { contrast: 0.2, saturation: 1.05, bloom: 1.0, vignette: 0.45 }, weather: null, roadRough: 0.8, clouds: 0, hills: 28,
@@ -1891,19 +1891,19 @@ export class World {
     const k = this.track.def.scale ?? 1;
     const x = v.x * k, z = v.z * k, R = v.r * k, rt = v.top * k, h = v.h;
     const prof = [
-      [R * 1.1, -1.5], [R, 0.3], [R * 0.78, h * 0.28], [R * 0.5, h * 0.62], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
+      [R * 1.1, -4], [R, -0.6], [R * 0.78, h * 0.28], [R * 0.5, h * 0.62], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
     ].map(([a, b]) => new THREE.Vector2(a, b));
-    const geo = new THREE.LatheGeometry(prof, 56);
+    const geo = new THREE.LatheGeometry(prof, 96);
     const pos = geo.attributes.position;
     const col = new Float32Array(pos.count * 3);
     const green = new THREE.Color('#4f9a4a'), rock = new THREE.Color('#7a6a5e'), rim = new THREE.Color('#3a302c'), c = new THREE.Color();
-    const sand = new THREE.Color(this.theme.beach || '#e8d6a8');
+    const sand = new THREE.Color(this.theme.beach || '#e8d6a8').multiplyScalar(0.7);
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i) / h;
       // lumpy foothills with a sandy skirt, so the base has no polygon edge
       const lump = 1 + (fbm2(pos.getX(i) * 0.02 + 5, pos.getZ(i) * 0.02) - 0.5) * 0.5 * (1 - smooth(0.05, 0.45, y));
       pos.setX(i, pos.getX(i) * lump); pos.setZ(i, pos.getZ(i) * lump);
-      c.copy(green).lerp(rock, smooth(0.22, 0.5, y)).lerp(rim, smooth(0.8, 0.96, y)).lerp(sand, 1 - smooth(0, 0.16, y));
+      c.copy(green).lerp(rock, smooth(0.22, 0.5, y)).lerp(rim, smooth(0.8, 0.96, y)).lerp(sand, 1 - smooth(0.05, 0.45, y));
       const n = 0.9 + 0.2 * Math.abs(Math.sin(pos.getX(i) * 0.21 + pos.getZ(i) * 0.17));
       col[i * 3] = c.r * n; col[i * 3 + 1] = c.g * n; col[i * 3 + 2] = c.b * n;
     }
