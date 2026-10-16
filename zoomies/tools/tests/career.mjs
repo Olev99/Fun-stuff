@@ -146,7 +146,26 @@ check('swap: turbo replaced tyres in socket 2, accel up, handling down', w.cur[1
 const sockets = await p.evaluate(() => document.querySelectorAll('#ws-sockets .sock').length);
 check('two sockets on the Rust Bucket', sockets === 2);
 // Chassis Mod: +1 socket, once
-await p.tap('#ws-chassis');
+await p.tap('#ws-chassis');// economy: parts stay scarce (see tools/economy.mjs)
+const eco = await p.evaluate(async () => {
+  const W = await import('./src/workshop.js');
+  const C = await import('./src/career.js');
+  const P = await import('./src/parts.js');
+  const bosses = C.CHAPTERS.map((ch) => ch.events.find((e) => e.boss).drop);
+  const drops = C.CHAPTERS.flatMap((ch, ci) => ch.events.filter((e) => e.drop && !e.bp && !e.dropAny).map((e) => ({ ci, p: P.partById(e.drop) })));
+  const c = { champion: false };
+  return {
+    bosses, dropsPerChapter: C.CHAPTERS.map((ch) => ch.events.filter((e) => e.drop).length),
+    tier3Drop: drops.some((d) => d.p.tier === 3), early2: drops.some((d) => d.ci < 2 && d.p.tier >= 2),
+    shopC1: W.shopList(c, 0).some((p) => p.tier >= 2), shopC2: W.shopList(c, 1).some((p) => p.kind === 'stat' && p.tier >= 2),
+    t2: ['engine2', 'turbo2', 'tyres2', 'armor2'].map((id) => P.partById(id).price),
+  };
+});
+check('economy: every chapter boss gives a different special', new Set(eco.bosses).size === 7 && eco.bosses.every((id) => id), JSON.stringify(eco.bosses));
+check('economy: no Tier III drops, no Tier II drops in chapters 1-2', !eco.tier3Drop && !eco.early2);
+check('economy: Tier II not sold in chapters 1-2, every chapter drops something', !eco.shopC1 && !eco.shopC2 && eco.dropsPerChapter.every((n) => n >= 1), JSON.stringify(eco.dropsPerChapter));
+check('economy: Tier II prices raised', JSON.stringify(eco.t2) === '[760,680,600,520]', JSON.stringify(eco.t2));
+
 await p.waitForTimeout(300);
 const w2 = await cur();
 check('chassis mod: +1 socket for 800 coins', w2.sockets === 1 && await p.evaluate(() => document.querySelectorAll('#ws-sockets .sock').length) === 3 && w2.coins === 3000 - 150 - 160 - 800, JSON.stringify(w2));
