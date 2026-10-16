@@ -29,21 +29,21 @@ const DRAWBACK = {
   armor: 'Slower acceleration',
 };
 // [Tier I, II, III] coins; chapter (0-based) the Workshop starts selling Tier I/II.
-const STAT_PRICE = { engine: [180, 560, 1400], turbo: [160, 500, 1250], tyres: [150, 440, 1100], armor: [130, 380, 950] };
-const STAT_FROM = { engine: [0, 1], turbo: [0, 2], tyres: [0, 1], armor: [0, 2] };
+const STAT_PRICE = { engine: [180, 760, 1400], turbo: [160, 680, 1250], tyres: [150, 600, 1100], armor: [130, 520, 950] };
+const STAT_FROM = { engine: [0, 2], turbo: [0, 3], tyres: [0, 2], armor: [0, 4] };
 
 const SPECIALS = [
-  { id: 'driftSpring', name: 'Drift Spring', icon: '🌀', price: 650, from: 1, blurb: 'Drift charges 35% faster.', suits: 'twisty tracks' },
-  { id: 'slipSail', name: 'Slip Sail', icon: '⛵', price: 600, from: 1, blurb: 'Slipstream starts sooner, reaches further and boosts harder.', suits: 'busy packs' },
-  { id: 'scoutLamp', name: 'Scout Lamp', icon: '🔦', price: 520, from: 1, blurb: 'Shortcut gems count double, shortcut entrances glow, and sand and candy shortcuts slow you less.', suits: 'shortcut tracks' },
-  { id: 'gemVac', name: 'Gem Vac', icon: '🧹', price: 500, from: 0, blurb: 'Gems fly in from further away, and a hit only costs you 1 gem instead of 3.', suits: 'gem hunts' },
-  { id: 'mudBoots', name: 'Mud Boots', icon: '🥾', price: 700, from: 1, blurb: 'Mud, sand, grass and oil barely slow you.', suits: 'mud, sand and oil' },
-  { id: 'iceStuds', name: 'Ice Studs', icon: '❄️', price: 750, from: 2, blurb: 'Black ice and snow grip like tarmac, at a small speed cost on dry roads.', suits: 'snow and ice' },
-  { id: 'rocketPill', name: 'Rocket Pill', icon: '💊', price: 900, from: 2, blurb: 'A stronger rocket start and a free little boost off every grid.', suits: 'every race' },
-  { id: 'wingKit', name: 'Wing Kit', icon: '🪽', price: 850, from: 3, blurb: 'Glide further and land with a bigger boost.', suits: 'glide ramps and moon jumps' },
-  { id: 'bumperPlate', name: 'Bumper Plate', icon: '🛡', price: 800, from: 2, blurb: 'Your bumps shove rivals harder and you get shoved less.', suits: 'duels and battles' },
-  { id: 'itemPouch', name: 'Item Pouch', icon: '👝', price: 1100, from: 4, blurb: 'Carry a second item. Grab another box while you hold one.', suits: 'everything' },
-  { id: 'comebackSpring', name: 'Comeback Spring', icon: '🔄', price: 900, from: 3, blurb: 'When you are last, every hit you take ends with a free boost.', suits: 'chaotic fields' },
+  { id: 'driftSpring', name: 'Drift Spring', icon: '🌀', price: 850, from: 2, blurb: 'Drift charges 35% faster.', suits: 'twisty tracks' },
+  { id: 'slipSail', name: 'Slip Sail', icon: '⛵', price: 780, from: 2, blurb: 'Slipstream starts sooner, reaches further and boosts harder.', suits: 'busy packs' },
+  { id: 'scoutLamp', name: 'Scout Lamp', icon: '🔦', price: 700, from: 3, blurb: 'Shortcut gems count double, shortcut entrances glow, and sand and candy shortcuts slow you less.', suits: 'shortcut tracks' },
+  { id: 'gemVac', name: 'Gem Vac', icon: '🧹', price: 650, from: 1, blurb: 'Gems fly in from further away, and a hit only costs you 1 gem instead of 3.', suits: 'gem hunts' },
+  { id: 'mudBoots', name: 'Mud Boots', icon: '🥾', price: 900, from: 1, blurb: 'Mud, sand, grass and oil barely slow you.', suits: 'mud, sand and oil' },
+  { id: 'iceStuds', name: 'Ice Studs', icon: '❄️', price: 980, from: 3, blurb: 'Black ice and snow grip like tarmac, at a small speed cost on dry roads.', suits: 'snow and ice' },
+  { id: 'rocketPill', name: 'Rocket Pill', icon: '💊', price: 1180, from: 4, blurb: 'A stronger rocket start and a free little boost off every grid.', suits: 'every race' },
+  { id: 'wingKit', name: 'Wing Kit', icon: '🪽', price: 1100, from: 5, blurb: 'Glide further and land with a bigger boost.', suits: 'glide ramps and moon jumps' },
+  { id: 'bumperPlate', name: 'Bumper Plate', icon: '🛡', price: 1050, from: 4, blurb: 'Your bumps shove rivals harder and you get shoved less.', suits: 'duels and battles' },
+  { id: 'itemPouch', name: 'Item Pouch', icon: '👝', price: 1400, from: 5, blurb: 'Carry a second item. Grab another box while you hold one.', suits: 'everything' },
+  { id: 'comebackSpring', name: 'Comeback Spring', icon: '🔄', price: 1180, from: 5, blurb: 'When you are last, every hit you take ends with a free boost.', suits: 'chaotic fields' },
 ];
 
 export const PARTS = {};
@@ -71,7 +71,7 @@ export const MAX_SOCKETS = 6;
 // Sockets a vehicle has from the factory; a Chassis Mod adds one more.
 export const BASE_SOCKETS = { buggy: 2, classic: 3, tub: 3, bike: 3, scooter: 3, comet: 4, stomper: 4, chopper: 4, sportbike: 4, bolt: 5 };
 export const baseSockets = (bodyId) => BASE_SOCKETS[bodyId] || 3;
-export const chassisPrice = (body) => Math.min(2500, Math.max(800, Math.round((800 + (body.price || 0) * 0.3) / 50) * 50));
+export const chassisPrice = (body) => Math.min(3000, Math.max(800, Math.round((800 + (body.price || 0) * 0.5) / 50) * 50));
 
 // A set of part ids fitted together: at most one stat part per family, and
 // each special once.
