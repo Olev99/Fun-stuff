@@ -144,7 +144,7 @@ export const THEME_FX = {
   },
   factory: {
     grade: { saturation: 1.0, contrast: 0.16, tint: '#fff4ea', bloom: 0.9, flare: 0.8 }, weather: 'sparks', roadRough: 0.42, clouds: 0.55,
-    cloudCol: ['#9a8a88', '#4a4048'], hills: 0, env: 1.0,
+    cloudCol: ['#9a8a88', '#4a4048'], hills: 9, env: 1.0,
   },
   moon: {
     grade: { contrast: 0.2, saturation: 1.05, bloom: 1.0, vignette: 0.45 }, weather: null, roadRough: 0.8, clouds: 0, hills: 28,
@@ -455,42 +455,51 @@ export class World {
       return;
     }
     const hasWater = !!th.water;
-    const R = tr.radius + (th.seaNear ? 150 : 230);
+    const R = tr.radius + (th.seaNear ? 190 : 260);
     this.groundR = hasWater ? R : R * 1.7;
+    // Props and grass stop here on sea themes; the shore slopes into the water beyond.
+    this.shoreR = hasWater ? this.groundR * 0.95 - 50 : Infinity;
     this._buildRoadField(this.groundR + 30);
     const amp = this.fx.hills || 0;
-    const rings = 64, segs = 180;
+    const rings = hasWater ? 84 : 64, segs = 180;
     const pos = [], col = [], uv = [], idx = [];
     const r = rng(42);
     const tints = th.groundTint.map((c) => new THREE.Color(c));
-    const beach = th.beach ? new THREE.Color(th.beach) : null;
-    const noise = [];
-    for (let s = 0; s < segs; s++) noise.push(0.9 + r() * 0.2);
+    const beach = new THREE.Color(th.beach || '#f1d79b'), wet = beach.clone().multiplyScalar(0.8), foam = new THREE.Color('#f4fffb'), shallow = new THREE.Color('#9fe6dc');
+    const c = new THREE.Color();
     for (let i = 0; i <= rings; i++) {
-      const f = i / rings;
+      const u = i / rings;
+      // sea themes pack most rings into the outer 15% so the shoreline is smooth
+      const f = hasWater ? (u < 0.6 ? (u / 0.6) * 0.85 : 0.85 + ((u - 0.6) / 0.4) * 0.15) : u;
       for (let s = 0; s <= segs; s++) {
         const a = (s / segs) * Math.PI * 2;
-        const n = noise[s % segs] * (0.94 + 0.06 * Math.sin(a * 5 + 1.3));
-        // wavy coastline: the outer rings take on the shoreline noise
-        const rad = this.groundR * f * (hasWater ? 1 + (n - 1) * smooth(0.9, 1, f) : 1);
+        // the coastline wanders smoothly with the angle (no spikes)
+        const coast = hasWater ? this.groundR * (0.95 + 0.1 * fbm2(Math.cos(a) * 1.6 + 11, Math.sin(a) * 1.6 - 7)) : this.groundR;
+        const rad = coast * f;
         const x = tr.center.x + Math.cos(a) * rad;
         const z = tr.center.z + Math.sin(a) * rad;
-        let y = -0.25;
         const h = this.hillHeight(x, z);
-        if (hasWater && f > 0.93) y = -0.25 - 2.75 * smooth(0.93, 1, f);
-        else y += h;
+        const sh = hasWater ? clamp((rad - (coast - 45)) / 45, 0, 1) : 0; // 0 inland .. 1 at the sea floor
+        const y = -0.25 + h * (1 - sh) - 3.4 * smooth(0, 1, sh);
         pos.push(x, y, z);
         uv.push(x / 14, z / 14);
-        const c = tints[Math.floor(r() * tints.length)].clone();
+        // palette: the tint mix, shifted by a slow noise so the ground has patches
+        const t0 = fbm2(x * 0.011 + 3, z * 0.011 - 9);
+        c.copy(tints[Math.min(tints.length - 1, Math.floor(t0 * tints.length))]).lerp(tints[Math.floor(r() * tints.length)], 0.5);
         if (amp) c.multiplyScalar(0.94 + 0.14 * Math.min(1, h / amp));
-        if (beach && f > 0.9) c.lerp(beach, smooth(0.9, 0.93, f));
+        if (hasWater) {
+          c.lerp(beach, smooth(-0.5, 0.05, (rad - (coast - 45)) / 45));
+          c.lerp(wet, smooth(0.25, 0.5, sh) * 0.7);
+          c.lerp(shallow, smooth(0.45, 0.62, sh) * 0.6);
+          c.lerp(foam, Math.max(0, 1 - Math.abs(y + 1.15) / 0.28) * 0.9); // foam where the water laps the sand
+        }
         col.push(c.r, c.g, c.b);
       }
     }
     for (let i = 0; i < rings; i++) {
       for (let s = 0; s < segs; s++) {
         const a = i * (segs + 1) + s, b = a + 1, c = a + segs + 1, d = c + 1;
-        idx.push(a, c, b, b, c, d);
+        idx.push(a, b, c, b, d, c); // counter-clockwise seen from above
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -910,28 +919,33 @@ export class World {
         });
       }
     }
-    // A rock face under the end of the road where a sky lane takes off or lands.
+    // A heap of rocks under the end of the road where a sky lane takes off or
+    // lands (stacked boulders instead of a flat wall, standing on the ground or in the water).
+    const rr = rng(path.count * 7 + 3);
+    const rockB = new GeoBuilder('stone');
     for (const z of path.zones) {
       if (z.kind !== 2) continue;
       for (const [s, dir] of [[z.s0, -1], [z.s0 + z.len, 1]]) {
-        const fr = path.frame(s + dir * 1, {});
-        const y0 = path.heightAtFrame(fr, 0);
-        if (y0 < 2.5) continue;
-        const W = fr.wd + 14;
-        const pts = [];
-        for (const d of [-W, W]) {
-          const x = fr.x + fr.rx * d, zz = fr.z + fr.rz * d;
-          pts.push([x, y0 + 0.2, zz], [x, this.groundAt(x, zz) - 1.5, zz]);
+        const fr0 = path.frame(s + dir * 1, {});
+        if (path.heightAtFrame(fr0, 0) < 2.5) continue;
+        for (let u = 1; u <= 13; u += 4) {
+          const fr = path.frame(s + dir * u, {});
+          const y0 = path.heightAtFrame(fr, 0) - 1.6;
+          const W = fr.wd + 9;
+          for (let d = -W; d <= W + 0.1; d += 5.5) {
+            const x = fr.x + fr.rx * d + (rr() - 0.5) * 2, zz = fr.z + fr.rz * d + (rr() - 0.5) * 2;
+            const edge = Math.abs(d) / W; // outer rocks sit lower: a mound, not a box
+            const top = y0 - edge * edge * 6;
+            const gy = Math.min(this.groundAt(x, zz), -1.4) - 1;
+            for (let y = top; y > gy; y -= 3.6) {
+              const R = 3.4 + rr() * 1.6;
+              rockB.add(new THREE.DodecahedronGeometry(R, 0), (y > top - 4 ? ['#7a8a5a', '#8a9a64'] : ['#6f6a5a', '#7b7564'])[Math.floor(rr() * 2)], [x, y - R * 0.8, zz], [rr() * 3, rr() * 3, 0], [1.1, 0.9, 1.1]);
+            }
+          }
         }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute([...pts[0], ...pts[1], ...pts[2], ...pts[1], ...pts[3], ...pts[2]], 3));
-        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, y0 / 6, 0, 0, W / 3, y0 / 6, 0, 0, W / 3, 0, W / 3, y0 / 6], 2));
-        g.computeVertexNormals();
-        const bm = this._bankMats();
-        const cliff = bm.cliff || (bm.cliff = (() => { const c = bm.wallMat.clone(); c.side = THREE.DoubleSide; return c; })());
-        this.group.add(new THREE.Mesh(g, cliff));
       }
     }
+    if (rockB.parts.length) this.group.add(new THREE.Mesh(rockB.build(), pbrMat({ flatShading: true })));
     // Sky: fluffy cloud banks mark the edges of the lane.
     const sky = path.runs((i) => zt[i] === 2);
     if (sky.length) {
@@ -1369,7 +1383,7 @@ export class World {
     const key = (x, z) => `${Math.floor(x / spacing)},${Math.floor(z / spacing)}`;
     let tries = 0;
     const floating = this.theme.floating;
-    const seaR = this.theme.water && !floating ? tr.radius + (this.theme.seaNear ? 130 : 205) : Infinity;
+    const seaR = floating ? Infinity : this.shoreR;
     while (out.length < count && tries < count * 25) {
       tries++;
       const i = Math.floor(r() * tr.count);
@@ -1390,8 +1404,9 @@ export class World {
 
   // Instanced props, split into spatial chunks so the camera and the shadow
   // pass can skip the ones out of view.
-  _instanced(geo, mat, spots, { scale = [1, 1], tilt = 0, castShadow = true, colors = null, yScale = null } = {}) {
+  _instanced(geo, mat, spots, { scale = [1, 1], tilt = 0, castShadow = true, colors = null, yScale = null, blob = true } = {}) {
     if (!spots.length) return null;
+    if (blob && !this.theme.floating) geo = this._withBlob(geo);
     groundAO(geo);
     const r = this.r;
     const CH = 110;
@@ -1427,6 +1442,17 @@ export class World {
       first = first || mesh;
     }
     return first;
+  }
+
+  // A dark blob under tall props so they sit on the ground instead of hovering
+  // (part of the prop's own mesh, so no extra draw call).
+  _withBlob(geo) {
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    if (bb.max.y - bb.min.y < 2.5 || bb.min.y < -0.5) return geo;
+    const r = clamp(Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) * 0.42, 0.9, 3.2);
+    const col = new THREE.Color(this.theme.hemi[1]).multiplyScalar(0.5);
+    return new GeoBuilder('matte').addRaw(geo).add(new THREE.CylinderGeometry(r, r * 0.8, 0.06, 12), col, [0, 0.05, 0]).build();
   }
 
   _buildScenery() {
@@ -1496,6 +1522,7 @@ export class World {
       bm.computeBoundingSphere();
       this.group.add(bm);
       this._instanced(P.pylon(), pbrMat(), S(60, 0, 40, 8), { scale: [0.9, 1.3], castShadow: false });
+      this._cityRing();
       this._neonRings();
       this._planet('#ff7ad9', '#39f5ff');
     } else if (theme === 'volcano') {
@@ -1598,7 +1625,7 @@ export class World {
     mark(tr);
     for (const sc of tr.shortcuts) mark(sc);
     const r = rng(tr.def.id.length * 131 + 7);
-    const seaR = this.theme.water ? tr.radius + (this.theme.seaNear ? 125 : 200) : Infinity;
+    const seaR = this.shoreR - 5;
     const out = [];
     for (let t = 0; t < count * 3 && out.length < count; t++) {
       const i = Math.floor(r() * tr.count);
@@ -1750,6 +1777,27 @@ export class World {
     this.group.add(bm);
   }
 
+  // A far ring of lit towers fading into the night haze: depth behind the city.
+  _cityRing() {
+    const tr = this.track, r = this.r;
+    const win = this._tex(TX.windowsTexture(5));
+    const bmat = stdMat({ map: win, emissiveMap: win, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 1.5, roughness: 0.4 });
+    const bgeo = new THREE.BoxGeometry(1, 1, 1);
+    bgeo.translate(0, 0.5, 0);
+    const n = 110;
+    const bm = new THREE.InstancedMesh(bgeo, bmat, n);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + r() * 0.05, d = tr.radius + 280 + r() * 260;
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * Math.PI);
+      m.compose(new THREE.Vector3(tr.center.x + Math.cos(a) * d, -0.3, tr.center.z + Math.sin(a) * d), q, new THREE.Vector3(22 + r() * 30, 50 + r() * 140, 22 + r() * 30));
+      bm.setMatrixAt(i, m);
+      bm.setColorAt(i, c.set(['#ffffff', '#c9b8ff', '#9ff6ff', '#ffc2f0'][i % 4]));
+    }
+    bm.computeBoundingSphere();
+    this.group.add(bm);
+  }
+
   _pagoda() {
     const spots = this._scatter(1, 25, 70, 40);
     if (!spots.length) return;
@@ -1843,15 +1891,19 @@ export class World {
     const k = this.track.def.scale ?? 1;
     const x = v.x * k, z = v.z * k, R = v.r * k, rt = v.top * k, h = v.h;
     const prof = [
-      [R * 1.1, -1.5], [R, 0.3], [R * 0.78, h * 0.28], [R * 0.5, h * 0.62], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
+      [R * 1.1, -4], [R, -0.6], [R * 0.78, h * 0.28], [R * 0.5, h * 0.62], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
     ].map(([a, b]) => new THREE.Vector2(a, b));
-    const geo = new THREE.LatheGeometry(prof, 56);
+    const geo = new THREE.LatheGeometry(prof, 96);
     const pos = geo.attributes.position;
     const col = new Float32Array(pos.count * 3);
     const green = new THREE.Color('#4f9a4a'), rock = new THREE.Color('#7a6a5e'), rim = new THREE.Color('#3a302c'), c = new THREE.Color();
+    const sand = new THREE.Color(this.theme.beach || '#e8d6a8').multiplyScalar(0.7);
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i) / h;
-      c.copy(green).lerp(rock, smooth(0.22, 0.5, y)).lerp(rim, smooth(0.8, 0.96, y));
+      // lumpy foothills with a sandy skirt, so the base has no polygon edge
+      const lump = 1 + (fbm2(pos.getX(i) * 0.02 + 5, pos.getZ(i) * 0.02) - 0.5) * 0.5 * (1 - smooth(0.05, 0.45, y));
+      pos.setX(i, pos.getX(i) * lump); pos.setZ(i, pos.getZ(i) * lump);
+      c.copy(green).lerp(rock, smooth(0.22, 0.5, y)).lerp(rim, smooth(0.8, 0.96, y)).lerp(sand, 1 - smooth(0.05, 0.45, y));
       const n = 0.9 + 0.2 * Math.abs(Math.sin(pos.getX(i) * 0.21 + pos.getZ(i) * 0.17));
       col[i * 3] = c.r * n; col[i * 3 + 1] = c.g * n; col[i * 3 + 2] = c.b * n;
     }
@@ -2028,28 +2080,89 @@ export class World {
     this.group.add(moon);
   }
 
+  // Distant ridgelines: noise-displaced rings in three layers, hazier the
+  // further out, with low foothills. On sea themes the low parts stay under
+  // water, so the high ones become islands with a sand shore and a foam line.
+  _buildRidges() {
+    const th = this.theme, tr = this.track;
+    const sea = !!th.water;
+    const cols = th.mountains.map((c) => new THREE.Color(c));
+    const haze = new THREE.Color(th.sky[1]);
+    const sand = new THREE.Color(th.beach || '#f1d79b'), wet = sand.clone().multiplyScalar(0.8), foam = new THREE.Color('#f4fffb');
+    const base = sea ? -3.6 : -6;
+    // [distance from the track, half width, height, haze, noise offset]
+    const layers = sea ? [[270, 70, 70, 0, 3], [390, 85, 130, 0.15, 17], [520, 100, 190, 0.3, 41]] : [[290, 85, 95, 0, 3], [400, 95, 140, 0.15, 17], [520, 105, 190, 0.3, 41]];
+    const segs = 220, rings = 14;
+    const pos = [], col = [], idx = [];
+    const c = new THREE.Color(), top = cols[cols.length - 1];
+    let v0 = 0;
+    for (const [dist, hw, H, hz, o] of layers) {
+      for (let i = 0; i <= rings; i++) {
+        const t = (i / rings) * 2 - 1;
+        for (let s = 0; s <= segs; s++) {
+          const a = (s / segs) * Math.PI * 2;
+          const ca = Math.cos(a), sa = Math.sin(a);
+          // the ridge line along the ring; gaps on the sea, foothills on land
+          const n = fbm2(ca * 4.5 + o, sa * 4.5 - o);
+          const A = sea ? H * smooth(0.42, 0.72, n) : 14 + H * smooth(0.2, 0.8, n);
+          const d = tr.radius + dist + t * hw + (fbm2(ca * 3 + o * 2, sa * 3) - 0.5) * 50;
+          const x = tr.center.x + ca * d, z = tr.center.z + sa * d;
+          const prof = Math.pow(Math.max(0, 1 - t * t), 1.4) * (0.7 + 0.6 * fbm2(x * 0.014 + o, z * 0.014));
+          const y = base + A * prof + (sea ? 0 : 6);
+          pos.push(x, y, z);
+          const hf = clamp((y - base) / H, 0, 1);
+          const ci = hf * (cols.length - 1.01);
+          c.copy(cols[Math.floor(ci)]).lerp(cols[Math.floor(ci) + 1], ci % 1);
+          if (hf > 0.8) c.lerp(top, smooth(0.8, 0.95, hf));
+          c.multiplyScalar(0.92 + 0.16 * vnoise(x * 0.05, z * 0.05));
+          if (sea) {
+            c.lerp(sand, smooth(5, 0, y) * 0.95);
+            c.lerp(wet, smooth(0.4, -0.7, y) * 0.5);
+            c.lerp(foam, Math.max(0, 1 - Math.abs(y + 1.15) / 0.5) * 0.9);
+          }
+          c.lerp(haze, hz);
+          col.push(c.r, c.g, c.b);
+        }
+      }
+      for (let i = 0; i < rings; i++) {
+        for (let s = 0; s < segs; s++) {
+          const a = v0 + i * (segs + 1) + s, b = a + 1, cc = a + segs + 1, d = cc + 1;
+          idx.push(a, b, cc, b, d, cc);
+        }
+      }
+      v0 += (rings + 1) * (segs + 1);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    this.group.add(new THREE.Mesh(geo, stdMat({ vertexColors: true, flatShading: true, roughness: 1 })));
+  }
+
   _buildBackdrop() {
     const th = this.theme;
     const tr = this.track;
     const r = this.r;
-    if (th.mountains) {
+    if (th.mountains && !th.mesa) this._buildRidges();
+    else if (th.mountains) {
       const B = new GeoBuilder();
       const count = 26;
       const cols = th.mountains.map((c) => new THREE.Color(c));
       for (let k = 0; k < count; k++) {
         const a = (k / count) * Math.PI * 2 + r() * 0.2;
-        const dist = tr.radius + (th.seaNear ? 330 : 300) + r() * 160;
+        const dist = tr.radius + 300 + r() * 160;
         const h = 70 + r() * 130;
         const rad = 60 + r() * 70;
-        const geo = th.mesa ? new THREE.CylinderGeometry(rad * 0.7, rad, h * 0.6, 7, 3) : new THREE.ConeGeometry(rad, h, 7, 4);
+        const geo = new THREE.CylinderGeometry(rad * 0.7, rad, h * 0.6, 7, 3);
         const g = geo.toNonIndexed();
         const pos = g.attributes.position;
         const col = new Float32Array(pos.count * 3);
-        const hh = th.mesa ? h * 0.6 : h;
+        const hh = h * 0.6;
         for (let i = 0; i < pos.count; i++) {
           const f = clamp((pos.getY(i) + hh / 2) / hh, 0, 1);
           const idx = Math.min(cols.length - 1, Math.floor(f * cols.length * 0.999));
-          const c = th.mesa ? cols[(idx + k) % cols.length] : f > 0.78 ? cols[cols.length - 1] : cols[Math.min(idx, cols.length - 2)];
+          const c = cols[(idx + k) % cols.length];
           col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
         }
         g.setAttribute('color', new THREE.BufferAttribute(col, 3));
