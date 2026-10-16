@@ -462,7 +462,7 @@ export class World {
     this._buildRoadField(this.groundR + 30);
     const amp = this.fx.hills || 0;
     const rings = hasWater ? 84 : 64, segs = 180;
-    const pos = [], col = [], uv = [], idx = [];
+    const pos = [], col = [], uv = [], idx = [], rads = [];
     const r = rng(42);
     const tints = th.groundTint.map((c) => new THREE.Color(c));
     const beach = new THREE.Color(th.beach || '#f1d79b'), wet = beach.clone().multiplyScalar(0.8), foam = new THREE.Color('#f4fffb'), shallow = new THREE.Color('#9fe6dc');
@@ -482,6 +482,7 @@ export class World {
         const sh = hasWater ? clamp((rad - (coast - 45)) / 45, 0, 1) : 0; // 0 inland .. 1 at the sea floor
         const y = -0.25 + h * (1 - sh) - 3.4 * smooth(0, 1, sh);
         pos.push(x, y, z);
+        rads.push(rad);
         uv.push(x / 14, z / 14);
         // palette: the tint mix, shifted by a slow noise so the ground has patches
         const t0 = fbm2(x * 0.011 + 3, z * 0.011 - 9);
@@ -502,6 +503,7 @@ export class World {
         idx.push(a, b, c, b, d, c); // counter-clockwise seen from above
       }
     }
+    this._gm = { cx: tr.center.x, cz: tr.center.z, segs, rings, rad: Float32Array.from(rads), y: Float32Array.from(pos.filter((_, k) => k % 3 === 1)) };
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -601,8 +603,26 @@ export class World {
   }
 
   // Height of the ground (not the road) at x, z.
+  // Once the ground mesh exists this follows the mesh itself (its vertices are
+  // sparse, so the exact formula would float props on slopes or sink them).
   groundAt(x, z) {
-    return -0.25 + this.hillHeight(x, z);
+    const g = this._gm;
+    if (!g) return -0.25 + this.hillHeight(x, z);
+    const W = g.segs + 1, dx = x - g.cx, dz = z - g.cz, rad = Math.hypot(dx, dz);
+    let a = Math.atan2(dz, dx);
+    if (a < 0) a += Math.PI * 2;
+    const sf = (a / (Math.PI * 2)) * g.segs, s0 = Math.min(g.segs - 1, Math.floor(sf)), ts = sf - s0;
+    const col = (sc) => {
+      let lo = 0, hi = g.rings;
+      if (rad >= g.rad[hi * W + sc]) return g.y[hi * W + sc];
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (g.rad[mid * W + sc] <= rad) lo = mid; else hi = mid;
+      }
+      const t = (rad - g.rad[lo * W + sc]) / (g.rad[hi * W + sc] - g.rad[lo * W + sc] || 1);
+      return g.y[lo * W + sc] * (1 - t) + g.y[hi * W + sc] * t;
+    };
+    return col(s0) * (1 - ts) + col(s0 + 1) * ts;
   }
 
   _buildLakes() {
@@ -943,8 +963,10 @@ export class World {
             const top = y0 - edge * edge * 6;
             const gy = Math.min(this.groundAt(x, zz), -1.4) - 1;
             for (let y = top; y > gy; y -= 3.6) {
-              const R = 3.4 + rr() * 1.6;
-              rockB.add(new THREE.DodecahedronGeometry(R, 0), (y > top - 4 ? ['#7a8a5a', '#8a9a64'] : ['#6f6a5a', '#7b7564'])[Math.floor(rr() * 2)], [x, y - R * 0.8, zz], [rr() * 3, rr() * 3, 0], [1.1, 0.9, 1.1]);
+              // lower boulders are bigger and slide outward, so the heap tapers like a pile, not a stack of columns
+              const t = clamp((top - y) / Math.max(1, top - gy), 0, 1), R = (3.4 + rr() * 1.6) * (0.85 + 0.9 * t);
+              const o = Math.sign(d) * t * 5 + (rr() - 0.5) * 3, o2 = (rr() - 0.5) * 3 * (0.4 + t);
+              rockB.add(new THREE.DodecahedronGeometry(R, 0), (y > top - 4 ? ['#7a8a5a', '#8a9a64'] : ['#6f6a5a', '#7b7564'])[Math.floor(rr() * 2)], [x + fr.rx * o + fr.tx * o2, y - R * 0.8, zz + fr.rz * o + fr.tz * o2], [rr() * 3, rr() * 3, 0], [1.1, 0.9, 1.1]);
             }
           }
         }
@@ -1409,7 +1431,7 @@ export class World {
 
   // Instanced props, split into spatial chunks so the camera and the shadow
   // pass can skip the ones out of view.
-  _instanced(geo, mat, spots, { scale = [1, 1], tilt = 0, castShadow = true, colors = null, yScale = null, blob = true } = {}) {
+  _instanced(geo, mat, spots, { scale = [1, 1], tilt = 0, castShadow = true, colors = null, yScale = null, blob = true, flat = 0 } = {}) {
     if (!spots.length) return null;
     // Tall, wide props (trees, towers) keep 3+ m off the wall so canopies never reach over the road or into the camera.
     geo.computeBoundingBox();
@@ -1430,6 +1452,12 @@ export class World {
       q.setFromEuler(e);
       p.set(x, y ?? -0.25, z);
       const ys = yScale ? sc * (yScale[0] + r() * (yScale[1] - yScale[0])) : sc;
+      if (flat) {
+        // Wide flat props (crater rims) only sit on level ground, resting on its lowest point, so no side floats or sinks.
+        const R = flat * sc, g = [this.groundAt(x, z), this.groundAt(x + R, z), this.groundAt(x - R, z), this.groundAt(x, z + R), this.groundAt(x, z - R)];
+        if (Math.max(...g) - Math.min(...g) > 0.35) continue;
+        p.y = Math.min(...g) - 0.05;
+      }
       s.set(sc, ys, sc);
       m.compose(p, q, s);
       const col = colors ? colors[Math.floor(r() * colors.length)] : null;
@@ -1572,7 +1600,7 @@ export class World {
       this._smokestacks();
       this._skyline(['#8a8e98', '#6e727c', '#9a8a7a', '#7a6a6a'], 0.7);
     } else if (theme === 'moon') {
-      this._instanced(P.crater(), vc, S(60, 3, 120, 16), { scale: [1, 3.4], castShadow: false });
+      this._instanced(P.crater(), vc, S(60, 3, 120, 16), { scale: [1, 3.4], castShadow: false, flat: 3.8 });
       this._instanced(P.rock('#8a8c92'), vc, S(70, 1, 100, 6), { scale: [0.6, 2.6], tilt: 0.6 });
       this._instanced(P.dome(), vc, S(8, 12, 70, 30), { scale: [1, 1.5] });
       this._instanced(P.antenna(), vc, S(10, 6, 50, 20), { scale: [0.9, 1.3] });
@@ -1903,19 +1931,19 @@ export class World {
     const k = this.track.def.scale ?? 1;
     const x = v.x * k, z = v.z * k, R = v.r * k, rt = v.top * k, h = v.h;
     const prof = [
-      [R * 1.1, -4], [R, -0.6], [R * 0.78, h * 0.28], [R * 0.5, h * 0.62], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
+      [R * 1.45, -4], [R * 1.08, -0.4], [R * 0.82, h * 0.2], [R * 0.5, h * 0.6], [rt * 1.3, h * 0.93], [rt, h], [rt * 0.8, h - 2.5], [0.1, h - 4],
     ].map(([a, b]) => new THREE.Vector2(a, b));
     const geo = new THREE.LatheGeometry(prof, 96);
     const pos = geo.attributes.position;
     const col = new Float32Array(pos.count * 3);
-    const green = new THREE.Color('#4f9a4a'), rock = new THREE.Color('#7a6a5e'), rim = new THREE.Color('#3a302c'), c = new THREE.Color();
-    const sand = new THREE.Color(this.theme.beach || '#e8d6a8').multiplyScalar(0.7);
+    const green = new THREE.Color('#438f3f'), rock = new THREE.Color('#7a6a5e'), rim = new THREE.Color('#3a302c'), c = new THREE.Color();
+    const sand = new THREE.Color(this.theme.beach || '#e8d6a8').multiplyScalar(0.85);
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i) / h;
       // lumpy foothills with a sandy skirt, so the base has no polygon edge
-      const lump = 1 + (fbm2(pos.getX(i) * 0.02 + 5, pos.getZ(i) * 0.02) - 0.5) * 0.5 * (1 - smooth(0.05, 0.45, y));
+      const lump = 1 + (fbm2(pos.getX(i) * 0.02 + 5, pos.getZ(i) * 0.02) - 0.5) * 0.5 * (1 - smooth(0.05, 0.6, y));
       pos.setX(i, pos.getX(i) * lump); pos.setZ(i, pos.getZ(i) * lump);
-      c.copy(green).lerp(rock, smooth(0.22, 0.5, y)).lerp(rim, smooth(0.8, 0.96, y)).lerp(sand, 1 - smooth(0.05, 0.45, y));
+      c.copy(green).lerp(rock, smooth(0.3, 0.6, y)).lerp(rim, smooth(0.8, 0.96, y)).lerp(sand, 1 - smooth(0.02, 0.3, y));
       const n = 0.9 + 0.2 * Math.abs(Math.sin(pos.getX(i) * 0.21 + pos.getZ(i) * 0.17));
       col[i * 3] = c.r * n; col[i * 3 + 1] = c.g * n; col[i * 3 + 2] = c.b * n;
     }
