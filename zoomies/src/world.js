@@ -712,6 +712,11 @@ export class World {
     this.group.add(new THREE.Mesh(outer, mats.sideMat));
   }
 
+  // Undersides get no light from above: a little emissive keeps them from reading as a black slab.
+  _underMat(c) {
+    return stdMat({ color: c, emissive: new THREE.Color(c), emissiveIntensity: 0.4, roughness: 0.9 });
+  }
+
   _underside(path, i0, i1, mat) {
     const geo = path.ribbon((i, o) => {
       const w = path.wd[i] + 0.7;
@@ -757,7 +762,7 @@ export class World {
       if (tr.def.terrain && !th.floating) this._berms(tr, side, (i) => !gap[i] && zt[i] !== 2 && !tr.bridge[i], (i) => (zt[i] === 1 ? 1.5 : tr.wallH));
     }
     // Bridge undersides and support pillars.
-    const underMat = stdMat({ color: th.wallSide || '#aaaaaa', roughness: 0.9 });
+    const underMat = this._underMat(th.wallSide || '#aaaaaa');
     const pred = th.floating ? (i) => zt[i] !== 2 : (i) => tr.bridge[i] === 1 && zt[i] !== 2;
     for (const [a, b] of tr.runs(pred)) this._underside(tr, a, b, underMat);
     if (!th.floating) {
@@ -1099,7 +1104,7 @@ export class World {
       if (this.track.def.terrain && !th.floating) {
         for (const side of [-1, 1]) this._berms(sc, side, (i) => !sc.overlap[i] && !sc.isVoid(i * sc.ds) && sc.zoneT[i] !== 2, (i) => (sc.zoneT[i] === 1 ? 1.5 : sc.wallH));
       }
-      if (th.floating) for (const [a, b] of sc.runs(wpred)) this._underside(sc, a, b, stdMat({ color: th.wallSide, roughness: 0.9 }));
+      if (th.floating) for (const [a, b] of sc.runs(wpred)) this._underside(sc, a, b, this._underMat(th.wallSide));
       this._shortcutDeco(sc);
       // Boost pads on shortcuts
       for (const b of sc.boosts) {
@@ -1406,6 +1411,13 @@ export class World {
   // pass can skip the ones out of view.
   _instanced(geo, mat, spots, { scale = [1, 1], tilt = 0, castShadow = true, colors = null, yScale = null, blob = true } = {}) {
     if (!spots.length) return null;
+    // Tall, wide props (trees, towers) keep 3+ m off the wall so canopies never reach over the road or into the camera.
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    if (bb.max.y > 2.5 && Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) > 1.6) {
+      spots = spots.filter(([x, z]) => this.track.clearance(x, z) > 3.2);
+      if (!spots.length) return null;
+    }
     if (blob && !this.theme.floating) geo = this._withBlob(geo);
     groundAO(geo);
     const r = this.r;
