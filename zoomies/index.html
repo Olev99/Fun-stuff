@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <!-- Content-Security-Policy: tools/stamp.mjs fills in the hashes of the inline scripts (script-src). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-nEVYMCQZGDxs8OIPPjnLmB5T7O7yj20wsXE0pMpaupU='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-qtp6wkblIMbBjOe2iiglS7vKMm/WaTqufBJFzS4zaDE='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="2f0e270">
+<meta name="zoomies-version" content="7c2424d">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -356,6 +356,38 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .rw-up { font-family: var(--font-display); font-size: 14px; color: var(--sun); animation: rwin .5s ease-out both; }
 .rw-ach { font-weight: 700; font-size: 12.5px; padding: 4px 8px; border-radius: 10px; background: rgba(255,210,63,.16); animation: rwin .5s .15s ease-out both; }
 .rw-ach b { font-family: var(--font-display); font-weight: 400; } .rw-ach span { color: var(--sun); font-weight: 800; }
+
+.medal-line { text-align: center; font-weight: 700; font-size: 14px; margin: 6px 0 2px; color: var(--cream); }
+.medal-line b { color: var(--sun); }
+.rw-medal { background: rgba(25,227,177,.18); }
+.tcard .tb.medals { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 10.5px; }
+.tcard .tb.medals span { opacity: .55; }
+.tcard .tb.medals span.got { opacity: 1; color: var(--sun); }
+
+/* Daily missions on the title screen */
+.missions { display: grid; gap: 4px; padding: 7px 10px 8px; border-radius: 14px; background: rgba(29,21,55,.78); border: 2px solid var(--ink); max-width: 330px; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.mis-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-size: 12.5px; color: var(--sun); }
+.mis-head .fl { color: var(--tang); }
+.mis { display: grid; grid-template-columns: 20px 1fr 44px 30px; gap: 6px; align-items: center; font-weight: 700; font-size: 12px; color: var(--cream); }
+.mis .mt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mis .mbar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; }
+.mis .mbar i { display: block; height: 100%; background: var(--mint); }
+.mis em { font-style: normal; font-size: 11px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.mis.done .mt { text-decoration: line-through; opacity: .7; } .mis.done em { color: var(--mint); }
+
+@keyframes lvpop { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: var(--sun); } 100% { transform: scale(1); } }
+.rw-l.pop { display: inline-block; animation: lvpop .7s ease-out; }
+.rw-mis { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.rw-mis .mbar { display: inline-block; width: 50px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; }
+.rw-mis .mbar i { display: block; height: 100%; background: var(--mint); }
+.rw-mis.done { color: var(--mint); } .rw-mis.done span { color: var(--sun); }
+.rw-next { margin-top: 2px; padding: 6px 10px; border-radius: 10px; background: rgba(54,169,255,.16); font-weight: 800; font-size: 13px; color: var(--cream); }
+.rw-next small { display: inline-block; margin-right: 8px; font-family: var(--font-display); font-size: 10px; letter-spacing: .12em; color: var(--sky); }
+.btn.big { font-size: clamp(17px, calc(5.2 * var(--vh)), 22px); padding-top: 12px; padding-bottom: 11px; min-width: 38%; }
+
+#chal-thumb { width: 100%; height: auto; border-radius: 14px; border: 3px solid var(--ink); }
+.chal-text { font-family: var(--font-display); font-size: clamp(18px, calc(5.6 * var(--vh)), 26px); line-height: 1.1; color: var(--sun); text-shadow: 0 2px 0 var(--ink); text-wrap: balance; }
+.chal-link { width: 100%; margin-top: 4px; padding: 5px 8px; border-radius: 8px; border: 2px solid var(--ink); font: inherit; font-size: 11px; }
 
 /* Career hub */
 #scr-career { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); gap: 16px; }
@@ -924,6 +956,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   <div class="logo-wrap">
     <h1 class="logo">ZOOMIES!<small>KART CHAOS</small></h1>
     <p class="tagline touch-only">Tilt your phone to steer. Hold <b>DRIFT</b> through corners, let go for a turbo.</p>
+    <div class="missions" id="missions" aria-label="Daily missions"></div>
     <p class="tagline desk-only">Steer with <kbd>←</kbd> <kbd>→</kbd>. Hold <kbd>SPACE</kbd> through corners, let go for a turbo. Or grab a controller, or turn your phone into a wheel.</p>
   </div>
   <button class="pchip" id="pchip" data-go="profile" aria-label="Your level and trophies"></button>
@@ -1158,6 +1191,20 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   </div>
 </section>
 
+<section id="scr-challenge" class="screen center shade-full" hidden>
+  <div class="dialog panel daily">
+    <div class="top-bar"><h2 class="title">Ghost challenge</h2><span class="eyebrow">From a friend</span></div>
+    <div class="daily-body">
+      <canvas id="chal-thumb" width="200" height="150"></canvas>
+      <div class="daily-info">
+        <div class="chal-text" id="chal-text"></div>
+        <p id="chal-sub" style="margin:0;font-weight:700;font-size:14px"></p>
+      </div>
+    </div>
+    <div class="bottom-bar"><button class="btn ghost small" data-go="back">Not now</button><button class="btn hot big" data-go="race">Race the ghost</button></div>
+  </div>
+</section>
+
 <section id="scr-daily" class="screen center shade-full" hidden>
   <div class="dialog panel daily">
     <div class="top-bar"><h2 class="title">Daily Challenge</h2><span class="eyebrow" id="daily-date"></span></div>
@@ -1331,7 +1378,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=3198f574", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=2ee8ef6b", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=88c3879f", "./src/careerui.js": "./src/careerui.js?v=2cc4f3cb", "./src/characters.js": "./src/characters.js?v=1ef2b005", "./src/cosmetics.js": "./src/cosmetics.js?v=9a65606d", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=b0517012", "./src/gumballui.js": "./src/gumballui.js?v=9333d4b1", "./src/hud.js": "./src/hud.js?v=63948231", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=77b85ea1", "./src/kart.js": "./src/kart.js?v=2ef21281", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/main.js": "./src/main.js?v=67d0c72e", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=718499b7", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=000e9a64", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=9a8d66a5", "./src/race.js": "./src/race.js?v=0cfb7c78", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=b3f596f4", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=d3de4371", "./src/ui.js": "./src/ui.js?v=4e86a78d", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=3666a770", "./src/world.js": "./src/world.js?v=9f50bbc9", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
-<script type="module" src="./src/main.js?v=67d0c72e"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=3198f574", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=2ee8ef6b", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=7015ccfc", "./src/careerui.js": "./src/careerui.js?v=2cc4f3cb", "./src/characters.js": "./src/characters.js?v=1ef2b005", "./src/cosmetics.js": "./src/cosmetics.js?v=9a65606d", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=ac13c7a6", "./src/ghostlink.js": "./src/ghostlink.js?v=dec0fdf6", "./src/gumballui.js": "./src/gumballui.js?v=9333d4b1", "./src/hud.js": "./src/hud.js?v=63948231", "./src/input.js": "./src/input.js?v=96c76ebe", "./src/items.js": "./src/items.js?v=77b85ea1", "./src/kart.js": "./src/kart.js?v=2ef21281", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/main.js": "./src/main.js?v=69122277", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=903fd996", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=718499b7", "./src/nextup.js": "./src/nextup.js?v=57cf070e", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=000e9a64", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=c0053606", "./src/race.js": "./src/race.js?v=54e2388e", "./src/settings.js": "./src/settings.js?v=d4fbb3d9", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=dd3a94c5", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=d3de4371", "./src/ui.js": "./src/ui.js?v=91870d0d", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=3666a770", "./src/world.js": "./src/world.js?v=d59799e7", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=69122277"></script>
 </body>
 </html>

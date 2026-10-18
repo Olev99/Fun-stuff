@@ -179,7 +179,7 @@ export class Race {
     if (this.mode === 'tt') {
       this.ghostKey = opts.trackDef.id + (opts.reverse ? '-r' : '');
       this.ghostRec = new GhostRecorder();
-      const g = loadGhost(this.ghostKey);
+      const g = opts.ghost || loadGhost(this.ghostKey); // a challenge link brings its own
       if (g) this.ghost = new GhostPlayer(this.scene, g);
     }
     this.items = new ItemSystem(this, !!(this.net && this.net.isGuest));

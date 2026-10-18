@@ -13,7 +13,7 @@ await mkdir(OUT, { recursive: true });
 const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
 p.on('pageerror', (e) => console.log('[pageerror]', e.message));
-await p.goto('http://localhost:8000/index.html');
+await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`);
 await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
 const all = await p.evaluate(async () => {
   const { TRACKS } = await import('./src/tracks.js'); const { ARENAS } = await import('./src/arenas.js');
@@ -58,6 +58,40 @@ for (const idr of ids) {
     await p.screenshot({ path: `${OUT}${id}${sfx}_${i}.png` });
   }
   console.log(id, tag, 'calls', info.calls, 'tris', info.tris); // numbers of the last shot
+  // shortcut shots: per shortcut, mouth from behind, mouth from above, middle, end from above
+  if (!arena) {
+    const scc = await p.evaluate(() => {
+      const r = window.zoomies.race, out = [], fr = {};
+      r.track.shortcuts.forEach((sc, n) => {
+        const at = (s, back, up, ahead, upLook) => {
+          sc.frame(Math.max(0, Math.min(sc.length, s)), fr); const y = sc.heightAtFrame(fr, 0);
+          const f2 = {}; sc.frame(Math.max(0, Math.min(sc.length, s + ahead)), f2);
+          return { pos: [fr.x - fr.tx * back, y + up, fr.z - fr.tz * back], look: [f2.x, sc.heightAtFrame(f2, 0) + upLook, f2.z] };
+        };
+        out.push(at(0, 12, 4, 14, 0.5), at(8, 4, 28, 10, -2), at(sc.length * 0.5, 9, 4, 12, 0.8), at(sc.length - 10, 4, 28, 10, -2));
+      });
+      return out;
+    });
+    if (scc.length) {
+      const sh = [];
+      for (let i = 0; i < scc.length; i++) {
+        await p.evaluate((c) => {
+          const a = window.zoomies, r = a.race; r.camera.position.set(...c.pos); r.camera.lookAt(...c.look); r.camera.fov = 70; r.camera.updateProjectionMatrix();
+          r.camera.updateMatrixWorld(); r.world.update(0.0001, r.camera, r.camera.position);
+          if (a.post && a.post.active) a.post.render(r.scene, r.camera, r.grade || a.view.grade, 0); else a.renderer.render(r.scene, r.camera);
+        }, scc[i]);
+        const png = await p.screenshot({ path: `${OUT}${id}${sfx}_sc${i}.png` });
+        sh.push(png.toString('base64'));
+      }
+      const sheet = await p.evaluate(async (imgs) => {
+        const load = (b64) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.src = 'data:image/png;base64,' + b64; });
+        const W = 426, H = 197, c = document.createElement('canvas'); c.width = W * 4; c.height = H * imgs.length / 4; const g = c.getContext('2d');
+        for (let i = 0; i < imgs.length; i++) g.drawImage(await load(imgs[i]), (i % 4) * W, Math.floor(i / 4) * H, W, H);
+        return c.toDataURL('image/png').split(',')[1];
+      }, sh);
+      await writeFile(`${OUT}${id}${sfx}_sc_sheet.png`, Buffer.from(sheet, 'base64'));
+    }
+  }
   // contact sheet 2x4, composed in the page from the PNGs
   const imgs = [];
   for (let i = 0; i < 8; i++) imgs.push((await readFile(`${OUT}${id}${sfx}_${i}.png`)).toString('base64'));
