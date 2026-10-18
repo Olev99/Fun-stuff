@@ -32,11 +32,8 @@ const SUITES = {
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
   shortcuts: ['shortcuts.mjs', [], 25],
-<<<<<<< HEAD
   phase2: ['phase2.mjs', [], 20],
-=======
   onboarding: ['onboarding.mjs', [], 12],
->>>>>>> worktree-agent-a8133e950e1e5a46b
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
 };
 const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];

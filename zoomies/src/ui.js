@@ -8,13 +8,10 @@ import { fmtTime, ordinal, clamp } from './util.js';
 import { saveSettings } from './settings.js';
 import { cleanNick } from './nametags.js';
 import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
-<<<<<<< HEAD
 import { missionView, missionStreak, MISSION_XP } from './missions.js';
 import { nextUp } from './nextup.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
-=======
 import { isTouch } from './platform.js';
->>>>>>> worktree-agent-a8133e950e1e5a46b
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
 const $ = (id) => document.getElementById(id);
