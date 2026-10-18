@@ -265,6 +265,7 @@ export function newCareer() {
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
     xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    missions: { day: '', prog: {}, done: [], streak: 0, last: '' }, // daily missions (missions.js)
     lvlPaid: 1, // highest level whose rewards were paid
     // gumball machine prizes: owned ids and what you're wearing
     cos: [], hat: 'nohat', trail: 'classic', horn: 'beep',
@@ -292,6 +293,17 @@ function mapObj(o, f) {
   return out;
 }
 const counts = (o) => mapObj(o, (v) => (Number.isFinite(v) ? count(v) : undefined));
+
+const DAY = /^\d{4}-\d\d-\d\d$/;
+const day = (v) => (typeof v === 'string' && DAY.test(v) ? v : '');
+// Daily missions: a date, up to 12 progress counters, the finished ids and the streak.
+export function cleanMissions(m) {
+  if (!isObj(m)) return { day: '', prog: {}, done: [], streak: 0, last: '' };
+  const prog = {};
+  for (const [k, v] of Object.entries(m.prog && isObj(m.prog) ? m.prog : {}).slice(0, 12)) if (!UNSAFE.has(k) && k.length <= 16 && Number.isFinite(v)) prog[k] = count(v, 1000);
+  const done = Array.isArray(m.done) ? [...new Set(m.done.filter((x) => typeof x === 'string' && x.length <= 16))].slice(0, 12) : [];
+  return { day: day(m.day), prog, done, streak: count(m.streak, 10000), last: day(m.last) };
+}
 
 export function cleanCareer(saved) {
   if (!isObj(saved)) return null;
@@ -336,6 +348,7 @@ export function cleanCareer(saved) {
   c.stats = mapObj(saved.stats, (v) => (Array.isArray(v) ? v.filter((x) => isStr(x) || Number.isFinite(x)).slice(0, 1000) : Number.isFinite(v) ? count(v) : undefined));
   const d = isObj(saved.daily) ? saved.daily : {};
   c.daily = { done: isStr(d.done) ? d.done : '', streak: count(d.streak), best: count(d.best) };
+  c.missions = cleanMissions(saved.missions);
   const sy = saved.sync;
   if (isObj(sy) && isStr(sy.id) && isObj(sy.base)) {
     const b = sy.base;

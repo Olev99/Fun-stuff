@@ -12,6 +12,9 @@ import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { BODIES, bodyLocked } from './karts.js';
 import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
+import { medalAward, medalTier, nextMedal, MEDALS } from './medals.js';
+import { encodeChallenge, challengeUrl, decodeChallenge, hasChallenge, challengeText } from './ghostlink.js';
+import { loadGhost } from './ghost.js';
 import { Showroom } from './showroom.js';
 import { Race } from './race.js';
 import { CHARACTERS, charById, charLocked } from './characters.js';
@@ -133,6 +136,7 @@ class App {
 
     this.toTitle();
     this._checkVersion();
+    this.checkChallenge();
     // Opened from the QR code on a computer: become its steering wheel.
     if (this.wheelPad.wanted) this.wheelPad.open();
     else if (this.sync.wanted) this.sync.open('title');
@@ -395,7 +399,7 @@ class App {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
-      look: lookOf(this.career),
+      look: lookOf(this.career), ghost: cfg.ghost || null,
     });
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
@@ -543,7 +547,7 @@ class App {
         title: won ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`,
         sub: `Balloon Battle · ${race.trackDef.name}`,
         html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons)}</span><span class="pts">💥 ${r.hits}</span>`)).join('')}</div>`,
-        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Arenas', 'alt'], ['retry', 'Battle again', 'hot']],
+        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Arenas', 'alt'], ['retry', 'Battle again', 'hot big']],
       });
       return;
     }
@@ -553,21 +557,25 @@ class App {
       const total = me.time;
       const bestLap = Math.min(...(me.lapTimes.length ? me.lapTimes : [Infinity]));
       const newBest = !rec.tt || total < rec.tt;
+      // Medals come from the best time, so a tier pays its XP once: when the old best was below it.
+      const medal = newBest && !race.track.reverse ? medalAward(race.trackDef.id, rec.tt, total) : null;
       if (newBest) rec.tt = total;
       if (!rec.lap || bestLap < rec.lap) rec.lap = bestLap;
       this.records[key] = rec;
       saveRecords(this.records);
       if (newBest) addStat(this.career, 'tt');
       if (race.newGhost && race.ghost) addStat(this.career, 'ghosts');
-      const rw = this.profileAward(race, me, { record: newBest });
+      const rw = this.profileAward(race, me, { record: newBest, xpBonus: medal ? medal.xp : 0, medal });
+      const tier = race.track.reverse ? 0 : medalTier(race.trackDef.id, rec.tt), nx = race.track.reverse ? null : nextMedal(race.trackDef.id, rec.tt);
+      const medalLine = race.track.reverse ? '' : `<div class="medal-line">${tier ? `${MEDALS[tier - 1].icon} <b>${MEDALS[tier - 1].name}</b>` : 'No medal yet'}${nx ? ` · next medal ${nx.medal.icon} ${nx.medal.name} in <b>${nx.gap.toFixed(2)}s</b> (${fmtTime(nx.target)})` : ' · every medal won!'}</div>`;
       ui.results({
         title: newBest ? 'New record!' : 'Time trial',
         sub: race.trackDef.name,
-        html: `${rw}<div class="big-msg"><em>${fmtTime(total)}</em></div>
+        html: `${rw}<div class="big-msg"><em>${fmtTime(total)}</em></div>${medalLine}
           <div class="tt-times">${me.lapTimes.map((t, i) => `<div><small>Lap ${i + 1}</small>${fmtTime(t)}</div>`).join('')}
           <div><small>Best total</small>${fmtTime(rec.tt)}</div><div><small>Best lap</small>${fmtTime(rec.lap)}</div></div>
-          ${race.newGhost ? '<p class="car-goal" style="text-align:center;margin:8px 0 0">👻 Ghost saved. Race against it next time!</p>' : ''}`,
-        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Retry', 'hot']],
+          ${race.newGhost ? '<p class="car-goal" style="text-align:center;margin:8px 0 0">👻 Ghost saved. Race against it next time!</p>' : ''}<div class="medal-line" id="chal-msg"></div>`,
+        buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt small'], ...(loadGhost(key) ? [['challenge', '📨 Challenge a friend', 'sky small']] : []), ['retry', 'Race again', 'hot big']],
       });
       return;
     }
@@ -596,7 +604,7 @@ class App {
       title: `${me.place}${ordinal(me.place).toLowerCase()} place`,
       sub: race.trackDef.name,
       html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`,
-      buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Race again', 'hot']],
+      buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Tracks', 'alt'], ['retry', 'Race again', 'hot big']],
     });
   }
 
@@ -606,7 +614,8 @@ class App {
   profileAward(race, me, extra = {}) {
     const sum = awardRace(this.career, {
       mode: race.mode, place: me ? me.place : 0, gems: (race.player && race.player.gemsGot) || 0,
-      style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id, online: race.mode === 'mp', ...extra,
+      style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id, online: race.mode === 'mp',
+      bike: !!(race.player && race.player.bodyDef && race.player.bodyDef.kind === 'bike'), battle: !!race.battle, pops: race.battle ? (me && me.hits) || 0 : 0, ...extra,
     });
     return this.rewardsFinish(sum);
   }
@@ -614,7 +623,7 @@ class App {
   rewardsFinish(sum, extraLines = []) {
     const achs = checkAchievements(this.career, this.records);
     saveCareer(this.career);
-    if ((sum && sum.ups.length) || achs.length) setTimeout(() => this.audio.play('levelup'), 400);
+    if ((sum && (sum.ups.length || sum.medal)) || achs.length) setTimeout(() => this.audio.play('levelup'), 400);
     return this.ui.rewardsHtml(this.career, sum, achs, extraLines);
   }
 
@@ -726,6 +735,9 @@ class App {
         else if (this.careerRun) this.startCareerEvent(this.careerRun.evId);
         else this.restart();
         break;
+      case 'challenge':
+        this.shareChallenge();
+        break;
       case 'tracks':
         this.ui.mode = this.lastCfg.mode;
         this.ui.trackSelect();
@@ -747,6 +759,63 @@ class App {
         break;
       }
     }
+  }
+
+  // ---------------- beat-my-ghost links ----------------
+  // Share your saved ghost for the track just raced as a link (see ghostlink.js).
+  async shareChallenge() {
+    const cfg = this.lastCfg;
+    const say = (t) => { const m = $('chal-msg'); if (m) m.textContent = t; };
+    if (!cfg || cfg.mode !== 'tt') return;
+    const g = loadGhost(cfg.trackId + (cfg.reverse ? '-r' : ''));
+    const frag = g && await encodeChallenge({ trackId: cfg.trackId, reverse: !!cfg.reverse, name: this.settings.name, speedClass: cfg.speedClass }, g);
+    if (!frag) { say('Could not make a link for this ghost.'); return; }
+    const url = challengeUrl(frag);
+    const text = `Beat my ${fmtTime(g.time).replace(/^0:/, '')} on ${trackById(cfg.trackId).name} in Zoomies!`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Zoomies! Kart Chaos', text, url });
+        say('Challenge sent!');
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // closed the share sheet
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      say('Link copied! Paste it to a friend.');
+    } catch (e) {
+      const m = $('chal-msg');
+      if (m) {
+        m.textContent = 'Copy this link: ';
+        const inp = document.createElement('input');
+        inp.readOnly = true;
+        inp.value = url;
+        inp.className = 'chal-link';
+        inp.addEventListener('focus', () => inp.select());
+        m.appendChild(inp);
+      }
+    }
+  }
+
+  // A page opened from a challenge link shows the card (and then starts the race).
+  async checkChallenge() {
+    const hash = location.hash;
+    if (!hasChallenge(hash)) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* keep the hash */ }
+    const c = await decodeChallenge(hash);
+    if (!c) { this.hud.toast('That challenge link is not valid'); return; }
+    this.challenge = c;
+    this.ui.challengeCard(c, challengeText(c));
+  }
+
+  startChallenge() {
+    const c = this.challenge;
+    if (!c) { this.toTitle(); return; }
+    this.gp = null;
+    this.careerRun = null;
+    this.dailyRun = null;
+    this.startRace({ mode: 'tt', trackId: c.trackId, reverse: c.reverse, player: this.menuChar(), speedClass: c.speedClass, playerLoadout: this.menuLoadout(), ghost: c.ghost });
   }
 
   // A shortcut the player drove through; true the first time ever.

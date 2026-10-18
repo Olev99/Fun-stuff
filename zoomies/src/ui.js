@@ -8,6 +8,9 @@ import { fmtTime, ordinal, clamp } from './util.js';
 import { saveSettings } from './settings.js';
 import { cleanNick } from './nametags.js';
 import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
+import { missionView, missionStreak, MISSION_XP } from './missions.js';
+import { nextUp } from './nextup.js';
+import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
 const $ = (id) => document.getElementById(id);
@@ -119,6 +122,10 @@ export class UI {
         if (action === 'race') app.startDaily();
         else app.toTitle();
         break;
+      case 'challenge':
+        if (action === 'race') app.startChallenge();
+        else app.toTitle();
+        break;
       case 'profile':
         if (action === 'sync') app.sync.open('title');
         else this.title();
@@ -158,11 +165,32 @@ export class UI {
     $('menu-daily').textContent = done ? `Done today ✓ · ${streak}-day streak` : `${d.mod.icon} ${d.mod.name} · +${dailyReward(streak + 1)} 🪙`;
     document.querySelector('[data-go="daily"]').classList.toggle('done', done);
     const nAch = Object.keys(c.ach || {}).length;
+    this.missionsPanel();
     $('menu-trophies').textContent = `🏆 ${nAch}/${ACHIEVEMENTS.length}`;
     // A badge on the gumball button when a free turn is waiting.
     const free = c.freeCaps || 0;
     $('menu-gum').hidden = !free;
     $('menu-gum').textContent = free;
+  }
+
+  // Three daily missions with progress bars and the all-done streak flame.
+  missionsPanel() {
+    const c = this.app.career;
+    const list = missionView(c);
+    const left = list.filter((g) => !g.done).length;
+    const streak = missionStreak(c);
+    $('missions').innerHTML = `<div class="mis-head"><span>Daily missions${left ? '' : ' ✓'}</span><span title="Days in a row with all 3 done">${streak ? `<span class="fl">🔥</span> ${streak}` : ''}</span></div>`
+      + list.map((g) => `<div class="mis${g.done ? ' done' : ''}"><span>${g.icon}</span><span class="mt">${g.text}</span><span class="mbar"><i style="width:${Math.round((g.prog / g.target) * 100)}%"></i></span><em>${g.done ? '+100' : `${g.prog}/${g.target}`}</em></div>`).join('')
+      + `<div class="mis-head" style="font-size:11px;color:var(--muted)"><span>${left ? `${left} to go: +100 XP each, all 3 = free capsule 🍬` : 'All done! Free capsule earned. Back tomorrow.'}</span></div>`;
+  }
+
+  // The card a "beat my ghost" link opens with.
+  challengeCard(c, text) {
+    this._thumb($('chal-thumb'), [trackById(c.trackId)], c.reverse);
+    $('chal-text').textContent = text;
+    $('chal-sub').textContent = `${{ chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[c.speedClass]} speed. A see-through ghost drives their lap; cross the line first.`;
+    this.app.previewTrack(c.trackId, c.reverse);
+    this.show('challenge');
   }
 
   // ---------------- Daily challenge ----------------
@@ -197,7 +225,7 @@ export class UI {
     $('prof-count').textContent = `${nAch} of ${ACHIEVEMENTS.length} trophies`;
     $('prof-top').innerHTML = `<div class="lvbadge"><small>Level</small>${lv.level}</div>
       <div class="lvinfo"><div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div><small>${lv.into} / ${lv.need} XP to level ${lv.level + 1}</small>
-      <div class="pstats"><span>🪙 ${c.coins.toLocaleString('en-US')}</span><span>🏁 ${n('races')} races</span><span>🥇 ${n('wins')} wins</span><span>🔥 best streak ${(c.daily && c.daily.best) || 0}</span></div></div>`;
+      <div class="pstats"><span>🪙 ${c.coins.toLocaleString('en-US')}</span><span>🏁 ${n('races')} races</span><span>🥇 ${n('wins')} wins</span><span>🔥 best streak ${(c.daily && c.daily.best) || 0}</span><span>🎖️ ${medalCount(app.records)}/${medalMax()} medals</span></div></div>`;
     $('ach-grid').innerHTML = ACHIEVEMENTS.map((a) => {
       const got = !!(c.ach && c.ach[a.id]);
       const [cur, max] = a.prog(c, app.records);
@@ -213,7 +241,16 @@ export class UI {
     const lv = levelOf(c.xp || 0);
     const pct = Math.round((lv.into / lv.need) * 100);
     const coins = sum ? sum.coins : 0;
-    const top = sum ? `<div class="rw-top">${coins ? `<span class="rw-c">+${coins} 🪙</span>` : ''}<span class="rw-x">+${sum.xp} XP</span><span class="rw-l">Lv ${lv.level}</span><span class="xpbar"><i style="width:${pct}%"></i></span></div>` : '';
+    // The bar and level start at the pre-race values; animateRewards() fills them in (or a tap skips to the end).
+    const fr = (sum && sum.from) || { level: lv.level, pct };
+    const top = sum ? `<div class="rw-top">${coins ? `<span class="rw-c">+${coins} 🪙</span>` : ''}<span class="rw-x">+${sum.xp} XP</span><span class="rw-l" data-lv="${lv.level}" data-lv0="${fr.level}">Lv ${lv.level}</span><span class="xpbar"><i data-from="${fr.pct}" data-to="${pct}" data-ups="${sum.ups.length}" style="width:${pct}%"></i></span></div>` : '';
+    // Missions this race moved, and the closest goal to chase next.
+    const mis = sum && sum.mis ? sum.mis.gained.map((g) => (g.justDone
+      ? `<div class="rw-line rw-mis done">✓ ${g.icon} ${g.text} <span>+${MISSION_XP} XP</span></div>`
+      : `<div class="rw-line rw-mis">${g.icon} ${g.text} <i class="mbar"><i style="width:${Math.round((g.prog / g.target) * 100)}%"></i></i> ${g.prog}/${g.target}</div>`)).join('')
+      + (sum.mis.capsule ? `<div class="rw-line rw-mis done">🍬 All 3 missions done! Free prize capsule · 🔥 ${missionStreak(c)}-day streak</div>` : '') : '';
+    const nu = sum ? nextUp(c, this.app.records) : null;
+    const next = nu ? `<div class="rw-next"><small>NEXT UP</small>${nu.icon} ${nu.text}</div>` : '';
     const extra = lines.map((l) => `<div class="rw-line">${l}</div>`).join('');
     // What each new level brings: racers you can now hire and free capsules.
     const ups = sum && sum.ups.length ? sum.ups.map((L) => {
@@ -221,8 +258,9 @@ export class UI {
       if ((sum.caps || []).includes(L)) gets.push('free gumball 🍬');
       return `<div class="rw-up">⭐ LEVEL ${L}!${gets.length ? ` · ${gets.join(' · ')}` : ''}</div>`;
     }).join('') : '';
+    const md = sum && sum.medal ? `<div class="rw-ach rw-medal">${sum.medal.medal.icon} <b>${sum.medal.medal.name} medal!</b> · a new time target beaten <span>+${sum.medal.xp} XP</span></div>` : '';
     const ach = achs.map((a) => `<div class="rw-ach">🏆 ${a.icon} <b>${a.name}</b> · ${a.desc} <span>+${a.reward} 🪙</span></div>`).join('');
-    return `<div class="rewards">${top}${extra}${ups}${ach}</div>`;
+    return `<div class="rewards">${top}${extra}${md}${mis}${ups}${ach}${next}</div>`;
   }
 
   // ---------------- Characters ----------------
@@ -522,11 +560,12 @@ export class UI {
       this._thumb(cv, [def], rev);
       b.appendChild(cv);
       const rec = app.records[def.id + (rev ? '-r' : '')];
+      const tier = !rev && rec ? medalTier(def.id, rec.tt) : 0, mt = rev ? null : medalTimes(def.id);
       const nSc = (def.shortcuts || []).length;
       const nFound = ((app.records.found || {})[def.id] || []).length;
       const tx = document.createElement('div');
       tx.className = 'tx';
-      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.legs ? `1 lap · ${def.legs.length} legs · 🚗⛵✈️` : `${def.laps || 3} laps`}${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}` : ''}</span><span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span><span class="tb">${def.blurb}</span>`;
+      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.legs ? `1 lap · ${def.legs.length} legs · 🚗⛵✈️` : `${def.laps || 3} laps`}${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}${tier ? ` ${MEDALS[tier - 1].icon}` : ''}` : ''}</span>${this.mode === 'tt' && mt ? `<span class="tb medals">${mt.map((t, i) => `<span class="${tier > i ? 'got' : ''}">${MEDALS[i].icon}${fmtTime(t).replace(/^0:/, '')}</span>`).join('')}</span>` : ''}<span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span><span class="tb">${def.blurb}</span>`;
       b.appendChild(tx);
       b.addEventListener('click', () => {
         app.audio.play('select');
@@ -730,6 +769,39 @@ export class UI {
     $('res-body').innerHTML = html;
     $('res-buttons').innerHTML = buttons.map(([go, label, cls]) => `<button class="btn ${cls || ''}" data-go="${go}">${label}</button>`).join('');
     this.show('results');
+    this.animateRewards();
+  }
+
+  // The XP bar fills from where it was (through a level-up if there is one) in about a second.
+  // Never blocks anything: the buttons work throughout and a tap on the rewards jumps to the end.
+  animateRewards() {
+    (this._rwT || []).forEach(clearTimeout);
+    this._rwT = [];
+    this._rwSkip = null;
+    const bar = document.querySelector('#res-body .xpbar i[data-to]');
+    const lbl = document.querySelector('#res-body .rw-l[data-lv]');
+    if (!bar || !lbl) return;
+    const to = +bar.dataset.to, from = +bar.dataset.from, ups = +bar.dataset.ups;
+    if (!ups && from === to) return;
+    const set = (w, ms) => { bar.style.transition = ms ? `width ${ms}ms ease-out` : 'none'; bar.style.width = `${w}%`; };
+    const fin = () => {
+      (this._rwT || []).forEach(clearTimeout);
+      set(to, 0);
+      lbl.textContent = `Lv ${lbl.dataset.lv}`;
+      lbl.classList.remove('pop');
+      this._rwSkip = null;
+    };
+    this._rwSkip = fin;
+    $('res-body').onclick = () => this._rwSkip && this._rwSkip();
+    set(from, 0);
+    lbl.textContent = `Lv ${lbl.dataset.lv0}`;
+    const T = (f, ms) => this._rwT.push(setTimeout(f, ms));
+    T(() => set(ups ? 100 : to, ups ? 700 : 900), 60);
+    if (ups) {
+      T(() => { lbl.textContent = `Lv ${lbl.dataset.lv}`; lbl.classList.add('pop'); set(0, 0); }, 800);
+      T(() => set(to, 700), 900);
+      T(() => lbl.classList.remove('pop'), 1700);
+    }
   }
 
   row(r, extra = '') {

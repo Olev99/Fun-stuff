@@ -2,6 +2,8 @@ import { TRACKS, trackById } from './tracks.js';
 import { BODY_LIST } from './karts.js';
 import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
+import { medalCount, bestTier, medalMax } from './medals.js';
+import { bumpMissions } from './missions.js';
 
 // The player profile lives in the career save (one wallet for everything):
 // XP and levels from every race, coins from the career, lifetime stats,
@@ -78,12 +80,18 @@ export function awardRace(c, info) {
   addStat(c, 'gems', info.gems || 0);
   if (info.trackId) addToSet(c, 'tracks', info.trackId);
   for (const [label, n] of Object.entries(info.styleCounts || {})) for (const st of STYLE_STATS[label] || []) addStat(c, st, n);
-  return grant(c, coins, xp);
+  // Daily missions: +100 XP each, counted with this race's XP so level-ups show once.
+  const mis = bumpMissions(c, info, info.day);
+  const sum = grant(c, coins, xp + mis.xp);
+  sum.mis = mis;
+  if (info.medal) sum.medal = info.medal;
+  return sum;
 }
 
 // Add coins and XP; handles level-ups.
 export function grant(c, coins, xp) {
-  const before = levelOf(c.xp || 0).level;
+  const lv0 = levelOf(c.xp || 0);
+  const before = lv0.level;
   c.xp = (c.xp || 0) + xp;
   const after = levelOf(c.xp).level;
   let levelCoins = 0;
@@ -100,7 +108,7 @@ export function grant(c, coins, xp) {
   c.coins += coins;
   c.earned = (c.earned || 0) + coins;
   // Level-ups no longer pay coins (coins come from the career only).
-  return { coins, xp, levelCoins: 0, ups, caps, level: after };
+  return { coins, xp, levelCoins: 0, ups, caps, level: after, from: { level: before, pct: Math.round((lv0.into / lv0.need) * 100) } };
 }
 
 // ---------------- achievements ----------------
@@ -146,6 +154,9 @@ export const ACHIEVEMENTS = [
   { id: 'mpwin', icon: '🎉', name: 'Party Champ', desc: 'Win an online race', reward: 250, ...count('mpWins', 1) },
   { id: 'daily1', icon: '📅', name: 'Daily Driver', desc: 'Complete a daily challenge', reward: 100, ...count('dailies', 1) },
   { id: 'streak7', icon: '🔥', name: 'On a Roll', desc: 'Keep a 7-day daily streak', reward: 700, prog: (c) => [Math.min((c.daily && c.daily.best) || 0, 7), 7] },
+  { id: 'medal1', icon: '🥇', name: 'Gold Standard', desc: 'Earn a Gold medal on any track', reward: 200, prog: (c, r) => [bestTier(r) >= 3 ? 1 : 0, 1] },
+  { id: 'medal10', icon: '🎖️', name: 'Medal Collector', desc: `Hold 10 medals (a track's tiers all count, up to ${medalMax()})`, reward: 300, prog: (c, r) => [Math.min(medalCount(r), 10), 10] },
+  { id: 'zoomie1', icon: '⚡', name: 'Certified Zoomie', desc: 'Beat a Zoomie time on any track', reward: 500, prog: (c, r) => [bestTier(r) >= 4 ? 1 : 0, 1] },
   { id: 'battle1', icon: '🎈', name: 'Balloon Buster', desc: 'Win a balloon battle', reward: 150, ...count('battleWins', 1) },
   { id: 'lv10', icon: '⭐', name: 'Rising Star', desc: 'Reach level 10', reward: 300, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 10), 10] },
   { id: 'lv30', icon: '🌟', name: 'Superstar', desc: 'Reach level 25', reward: 1500, prog: (c) => [Math.min(levelOf(c.xp || 0).level, 25), 25] },

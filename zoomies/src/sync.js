@@ -121,6 +121,17 @@ export function mergeCareer(A, B) {
   const da = a.daily || {}, db = b.daily || {};
   const later = (da.done || '') >= (db.done || '') ? da : db;
   m.daily = { done: later.done || '', streak: later.streak || 0, best: Math.max(num(da.best), num(db.best)) };
+  // Daily missions: the same day keeps the best progress and every finished goal;
+  // otherwise the newer day wins. The streak comes from whichever finished a day last.
+  const ma = a.missions || {}, mb = b.missions || {};
+  const newer = (ma.day || '') >= (mb.day || '') ? ma : mb;
+  const lastM = (ma.last || '') >= (mb.last || '') ? ma : mb;
+  m.missions = { day: newer.day || '', prog: { ...(newer.prog || {}) }, done: [...(newer.done || [])], streak: lastM.streak || 0, last: lastM.last || '' };
+  if (ma.day && ma.day === mb.day) {
+    for (const k of union(Object.keys(ma.prog || {}), Object.keys(mb.prog || {}))) m.missions.prog[k] = Math.max(num((ma.prog || {})[k]), num((mb.prog || {})[k]));
+    m.missions.done = union(ma.done, mb.done);
+    m.missions.streak = Math.max(...[ma, mb].filter((x) => x.last === lastM.last).map((x) => x.streak || 0));
+  }
   // Make sure what you're driving is something you own.
   if (!m.racers.includes(m.racer)) m.racer = m.racers[0];
   if (!m.bodies.includes(m.body)) m.body = m.bodies[0];

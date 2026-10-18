@@ -357,6 +357,38 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .rw-ach { font-weight: 700; font-size: 12.5px; padding: 4px 8px; border-radius: 10px; background: rgba(255,210,63,.16); animation: rwin .5s .15s ease-out both; }
 .rw-ach b { font-family: var(--font-display); font-weight: 400; } .rw-ach span { color: var(--sun); font-weight: 800; }
 
+.medal-line { text-align: center; font-weight: 700; font-size: 14px; margin: 6px 0 2px; color: var(--cream); }
+.medal-line b { color: var(--sun); }
+.rw-medal { background: rgba(25,227,177,.18); }
+.tcard .tb.medals { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 10.5px; }
+.tcard .tb.medals span { opacity: .55; }
+.tcard .tb.medals span.got { opacity: 1; color: var(--sun); }
+
+/* Daily missions on the title screen */
+.missions { display: grid; gap: 4px; padding: 7px 10px 8px; border-radius: 14px; background: rgba(29,21,55,.78); border: 2px solid var(--ink); max-width: 330px; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.mis-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-size: 12.5px; color: var(--sun); }
+.mis-head .fl { color: var(--tang); }
+.mis { display: grid; grid-template-columns: 20px 1fr 44px 30px; gap: 6px; align-items: center; font-weight: 700; font-size: 12px; color: var(--cream); }
+.mis .mt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mis .mbar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; }
+.mis .mbar i { display: block; height: 100%; background: var(--mint); }
+.mis em { font-style: normal; font-size: 11px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.mis.done .mt { text-decoration: line-through; opacity: .7; } .mis.done em { color: var(--mint); }
+
+@keyframes lvpop { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: var(--sun); } 100% { transform: scale(1); } }
+.rw-l.pop { display: inline-block; animation: lvpop .7s ease-out; }
+.rw-mis { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.rw-mis .mbar { display: inline-block; width: 50px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; }
+.rw-mis .mbar i { display: block; height: 100%; background: var(--mint); }
+.rw-mis.done { color: var(--mint); } .rw-mis.done span { color: var(--sun); }
+.rw-next { margin-top: 2px; padding: 6px 10px; border-radius: 10px; background: rgba(54,169,255,.16); font-weight: 800; font-size: 13px; color: var(--cream); }
+.rw-next small { display: inline-block; margin-right: 8px; font-family: var(--font-display); font-size: 10px; letter-spacing: .12em; color: var(--sky); }
+.btn.big { font-size: clamp(17px, calc(5.2 * var(--vh)), 22px); padding-top: 12px; padding-bottom: 11px; min-width: 38%; }
+
+#chal-thumb { width: 100%; height: auto; border-radius: 14px; border: 3px solid var(--ink); }
+.chal-text { font-family: var(--font-display); font-size: clamp(18px, calc(5.6 * var(--vh)), 26px); line-height: 1.1; color: var(--sun); text-shadow: 0 2px 0 var(--ink); text-wrap: balance; }
+.chal-link { width: 100%; margin-top: 4px; padding: 5px 8px; border-radius: 8px; border: 2px solid var(--ink); font: inherit; font-size: 11px; }
+
 /* Career hub */
 #scr-career { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); gap: 16px; }
 #scr-career::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; background: linear-gradient(90deg, rgba(20,14,40,.8), rgba(20,14,40,.55) 45%, rgba(20,14,40,.7)); }
@@ -924,6 +956,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   <div class="logo-wrap">
     <h1 class="logo">ZOOMIES!<small>KART CHAOS</small></h1>
     <p class="tagline touch-only">Tilt your phone to steer. Hold <b>DRIFT</b> through corners, let go for a turbo.</p>
+    <div class="missions" id="missions" aria-label="Daily missions"></div>
     <p class="tagline desk-only">Steer with <kbd>←</kbd> <kbd>→</kbd>. Hold <kbd>SPACE</kbd> through corners, let go for a turbo. Or grab a controller, or turn your phone into a wheel.</p>
   </div>
   <button class="pchip" id="pchip" data-go="profile" aria-label="Your level and trophies"></button>
@@ -1155,6 +1188,20 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
       <p id="story-text"></p>
       <span class="story-next">Tap to continue ▸</span>
     </div>
+  </div>
+</section>
+
+<section id="scr-challenge" class="screen center shade-full" hidden>
+  <div class="dialog panel daily">
+    <div class="top-bar"><h2 class="title">Ghost challenge</h2><span class="eyebrow">From a friend</span></div>
+    <div class="daily-body">
+      <canvas id="chal-thumb" width="200" height="150"></canvas>
+      <div class="daily-info">
+        <div class="chal-text" id="chal-text"></div>
+        <p id="chal-sub" style="margin:0;font-weight:700;font-size:14px"></p>
+      </div>
+    </div>
+    <div class="bottom-bar"><button class="btn ghost small" data-go="back">Not now</button><button class="btn hot big" data-go="race">Race the ghost</button></div>
   </div>
 </section>
 
