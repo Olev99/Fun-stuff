@@ -381,6 +381,12 @@ export class Audio {
       case 'burnout':
         this._noise(0.5, 0.3, 'lowpass', 600, 100);
         break;
+      case 'whoosh':
+        this._noise(0.28, 0.2, 'bandpass', 500, 2600, 0, this.sfx, 1.4);
+        break;
+      case 'lesson':
+        [0, 4, 7, 12].forEach((st, i) => this._tone('triangle', mtof(79 + st), 0, 0.14, 0.13, i * 0.06));
+        break;
     }
   }
 

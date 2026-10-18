@@ -33,6 +33,7 @@ const SUITES = {
   online: ['online.mjs', [], 10],
   shortcuts: ['shortcuts.mjs', [], 25],
   phase2: ['phase2.mjs', [], 20],
+  onboarding: ['onboarding.mjs', [], 12],
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
 };
 const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];

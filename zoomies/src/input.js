@@ -197,7 +197,7 @@ export class Input {
     const s = this.settings;
     const t = this.tilt;
     const maxDeg = 40 - s.tiltSens * 26; // 40deg (low) .. 14deg (high)
-    let a = t.angle * (s.invertTilt ? -1 : 1);
+    let a = (t.angle - (s.tiltZero || 0)) * (s.invertTilt ? -1 : 1);
     const dead = 1.5;
     const mag = Math.max(0, Math.abs(a) - dead) / (maxDeg - dead);
     return Math.sign(a) * Math.pow(clamp(mag, 0, 1), 1.12);

@@ -21,8 +21,22 @@ export const DEFAULTS = {
   reverse: false,
   name: '', // multiplayer nickname
   tags: 'all', // name tags over karts: all | friends | off
-  assist: 'off', // steering assist: off | light | strong
+  assist: 'light', // steering assist: off | light | strong (new saves start on Light)
+  shake: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : 'normal', // screen shake: off | low | normal
+  tiltZero: 0, // tilt angle that counts as level (set in the intro's tilt step)
 };
+
+// How much camera shake, FOV kick and hit-stop each Screen shake setting allows.
+export const SHAKE = { off: 0, low: 0.45, normal: 1 };
+
+// A brand-new player has never saved settings (main.js also checks the career save).
+export function hasSettings() {
+  try {
+    return localStorage.getItem(KEY) !== null;
+  } catch (e) {
+    return false;
+  }
+}
 
 export function loadSettings() {
   let s = {};
