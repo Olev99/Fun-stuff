@@ -219,6 +219,7 @@ export class CareerUI {
     else if (a === 'garage') this.openGarage();
     else if (a === 'workshop') this.openWorkshop();
     else if (a === 'gumball') this.app.gumballUI.open('career');
+    else if (a === 'school') this.app.startSchool('career');
     else if (a === 'prev' && this.ci > 0) { this.ci--; this.sel = null; this.render(); }
     else if (a === 'next' && this.ci < CHAPTERS.length - 1) { this.ci++; this.sel = null; this.render(); }
     else if (a === 'race') {

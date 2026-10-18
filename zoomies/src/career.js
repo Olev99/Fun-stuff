@@ -76,7 +76,7 @@ export const CHAPTERS = [
     ],
     events: [
       {
-        id: 'c1-0', type: 'race', track: 'sprout', goal: 4, laps: 1, tutorial: true, tip: 'Hold DRIFT in a bend and let go on the sparks for a boost. Parts come from the Workshop after this one.', title: 'Scrapyard Dash', reward: 100, drop: 'engine1', dropAny: true,
+        id: 'c1-0', type: 'race', track: 'sprout', goal: 8, laps: 1, tutorial: true, tip: 'Hold DRIFT in a bend and let go on the sparks for a boost. Parts come from the Workshop after this one.', title: 'Scrapyard Dash', reward: 100, drop: 'engine1', dropAny: true,
         after: [
           ['gramps', 'You drift like a shopping trolley. I have never been prouder.'],
           ['gramps', 'You earned your first part! Open my Workshop from the Career menu. Parts go into sockets, and the Bucket only has two. Choose wisely.'],
@@ -488,7 +488,7 @@ export function trackLabel(id, rev) {
 
 export function goalLabel(ev, c) {
   switch (ev.type) {
-    case 'race': return ev.goal === 1 ? 'Win the race' : `Finish in the top ${ev.goal}`;
+    case 'race': return ev.goal === 1 ? 'Win the race' : ev.goal >= 8 ? 'Finish the race' : `Finish in the top ${ev.goal}`;
     case 'gems': return `Grab ${ev.n} gems and finish`;
     case 'time': return `Finish under ${fmtTime(ev.target)}`;
     case 'duel': {
@@ -517,7 +517,7 @@ export function hudGoal(ev, race) {
   if (!p) return '';
   if (ev.type === 'gems') return `💎 ${Math.min(p.gemsGot || 0, 99)} / ${ev.n}`;
   if (ev.type === 'time') return `Target ${fmtTime(ev.target)}`;
-  if (ev.type === 'race') return ev.goal === 1 ? 'Goal: win' : `Goal: top ${ev.goal}`;
+  if (ev.type === 'race') return ev.goal === 1 ? 'Goal: win' : ev.goal >= 8 ? 'Goal: finish' : `Goal: top ${ev.goal}`;
   if (ev.type === 'duel') return `Duel: beat ${race.karts.find((k) => !k.isPlayer)?.ch.name || 'your rival'}`;
   return '';
 }

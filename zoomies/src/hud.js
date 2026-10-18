@@ -70,6 +70,7 @@ export class HUD {
     this.timeEl.classList.remove('low');
     this.showTrackName(race);
     if (race.battle) this.hint('Pop everyone else\'s balloons! Ram a rival with a 🌶️ Chili Boost to steal one. Lose them all and you get one comeback.', 6);
+    else if (this.app.schoolRun || (race.careerEv && race.careerEv.tutorial)) this.hint('Gas is automatic. Just steer!', 4);
     else if (race.mode !== 'demo') this.hint(this.controlsHint(), 5.5);
     if (race.ghost) this.hint(`👻 Race your ghost: best ${fmtTime(race.ghost.g.time)}`, 5);
   }
@@ -367,6 +368,23 @@ export class HUD {
     el.className = '';
     void el.offsetWidth;
     el.className = `show ${d <= 0 ? 'ahead' : 'behind'}`;
+  }
+
+  // Item use: a quick flash on the item slot and the ITEM button.
+  itemUsed() {
+    for (const el of [this.itemSlot, this.btnItem]) {
+      el.classList.remove('used');
+      void el.offsetWidth;
+      el.classList.add('used');
+    }
+  }
+
+  // "+1" flicks up beside the place after an overtake.
+  placeUp() {
+    const el = this.plusEl || (this.plusEl = $('hud-plus'));
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   toast(text) {
