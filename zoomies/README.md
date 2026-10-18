@@ -35,7 +35,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 - **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels, moon rovers, and on the adventures floating logs, crocodiles and storm clouds. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
 - **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer, and take on Boost Corp.
   - **The story:** Gramps Gearbox (once the champion "Gearbox Gus") and you against **Baron Von Boost**, the owner of Boost Corp. The company sponsors the Zoomies Circuit and sells every team the same "approved" kart. Years ago the Baron took the Starbolt design Gramps built with him. Each chapter drops a clue (fine print in a sponsor deal, a statue with the wrong name on it, a rigged boost pad, a locked garage), rivals react to how you are doing, and one by one some of them change sides. A prologue, a mid-story twist (the Baron offers you a golden seat), a final cup against the Baron himself on the moon and an epilogue that opens the door to the next league ("coming soon").
-  - A prologue and 7 chapters, 36 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel. The prologue is a one-lap race on Easy with hints that teach drifting and boosting; the first part drops with the first clear.
+  - A prologue and 7 chapters, 36 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel. The prologue is a one-lap race on Easy where just finishing pays 100 coins and the first part (see **First steps** below for its lessons).
   - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team. The hub shows your story progress and the latest clue.
   - Events pay coins by finishing place and gems, plus a first-clear bonus. Each event also has 3 stars to earn.
   - **A slow start:** the Rust Bucket is clearly the weakest ride and the first chapter's computer racers run old buggies too. Power comes from earned parts and sockets, not from buying levels.
@@ -90,6 +90,15 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - **Throwing behind:** when you hold an item that can be aimed, a **⤵️ THROW BACK** button appears next to ITEM. Tap it to throw or drop behind you. You can also swipe ITEM up or down, or hold BRAKE while tapping it.
 - **Prize orbs:** items come from spinning crystal orbs with a star inside, not boxes. Every regular shortcut has its own orbs as a reward for finding it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
+
+## First steps
+
+- **Start your story:** a brand-new save opens with one big button. A single screen then checks your controls: on a phone, hold it like a steering wheel and watch the dot follow, tap **Set level** to set straight-ahead, or tap **Use touch steering instead**. If motion access is refused or no tilt arrives within 2 seconds, touch steering is picked for you. On a computer it shows the keyboard keys. Then the story starts. Players with an existing save never see it; **Settings → Replay intro** shows it again.
+- **Lessons, not walls of text:** the first Career races teach as you drive, one small banner at a time: steer round a bend, hold DRIFT until sparks fly, let go for the boost, drive through a prize orb, use your ITEM and (on touch screens) THROW BACK. The button to press pulses, each lesson ends with a tick and +10 style, a hint you ignore fades and comes back after 12 seconds, and **Skip lessons** ends them for good. The rocket start is a one-line tip at the next race start. You clear the prologue just by finishing.
+- **Driving School:** a calm practice lap of Sprout Speedway with every lesson, on your own, with nothing to win or lose. Open it with 🎓 in the Career hub or **Practice** in Settings.
+- **First-time tips:** one line the first time you grab an item, find a shortcut, play Balloon Battle, open the online lobby or hold an item you can throw backwards. At most one every 20 seconds, never during the countdown and never in online races.
+- **Steering help offer:** a new player who keeps hitting walls or falling off in their first races is asked once whether to turn on Strong steering assist. New saves start on Light.
+- **Feel:** a short camera shake on big hits, hard landings and boosts, a zoom that kicks in on boost and eases out after, a split-second slowdown on big hits (single player only), sparkles and a pop on item pickups, a flash and whoosh when you use one, a flash on boost pads, a whoosh and "+1" on overtakes, confetti and an easing camera at the finish. Phones that support vibration (Android) buzz on hits, boosts and pickups; iPhone Safari has no vibration API, so iPhones stay still. **Settings → Screen shake** (Off, Low or Normal) turns the shake, zoom, slowdown and buzzing down or off; it starts on Off if your device asks for reduced motion.
 
 ## Playing on iPhone
 
@@ -160,7 +169,8 @@ How it works:
 - **Hitting walls:** steer away and the kart swings back into the race direction. If you're ever pinned, the drone lifts you back onto the road after a few seconds, and the pause menu has **Stuck? Back on the road** to do it at once.
 - **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
-- **Steering assist:** Off, Light or Strong in Settings. It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
+- **Steering assist:** Off, Light or Strong in Settings (new saves start on Light). It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
+- **Screen shake:** Off, Low or Normal in Settings.
 - **Name tags:** the other karts show their name and current place above them, so you can see when you pass someone. In online races, friends get big tags in their kart colour that show from far away; computer racers get small tags up close. Settings switches tags between Everyone, Friends and Off.
 - **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are mostly slow unless you hit them with a boost (Snowmobile Trail, and Dune Surf driven forwards, still pay off without one).
 - **Gems:** each one adds a little top speed, up to 10. Getting hit drops 3.
@@ -211,6 +221,7 @@ zoomies/
   src/ai.js           computer drivers and difficulty levels
   src/items.js        items, prize orbs, gems, obstacles, crates
   src/input.js        tilt, touch and keyboard input
+  src/coach.js        first steps: lessons, one-shot tips, the steering-help offer, haptics
   src/audio.js        synthesised sound effects and music
   tools/build-single.mjs  bundles everything into one HTML file
 ```

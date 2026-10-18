@@ -8,9 +8,13 @@ import { fmtTime, ordinal, clamp } from './util.js';
 import { saveSettings } from './settings.js';
 import { cleanNick } from './nametags.js';
 import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
+<<<<<<< HEAD
 import { missionView, missionStreak, MISSION_XP } from './missions.js';
 import { nextUp } from './nextup.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
+=======
+import { isTouch } from './platform.js';
+>>>>>>> worktree-agent-a8133e950e1e5a46b
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
 const $ = (id) => document.getElementById(id);
@@ -61,6 +65,7 @@ export class UI {
         else if (action === 'profile') this.profileScreen();
         else if (action === 'gumball') app.gumballUI.open('title');
         else if (action === 'wheel') app.wheelHost.open('title');
+        else if (action === 'story') app.startIntro();
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
@@ -85,7 +90,14 @@ export class UI {
       case 'settings':
         if (action === 'wheelpad') app.wheelPad.open();
         else if (action === 'sync') app.sync.open('settings');
-        else this.closeOverlay();
+        else if (action === 'school') app.startSchool('title');
+        else if (action === 'intro') {
+          const from = this.returnTo;
+          this.intro(() => this.overlay('settings', from));
+        } else this.closeOverlay();
+        break;
+      case 'intro':
+        this._introAction(action);
         break;
       case 'sync':
         app.sync.close();
@@ -139,6 +151,8 @@ export class UI {
   overlay(name, from) {
     this.returnTo = from;
     if (name === 'settings') this._syncSettings();
+    // Driving School and the intro replay start from menus, not mid-race.
+    document.querySelectorAll('#scr-settings .no-pause').forEach((el) => { el.hidden = from === 'pause'; });
     this.show(name);
   }
 
@@ -150,6 +164,7 @@ export class UI {
 
   // ---------------- Title ----------------
   title() {
+    $('scr-title').classList.toggle('first-run', !this.app.settings.introDone);
     this.refreshChip();
     this.show('title');
   }
@@ -637,6 +652,14 @@ export class UI {
       saveSettings(s());
       this._syncSettings();
     });
+    $('set-shake').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      s().shake = b.dataset.v;
+      saveSettings(s());
+      this._syncSettings();
+    });
     $('set-tags').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;
@@ -671,6 +694,7 @@ export class UI {
     document.querySelectorAll('#set-quality [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.quality));
     document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
     document.querySelectorAll('#set-assist [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.assist || 'off')));
+    document.querySelectorAll('#set-shake [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.shake || 'normal')));
     $('set-sens').value = s.tiltSens;
     $('set-invert').checked = s.invertTilt;
     $('set-music').checked = s.music;
@@ -681,7 +705,59 @@ export class UI {
     $('set-about').textContent = this.app.versionInfo;
   }
 
+  // ---------------- First-run intro ----------------
+  // One screen: on a phone a live tilt check with "Set level" and a touch
+  // fallback (picked for you if motion access is refused or silent for 2 s);
+  // on a computer the keyboard controls. done() runs on "Let's go!".
+  intro(done) {
+    const app = this.app;
+    this._intro = { done, t0: performance.now() };
+    $('scr-intro').querySelector('.intro').classList.remove('touchsteer');
+    $('intro-title').textContent = 'Hold your phone like a steering wheel';
+    $('intro-status').textContent = 'Turn it left and right: the dot follows. Hold it straight and tap Set level.';
+    if (isTouch) {
+      app.settings.steering = 'tilt';
+      // Asked from inside the tap that opened this screen (iOS permission rules).
+      app.input.requestTilt().then((ok) => { if (!ok) this._introTouch('Motion access is off, so touch steering is on.'); });
+    }
+    this.show('intro');
+  }
+
+  _introTouch(msg) {
+    const app = this.app;
+    app.settings.steering = 'touch';
+    saveSettings(app.settings);
+    app.applyControls();
+    $('scr-intro').querySelector('.intro').classList.add('touchsteer');
+    $('intro-title').textContent = 'Steer with your thumb';
+    $('intro-status').textContent = `${msg} Drag on the left side of the screen to steer.`;
+  }
+
+  _introAction(action) {
+    const app = this.app, inp = app.input;
+    if (action === 'level') {
+      app.settings.tiltZero = inp.tilt.angle;
+      saveSettings(app.settings);
+      $('intro-status').textContent = 'Level set ✓ Now turn it like a wheel.';
+    } else if (action === 'touch') this._introTouch('Touch steering is on.');
+    else if (action === 'go') {
+      app.settings.introDone = true;
+      saveSettings(app.settings);
+      const done = this._intro && this._intro.done;
+      this._intro = null;
+      if (done) done();
+    }
+  }
+
   tick() {
+    if (this.current === 'intro' && this._intro && isTouch && this.app.settings.steering === 'tilt') {
+      const inp = this.app.input;
+      const v = inp.tilt.listening ? inp.tiltSteer() : 0;
+      $('intro-dot').style.transform = `translateX(${v * 100}px)`;
+      $('intro-wheel').style.transform = `rotate(${90 + v * 40}deg)`;
+      // No motion events within 2 seconds (real time): fall back to touch steering.
+      if (!inp.tiltLive && performance.now() - this._intro.t0 > 2000) this._introTouch('No motion sensor found, so touch steering is on.');
+    }
     if (this.current === 'settings') {
       const inp = this.app.input;
       const v = inp.tilt.listening ? inp.tiltSteer() : 0;
@@ -694,7 +770,9 @@ export class UI {
   lobby(view, error = '') {
     $('lobby-start').hidden = view !== 'start';
     $('lobby-room').hidden = view !== 'room';
-    $('lobby-error').textContent = error;
+    const tip = !error && view === 'start' ? this.app.coach.lobbyTip() : '';
+    $('lobby-error').textContent = error || tip;
+    $('lobby-error').classList.toggle('tip', !!tip);
     if (view === 'start') {
       $('nick').value = this.app.settings.name || '';
       $('lobby-status').textContent = '';

@@ -10,6 +10,7 @@ import { FX } from './particles.js';
 import { charById } from './characters.js';
 import { wheelGeometry } from './karts.js';
 import { clamp, damp, dampAngle, pbrMat, GeoBuilder, ordinal } from './util.js';
+import { SHAKE } from './settings.js';
 import { SkidMarks } from './skids.js';
 import { Battle, BattleAI, MAX_BALLOONS } from './battle.js';
 import * as TX from './textures.js';
@@ -292,6 +293,7 @@ export class Race {
     const inp = this.player && this.player.ai == null && this.state !== 'wait' ? this.app.input.read(dt) : null;
     if (inp && this.player) {
       Object.assign(this.player.ctl, inp);
+      this.lastInput = inp; // the player's own steering, before the assist (lessons read it)
       this._assist(this.player, this.player.ctl);
       this.lookBack = !!inp.lookBack && this.state === 'race';
       if (this.state === 'countdown') this._trackRocket(inp);
@@ -477,8 +479,10 @@ export class Race {
     const a = this.app.audio;
     const hud = this.app.hud;
     const near = k.isPlayer || (this.player && k.pos.distanceToSquared(this.player.pos) < 400);
+    const coach = k.isPlayer && this.mode !== 'demo' ? this.app.coach : null;
     for (let i = 0; i < ev.length; i += 2) {
       const type = ev[i], data = ev[i + 1];
+      if (coach) coach.event(type, data, k);
       switch (type) {
         case 'useItem': {
           const used = this.items.use(k, null, null, k.ctl.aim || 0);
@@ -491,12 +495,13 @@ export class Race {
             if (snd && (k.isPlayer || used !== 'chili')) a.play(snd);
             if (k.isPlayer && used === 'rocket') hud.toast('ROCKET RIDE!');
           }
+          if (used && coach) { coach.event('used', used, k); hud.itemUsed(); a.play('whoosh'); }
           break;
         }
         case 'boost':
           if (k.isPlayer && data >= 1) this.app.wheelHost.event('boost');
           if (k.isPlayer && data < 1.3) a.play('miniturbo');
-          if (k.isPlayer) this.shake = Math.max(this.shake, 0.15);
+          if (k.isPlayer) { this.shake = Math.max(this.shake, 0.15); if (coach) coach.feel('boost'); }
           break;
         case 'driftLevel':
           if (k.isPlayer) a.play('driftLevel', data);
@@ -521,7 +526,7 @@ export class Race {
             this.fx.burst(k.pos.x, k.pos.y + 0.2, k.pos.z, ['#ffffff', '#cfefff'], 16, 7, 0.9, 0.7, 10, false);
             break;
           }
-          if (k.isPlayer) a.play('land');
+          if (k.isPlayer) { a.play('land'); if (data > 0.5) this.shake = Math.max(this.shake, Math.min(0.35, data * 0.2)); }
           this.fx.burst(k.pos.x, k.pos.y + 0.2, k.pos.z, [this.dust], 8, 4, 1.2, 0.5, 2, false);
           break;
         case 'transform':
@@ -553,7 +558,7 @@ export class Race {
           break;
         case 'hit':
           if (near) a.play('hit');
-          if (k.isPlayer) { this.shake = 0.6; this.flash = Math.max(this.flash, 0.25); this.app.wheelHost.event('hit'); }
+          if (k.isPlayer) { this.shake = 0.6; this.flash = Math.max(this.flash, 0.25); this.app.wheelHost.event('hit'); if (coach) coach.feel('hit'); }
           for (let n = 0; n < data; n++) {
             this.fx.glow.emit(k.pos.x, k.pos.y + 1, k.pos.z, (Math.random() - 0.5) * 8, 6 + Math.random() * 4, (Math.random() - 0.5) * 8, '#46f0ff', 0.7, 0.3, 0.9, 16, 0.5);
           }
@@ -600,7 +605,7 @@ export class Race {
           k._padCool = this.time;
           k.startBoost(1.0, 10);
           // In the sky the boost pads are rings to fly through.
-          if (k.isPlayer) this.app.audio.play(k.mode === 2 ? 'ring' : 'boost');
+          if (k.isPlayer) { this.app.audio.play(k.mode === 2 ? 'ring' : 'boost'); this.flash = Math.max(this.flash, 0.12); }
           if (k.isPlayer && k.mode === 2) this.style('RING', 5, 'gold');
         }
       }
@@ -940,7 +945,13 @@ export class Race {
     if (k.isPlayer) { this.flash = 0.4; this.app.hud.toast('WARP!'); }
   }
 
-  onBoxHit(k) { if (k.isPlayer) this.app.audio.play('item'); }
+  onBoxHit(k) {
+    if (!k.isPlayer) return;
+    this.app.audio.play('item');
+    // A pop of sparkles as the orb bursts.
+    this.fx.burst(k.pos.x, k.pos.y + 1.4, k.pos.z, ['#ffd23f', '#ffffff', '#c77dff'], 14, 6, 0.4, 0.5, 3);
+    if (this.mode !== 'demo') { this.app.coach.event('orb', null, k); this.app.coach.feel('pickup'); }
+  }
   onGem(k) {
     k.gemsGot = (k.gemsGot || 0) + 1;
     if (k.isPlayer) this.app.audio.play('gem');
@@ -950,7 +961,7 @@ export class Race {
 
   // The player's item landed on someone: style points.
   _hitBy(k, owner) {
-    if (owner && owner === this.player && k !== owner && k.spinTime > 0) this.style('HIT', 20, 'hit');
+    if (owner && owner === this.player && k !== owner && k.spinTime > 0) { this.style('HIT', 20, 'hit'); this.app.coach.feel('hit'); }
     if (this.battle && k.spinTime > 0) this.battle.credit(k, owner);
   }
 
@@ -977,6 +988,8 @@ export class Race {
     if (this._overtakeT > 0) this._overtakeT -= dt;
     if (this._lastPlace && p.place < this._lastPlace && this.raceTime > 4 && this._overtakeT <= 0) {
       this.style('OVERTAKE', 10, 'mint');
+      this.app.audio.play('whoosh');
+      this.app.hud.placeUp();
       this._overtakeT = 1.2;
       this.honk();
     }
@@ -1312,8 +1325,10 @@ export class Race {
     if (Math.abs(trk.d) < trk.wd + 1 && !(cp.voids.length && cp.isVoid(trk.s))) this.camPos.y = Math.max(this.camPos.y, trk.y + 1.3);
     this.camLook.set(k.pos.x + fx * 3.5, k.pos.y + 1.25, k.pos.z + fz * 3.5);
     this.camera.position.copy(this.camPos);
-    if (this.shake > 0) {
-      const s = this.shake * 0.25;
+    // Screen shake and the boost zoom scale with the Screen shake setting.
+    const feel = SHAKE[this.app.settings.shake] ?? 1;
+    if (this.shake > 0 && feel > 0) {
+      const s = this.shake * 0.25 * feel;
       this.camera.position.x += (Math.random() - 0.5) * s;
       this.camera.position.y += (Math.random() - 0.5) * s;
     }
@@ -1322,7 +1337,7 @@ export class Race {
     const rollT = (k.drifting ? -k.driftDir * 0.035 : -(k.steerS || 0) * 0.015 * sf) * (1 + this.camPlane * 2.5);
     this.camRoll = snap ? rollT : damp(this.camRoll, rollT, 4, dt);
     this.camera.rotateZ(this.camRoll);
-    this.fov = 68 + sf * 7 + (k.boostTime > 0 ? 7 : 0) + (k.rocketTime > 0 ? 6 : 0);
+    this.fov = 68 + sf * 7 + ((k.boostTime > 0 ? 7 : 0) + (k.rocketTime > 0 ? 6 : 0)) * feel;
   }
 
   // ---------------- podium ceremony ----------------
@@ -1425,7 +1440,8 @@ export class Race {
   _orbitCam(dt, k) {
     const a = this.stateTime * 0.35 + k.yaw + Math.PI * 0.75;
     const want = this._v.set(k.pos.x + Math.sin(a) * 8.5, k.pos.y + 3.2, k.pos.z + Math.cos(a) * 8.5);
-    this.camPos.lerp(want, 1 - Math.exp(-4 * dt));
+    // Ease out of the chase view as you cross the line.
+    this.camPos.lerp(want, 1 - Math.exp(-(1.5 + Math.min(1, this.stateTime) * 2.5) * dt));
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(k.pos.x, k.pos.y + 1.2, k.pos.z);
     this.fov = damp(this.fov, 55, 3, dt);
@@ -1482,7 +1498,8 @@ export class Race {
     this.fill.position.y += 4;
     this.fill.target.position.copy(this.camLook);
     if (Math.abs(this.camera.fov - this.fov) > 0.05) {
-      this.camera.fov = damp(this.camera.fov, this.fov, 6, dt);
+      // The boost zoom kicks in fast and eases out slowly.
+      this.camera.fov = damp(this.camera.fov, this.fov, this.fov > this.camera.fov ? 6 : 2.5, dt);
       this.camera.updateProjectionMatrix();
       this.fx.setScale(this.viewH || 800, this.camera.fov);
     }

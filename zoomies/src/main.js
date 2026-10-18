@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadSettings, saveSettings, loadRecords, saveRecords, QUALITY } from './settings.js';
+import { loadSettings, saveSettings, loadRecords, saveRecords, QUALITY, hasSettings } from './settings.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
@@ -16,6 +16,7 @@ import { medalAward, medalTier, nextMedal, MEDALS } from './medals.js';
 import { encodeChallenge, challengeUrl, decodeChallenge, hasChallenge, challengeText } from './ghostlink.js';
 import { loadGhost } from './ghost.js';
 import { Showroom } from './showroom.js';
+import { Coach } from './coach.js';
 import { Race } from './race.js';
 import { CHARACTERS, charById, charLocked } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
@@ -67,7 +68,16 @@ class App {
     this.settings = loadSettings();
     this.records = loadRecords();
     // One save for career progress, the wallet, XP, stats and achievements.
-    this.career = loadCareer() || newCareer();
+    const saved = loadCareer();
+    this.career = saved || newCareer();
+    // Brand-new players get the first-run intro and the lessons; everyone else
+    // is marked as having seen them, once.
+    if (this.settings.introDone === undefined) {
+      const fresh = !saved && !hasSettings();
+      this.settings.introDone = !fresh;
+      this.settings.lessonsDone = !fresh;
+      saveSettings(this.settings);
+    }
     this.careerRun = null;
     this.pendingStories = []; // story scenes the hub plays next (career.js applyResult)
     this.canvas = $('gl');
@@ -97,6 +107,7 @@ class App {
     this.ui = new UI(this);
     this.careerUI = new CareerUI(this, this.ui);
     this.gumballUI = new GumballUI(this);
+    this.coach = new Coach(this);
     // A phone can be the steering wheel for a computer (see wheel.js).
     this.wheelHost = new WheelHost(this);
     this.wheelPad = new WheelPad(this);
@@ -116,6 +127,8 @@ class App {
     this.blockRaise = 0;
     this.fpsFrames = 0;
     this.fpsTime = 0;
+    this.hitStopT = 0; // big-hit slowdown left (single player only)
+    this.hitStopCool = 0;
 
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -386,6 +399,7 @@ class App {
     clearTimeout(this._prevT);
     // Only daily challenge races report back as the daily.
     if (!cfg.dailyEv) this.dailyRun = null;
+    this.schoolRun = !!cfg.school;
     this.lastCfg = cfg;
     this.disposeRace();
     this.paused = false;
@@ -413,7 +427,28 @@ class App {
     this.audio.setTempo(1);
     this.audio.playSong(this.race.trackDef.music, this.race.trackDef.theme);
     this._tiltChecked = false;
+    this.coach.start(this.race, cfg);
     this.requestWake();
+  }
+
+  // Driving School: a calm solo lap of Sprout Speedway with every lesson. No
+  // stakes and no rewards; from = 'career' or 'title' (where it goes back to).
+  startSchool(from) {
+    this.gp = null;
+    this.careerRun = null;
+    this.schoolFrom = from;
+    const c = this.career;
+    const player = c.racer || this.menuChar();
+    this.startRace({ mode: 'quick', trackId: 'sprout', reverse: false, player, grid: [player], speedClass: 'chill', difficulty: 'easy', laps: 1, playerLoadout: this.menuLoadout(), school: true });
+  }
+
+  // A big hit freezes the action for a split second, in single-player races
+  // only (never online). Capped and never stacked.
+  hitStop() {
+    const r = this.race;
+    if (!r || r.mode === 'mp' || r.mode === 'demo' || r.net || this.hitStopT > 0 || this.hitStopCool > 0) return;
+    this.hitStopT = 0.07;
+    this.hitStopCool = 0.6;
   }
 
   restart() {
@@ -495,6 +530,7 @@ class App {
 
   // ---------------- results ----------------
   onRaceComplete(race, rows, afterPodium = false) {
+    if (this.schoolRun) { this.onSchoolComplete(); return; }
     // Races (not time trials or Grand Prix legs) end on the podium first.
     if (!afterPodium && race.mode !== 'tt' && race.mode !== 'demo' && !this.gp && race.state !== 'podium') {
       this.audio.stopEngine();
@@ -730,6 +766,14 @@ class App {
       case 'leave':
         this.leaveMP();
         break;
+      case 'school':
+        this.startSchool(this.schoolFrom);
+        break;
+      case 'schoolout':
+        this.schoolRun = false;
+        if (this.schoolFrom === 'career') this.openCareer();
+        else this.toTitle();
+        break;
       case 'retry':
         if (this.dailyRun) this.startDaily();
         else if (this.careerRun) this.startCareerEvent(this.careerRun.evId);
@@ -828,10 +872,24 @@ class App {
     return true;
   }
 
+  // Driving School ends without a podium or rewards.
+  onSchoolComplete() {
+    this.audio.stopEngine();
+    this.menuOpen = false;
+    this.hud.show(false);
+    this.applyControls();
+    this.audio.play('finish');
+    this.ui.results({
+      title: 'Lap done!', sub: 'Driving School',
+      html: '<p class="car-tip">Practice laps pay nothing and cost nothing. Come back any time from the Career or Settings.</p>',
+      buttons: [['school', 'Again', 'alt'], ['schoolout', 'Done', 'hot']],
+    });
+  }
+
   // ---------------- career ----------------
   // Leave a race from the pause menu: career players go back to the hub.
   quitRace() {
-    if (this.careerRun) this.openCareer();
+    if (this.careerRun || (this.schoolRun && this.schoolFrom === 'career')) this.openCareer();
     else this.toTitle();
   }
 
@@ -853,6 +911,11 @@ class App {
     else this.careerUI.open();
   }
 
+  // First run: the tilt step (or the keyboard on a computer), then the story.
+  startIntro() {
+    this.ui.intro(() => this.openCareer());
+  }
+
   resetCareer() {
     clearCareer();
     this.career = newCareer();
@@ -866,7 +929,6 @@ class App {
     const rival = rivalFor(c, chapter);
     const lo = playerLoadout(c);
     const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0 };
-    this._coachAt = 0;
     this.careerRun = { evId };
     if (ev.type === 'cup') {
       this.gp = {
@@ -883,25 +945,6 @@ class App {
     } else {
       const grid = this.makeGrid(player, null, [rival]);
       this.startRace({ ...base, mode: 'quick', grid, loadoutsById: aiLoadouts(chapter, grid.filter((id) => id !== player), rival) });
-    }
-  }
-
-  // The prologue race teaches drifting and boosting with a few hints.
-  _coach() {
-    const r = this.race, run = this.careerRun;
-    if (!r || !run || r.mode === 'demo' || r.state !== 'race') return;
-    const ev = eventById(run.evId).ev;
-    if (!ev.tutorial) return;
-    const steps = [
-      [1, 'Tilt or steer to follow the road. Stay off the grass!'],
-      [6, 'Hold DRIFT in a bend, steer into it, and let go when the sparks glow for a BOOST.'],
-      [16, 'Drive through item boxes, then press ITEM to use what you get.'],
-      [26, 'Nearly there. Keep drifting to build speed for the finish!'],
-    ];
-    const i = this._coachAt || 0;
-    if (i < steps.length && r.raceTime >= steps[i][0]) {
-      this.hud.hint(steps[i][1], 4.5);
-      this._coachAt = i + 1;
     }
   }
 
@@ -1132,6 +1175,8 @@ class App {
     this.hud.reset(this.race);
     this.hud.show(true);
     this.hud.hint('Get ready…', 3);
+    this.schoolRun = false;
+    this.coach.start(this.race);
     this.input.resetButtons();
     this.applyControls();
     this.audio.unlock();
@@ -1154,8 +1199,11 @@ class App {
     this._pollPad();
     if (!this.paused && this.view) {
       this.renderer.info.reset();
-      this.view.update(dt);
-      if (this.careerRun) this._coach();
+      // Hit-stop slows only the local simulation step, for a moment.
+      let sim = dt;
+      if (this.hitStopT > 0) { this.hitStopT -= dt; sim = dt * 0.15; } else if (this.hitStopCool > 0) this.hitStopCool -= dt;
+      this.view.update(sim);
+      this.coach.tick(dt);
       this._checkTilt();
       this._frameStats(dt);
       if (this.post.active) this.post.render(this.view.scene, this.view.camera, this.view.grade, dt);
