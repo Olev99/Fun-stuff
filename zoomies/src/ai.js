@@ -2,10 +2,15 @@ import { clamp, wrapAngle } from './util.js';
 import { AIM_DEFAULT } from './items.js';
 
 // How the computer racers behave at each difficulty.
+// rubberUp / rubberDown: how much faster computer racers behind the human go
+// (up to +x at 240 m back) and slower the ones ahead (down to -x). Kept low
+// enough that the better driver can pull away and skill beats luck (tools/balance.mjs
+// measured the first-to-last gap at about 10% of race time), and Hard lets
+// racers behind catch up more than Normal so its field stays tight.
 export const DIFFICULTY = {
   easy: { id: 'easy', name: 'Easy', speed: 0.89, skill: [0.72, 0.84], rubberUp: 0.05, rubberDown: 0.16, drift: 0.3, dodge: 0.3, shortcut: 0, items: 0.35, rocketStart: 0.1 },
-  normal: { id: 'normal', name: 'Normal', speed: 0.955, skill: [0.84, 0.95], rubberUp: 0.1, rubberDown: 0.09, drift: 0.65, dodge: 0.6, shortcut: 0.35, items: 0.7, rocketStart: 0.3 },
-  hard: { id: 'hard', name: 'Hard', speed: 1.0, skill: [0.95, 1.0], rubberUp: 0.14, rubberDown: 0.035, drift: 0.95, dodge: 0.9, shortcut: 0.8, items: 1, rocketStart: 0.6 },
+  normal: { id: 'normal', name: 'Normal', speed: 0.955, skill: [0.84, 0.95], rubberUp: 0.08, rubberDown: 0.05, drift: 0.65, dodge: 0.6, shortcut: 0.35, items: 0.7, rocketStart: 0.3 },
+  hard: { id: 'hard', name: 'Hard', speed: 1.0, skill: [0.95, 1.0], rubberUp: 0.1, rubberDown: 0.03, drift: 0.95, dodge: 0.9, shortcut: 0.8, items: 1, rocketStart: 0.6 },
 };
 
 // Whether an all-offroad cut is quicker than the road even without a boost

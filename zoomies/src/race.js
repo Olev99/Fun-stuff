@@ -162,6 +162,7 @@ export class Race {
     this.raceTime = 0;
     this.results = null;
     this.flash = 0;
+    this.stormQueue = []; // Zap Clouds waiting to strike
     this.shake = 0;
     this.found = new Set();
     this.stylePts = 0;
@@ -319,6 +320,7 @@ export class Race {
     if (this.ghost) this.ghost.update(locked ? 0 : this.raceTime);
 
     this.items.update(dt, this.session ? this.netClock : this.time);
+    for (let i = this.stormQueue.length - 1; i >= 0; i--) if ((this.stormQueue[i].t -= dt) <= 0) this._zap(this.stormQueue.splice(i, 1)[0].user);
     if (this.battle) {
       this.battle.update(dt);
       this.battle.animate(dt, this.time);
@@ -868,8 +870,15 @@ export class Race {
     sk.update(dt);
   }
 
-  // Zap Cloud: zap everyone ahead of the user.
+  // Zap Cloud: the sky darkens first, then everyone ahead of the user is
+  // zapped a moment later. A Bubble Shield, Pogo hop, Spook Mask or Rainbow
+  // Rush in that window blocks it, so the leader gets a chance to answer.
   storm(user) {
+    this.stormQueue.push({ user, t: 1.1 });
+    if (this.player && this.player.place < user.place) this.app.hud.toast('ZAP CLOUD! Shield up or hop!');
+  }
+
+  _zap(user) {
     for (const k of this.karts) {
       if (k === user || k.place > user.place) continue;
       if (k.remote) this.net.sendHit(k, 'zap');
