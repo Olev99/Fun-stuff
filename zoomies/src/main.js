@@ -12,6 +12,7 @@ import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { BODIES, bodyLocked } from './karts.js';
 import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
+import { weeklyFor, weeklyFinish, weekNum } from './weekly.js';
 import { medalAward, medalTier, nextMedal, MEDALS } from './medals.js';
 import { encodeChallenge, challengeUrl, decodeChallenge, hasChallenge, challengeText } from './ghostlink.js';
 import { loadGhost } from './ghost.js';
@@ -651,6 +652,7 @@ class App {
     const sum = awardRace(this.career, {
       mode: race.mode, place: me ? me.place : 0, gems: (race.player && race.player.gemsGot) || 0,
       style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id, online: race.mode === 'mp',
+      racer: race.player && race.player.ch.id, body: race.player && race.player.bodyDef && race.player.bodyDef.id,
       bike: !!(race.player && race.player.bodyDef && race.player.bodyDef.kind === 'bike'), battle: !!race.battle, pops: race.battle ? (me && me.hits) || 0 : 0, ...extra,
     });
     return this.rewardsFinish(sum);
@@ -683,6 +685,7 @@ class App {
     const pass = me.place <= d.goal && gems >= (d.gems || 0);
     const sum = awardRace(this.career, {
       mode: race.mode, place: me.place, gems, style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id,
+      racer: race.player.ch.id, body: race.player.bodyDef.id,
     });
     const lines = [];
     let title = pass ? 'Challenge complete!' : 'Not quite!';
@@ -708,6 +711,39 @@ class App {
     });
   }
 
+  // ---------------- weekly cup ----------------
+  // This week's special Grand Prix: 4 tracks, one twist, retry as often as you like.
+  startWeekly() {
+    const w = weeklyFor();
+    const player = this.menuChar();
+    this.careerRun = null;
+    this.dailyRun = null;
+    this.gp = {
+      cup: { id: `weekly-${w.week}`, name: w.name }, weekly: w, tracks: w.tracks, reverse: false, index: 0, points: {}, speedClass: w.cls, player,
+      extra: { playerLoadout: this.menuLoadout(), mods: w.mod, difficulty: w.diff },
+    };
+    this._gpField(this.gp);
+    this.startGPRace();
+  }
+
+  onWeeklyFinal(table, me) {
+    const gp = this.gp, w = gp.weekly;
+    const r = weeklyFinish(this.career, me.place, w.week);
+    const ord = `${me.place}${ordinal(me.place).toLowerCase()}`;
+    const lines = [r.improved ? `Cup XP for ${ord} place${r.was ? ` (better than your ${r.was}${ordinal(r.was).toLowerCase()} this week)` : ''}` : `Your best this week is still ${r.best}${ordinal(r.best).toLowerCase()}: retries only pay when you do better.`];
+    if (r.trophy) lines.push(`🏅 Week ${weekNum(w.week)} trophy added to your profile · 🔥 ${r.streak} podium week${r.streak === 1 ? '' : 's'} in a row`);
+    if (r.capsule) lines.push('🍬 Free prize capsule for this week\'s podium!');
+    this.audio.play(me.place <= 3 ? 'finish' : 'lose');
+    const rw = this.rewardsFinish(r, lines);
+    this.ui.results({
+      title: 'Weekly Cup',
+      sub: `${w.name} · ${w.mod.icon} ${w.mod.name}`,
+      html: `${rw}<div class="trophy">${me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁'}</div>
+        <div class="results">${table.map((t) => this.ui.row(t, `<span></span><span class="pts">${t.pts}</span>`)).join('')}</div>`,
+      buttons: [['menu', 'Menu', 'ghost small'], ['again', 'Try again', 'hot']],
+    });
+  }
+
   showGPFinal(afterPodium = false) {
     const gp = this.gp;
     const table = gp.field.map((id) => ({ ch: charById(id), pts: gp.points[id], isPlayer: id === gp.player }))
@@ -722,6 +758,10 @@ class App {
     }
     if (gp.careerEv) {
       this.onCareerCupFinal(table, me);
+      return;
+    }
+    if (gp.weekly) {
+      this.onWeeklyFinal(table, me);
       return;
     }
     const trophy = me.place === 1 ? '🏆' : me.place === 2 ? '🥈' : me.place === 3 ? '🥉' : '🏁';
@@ -797,6 +837,7 @@ class App {
         this.showGPFinal();
         break;
       case 'again': {
+        if (this.gp.weekly) { this.startWeekly(); break; }
         const cup = this.gp.cup;
         this.settings.cup = cup.id;
         this.startFromMenu('gp');

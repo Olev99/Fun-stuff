@@ -107,7 +107,8 @@ export class HUD {
     }
     const ev = race.careerEv;
     const dv = race.dailyEv;
-    const cls = dv ? `Daily challenge · ${dv.mod.icon} ${dv.mod.name}` : ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : race.battle ? '🎈 Balloon Battle' : `${race.speedClass.name} class`;
+    const gw = this.app.gp && this.app.gp.weekly;
+    const cls = dv ? `Daily challenge · ${dv.mod.icon} ${dv.mod.name}` : gw ? `Weekly Cup · ${gw.mod.icon} ${gw.mod.name}` : ev ? ev.title : race.mode === 'tt' ? 'Time Trial' : race.battle ? '🎈 Balloon Battle' : `${race.speedClass.name} class`;
     const extra = this.app.gp ? ` · Race ${this.app.gp.index + 1} of ${this.app.gp.tracks.length}` : '';
     this.trackName.innerHTML = `<small>${cls}${extra}</small>${race.trackDef.name}${race.track.reverse ? ' ⟲' : ''}`;
     this.trackName.hidden = false;

@@ -311,10 +311,39 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .daily-btn { background: linear-gradient(135deg, #ffd23f, #ff9ecb 60%, #c77dff); }
 .daily-btn:not(.done)::after { content: "NEW"; position: absolute; right: 10px; top: 8px; font-size: 10px; padding: 2px 5px 1px; border-radius: 6px; background: var(--berry); color: var(--cream); animation: blink 1.2s steps(2) infinite; }
 .daily-btn { position: relative; }
+.menu-row.two .btn { padding: 8px 8px 7px; line-height: 1.05; }
+.menu-row.two .btn .sub { white-space: normal; font-size: 10.5px; line-height: 1.15; margin-top: 2px; }
+.menu-row.two .daily-btn:not(.done)::after { right: 5px; top: 4px; font-size: 8.5px; padding: 2px 4px 1px; }
+.weekly-btn { background: linear-gradient(135deg, #3fe0b0, #3fb0ff 60%, #8f5cff); position: relative; }
+.weekly-btn.done { filter: saturate(.6); }
+.weekly-btn:not(.done)::after { content: "WEEK"; position: absolute; right: 6px; top: 5px; font-size: 9px; padding: 2px 4px 1px; border-radius: 6px; background: var(--berry); color: var(--cream); }
+.daily-facts .wide { grid-column: 1 / -1; }
+.weekly .daily-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.weekly .daily-facts div { font-size: 12px; }
+.weekly .daily-reward { font-size: 12px; }
+.weekly .wdesc { margin: 0; font-weight: 700; font-size: 14px; }
+/* Mastery and Weekly Cup badges */
+.mst { color: var(--sc, transparent); font-family: var(--font-display); font-size: 12px; line-height: 1; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+.mst b { font-weight: 400; font-size: 10px; color: var(--cream); margin-left: 1px; }
+.ci-mast { font-weight: 800; font-size: 12.5px; color: var(--cream); } .ci-mast .mst { font-size: 15px; } .ci-mast b { color: var(--sun); font-family: var(--font-display); font-weight: 400; }
+.card .ms, .vcard .ms { position: absolute; top: 3px; left: 4px; font-family: var(--font-display); font-size: 11px; color: var(--sc, transparent); text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+.vcard .ms { left: auto; right: 4px; font-size: 10px; }
+.card .ms:empty, .vcard .ms:empty { display: none; }
+.prof-sec { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 5px; font-family: var(--font-display); color: var(--sun); font-size: 14px; }
+.prof-sec b { font-weight: 400; } .prof-sec span { font-family: var(--font-body); font-weight: 700; font-size: 11.5px; color: var(--muted); }
+.wbadges { display: flex; flex-wrap: wrap; gap: 5px; } .wbadges small { font-weight: 700; font-size: 11.5px; color: var(--muted); }
+.wbadge { font-weight: 800; font-size: 11.5px; padding: 3px 8px; border-radius: 10px; background: rgba(63,224,176,.18); }
+.mast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.mrow { display: grid; grid-template-columns: 38px 1fr; gap: 8px; align-items: center; padding: 5px 9px; border-radius: 12px; background: rgba(0,0,0,.2); }
+.mrow .mst { font-size: 18px; text-align: center; } .mrow .mst b { font-size: 11px; display: block; margin: 0; }
+.mrow .mm { display: grid; gap: 1px; min-width: 0; } .mrow .mm b { font-family: var(--font-display); font-weight: 400; font-size: 12.5px; }
+.mrow small { font-weight: 700; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mbar2 { display: block; height: 5px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; margin-top: 2px; } .mbar2 i { display: block; height: 100%; background: var(--mint); }
+.rw-mast { color: var(--cream); } .rw-ach.rw-mast { background: rgba(63,224,176,.16); }
 .daily-btn.done { filter: saturate(.55); }
 .daily { width: min(640px, 100%); }
 .daily-body { display: grid; grid-template-columns: minmax(0, 200px) 1fr; gap: 14px; align-items: start; }
-#daily-thumb { width: 100%; border-radius: 14px; border: 3px solid var(--ink); }
+#daily-thumb, #weekly-thumb { width: 100%; border-radius: 14px; border: 3px solid var(--ink); }
 .daily-info { display: grid; gap: 6px; }
 .daily-mod { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 20px; color: var(--sun); }
 .daily-mod span { font-size: 28px; }
@@ -327,7 +356,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .flames i { font-style: normal; font-size: 18px; filter: grayscale(1) opacity(.35); }
 .flames i.on { filter: none; }
 .daily-reward { margin: 0; font-weight: 700; font-size: 13px; color: var(--muted); } .daily-reward b { color: var(--sun); }
-@media (max-width: 600px) { .daily-body { grid-template-columns: 1fr; } #daily-thumb { max-height: 110px; object-fit: contain; } }
+@media (max-width: 600px) { .daily-body { grid-template-columns: 1fr; } #daily-thumb, #weekly-thumb { max-height: 110px; object-fit: contain; } }
 /* Trophies */
 .profile { width: min(720px, 100%); }
 .prof-top { display: flex; gap: 12px; align-items: center; }
@@ -847,7 +876,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .story-btn { display: none; }
 #scr-title.first-run .story-btn { display: block; }
 #scr-title.first-run [data-go="career"] { background: var(--ink-3); }
-#scr-title.first-run [data-go="daily"] { display: none; }
+#scr-title.first-run .menu-row.two { display: none; }
 .intro { width: min(520px, 100%); align-items: center; text-align: center; }
 .intro .bottom-bar { justify-content: center; flex-wrap: wrap; }
 .intro-tilt { display: grid; justify-items: center; gap: 8px; }
@@ -1010,7 +1039,10 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
   <nav class="menu">
     <button class="btn hot story-btn" data-go="story">Start your story<span class="sub">Your first race, about two minutes</span></button>
     <button class="btn hot" data-go="career">Career<span class="sub">From junk kart to champion</span></button>
-    <button class="btn daily-btn" data-go="daily">Daily Challenge<span class="sub" id="menu-daily"></span></button>
+    <div class="menu-row two">
+      <button class="btn daily-btn" data-go="daily">Daily<span class="sub" id="menu-daily"></span></button>
+      <button class="btn weekly-btn" data-go="weekly">Weekly Cup<span class="sub" id="menu-weekly"></span></button>
+    </div>
     <div class="menu-row">
       <button class="btn small" data-go="gp">Grand Prix</button>
       <button class="btn mint small" data-go="quick">Quick Race</button>
@@ -1040,6 +1072,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <div class="char-species" id="ci-species">Cat</div>
       <div class="char-name" id="ci-name">Mochi</div>
       <div class="char-tag" id="ci-tag"></div>
+      <div class="ci-mast" id="ci-mast"></div>
       <div class="stats" id="ci-stats"></div>
     </div>
   </div>
@@ -1271,11 +1304,28 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
   </div>
 </section>
 
+<section id="scr-weekly" class="screen center shade-full" hidden>
+  <div class="dialog panel daily weekly">
+    <div class="top-bar"><h2 class="title">Weekly Cup</h2><span class="eyebrow" id="weekly-date"></span></div>
+    <div class="daily-body">
+      <canvas id="weekly-thumb" width="240" height="180"></canvas>
+      <div class="daily-info">
+        <div class="daily-mod"><span id="weekly-icon"></span><b id="weekly-mod"></b></div>
+        <p id="weekly-desc" class="wdesc"></p>
+        <div class="daily-facts" id="weekly-facts"></div>
+        <div class="daily-streak" id="weekly-streak"></div>
+        <p class="daily-reward" id="weekly-reward"></p>
+      </div>
+    </div>
+    <div class="bottom-bar"><button class="btn ghost small" data-go="back">Back</button><button class="btn hot" data-go="race">Race the cup!</button></div>
+  </div>
+</section>
+
 <section id="scr-profile" class="screen center shade-full" hidden>
   <div class="dialog panel profile">
     <div class="top-bar"><h2 class="title">Trophies</h2><span class="eyebrow" id="prof-count"></span></div>
     <div class="prof-top" id="prof-top"></div>
-    <div class="scroll"><div class="ach-grid" id="ach-grid"></div></div>
+    <div class="scroll"><div id="prof-extra"></div><div class="prof-sec"><b>Trophies</b></div><div class="ach-grid" id="ach-grid"></div></div>
     <div class="bottom-bar"><button class="btn sky small" data-go="sync">⇄ Sync with my other device</button><button class="btn" data-go="close">Done</button></div>
   </div>
 </section>

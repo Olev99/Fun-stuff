@@ -4,6 +4,7 @@ import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
 import { medalCount, bestTier, medalMax } from './medals.js';
 import { bumpMissions } from './missions.js';
+import { addMastery } from './mastery.js';
 
 // The player profile lives in the career save (one wallet for everything):
 // XP and levels from every race, coins from the career, lifetime stats,
@@ -84,6 +85,7 @@ export function awardRace(c, info) {
   const mis = bumpMissions(c, info, info.day);
   const sum = grant(c, coins, xp + mis.xp);
   sum.mis = mis;
+  sum.mastery = addMastery(c, info); // info.racer / info.body; null without them
   if (info.medal) sum.medal = info.medal;
   return sum;
 }

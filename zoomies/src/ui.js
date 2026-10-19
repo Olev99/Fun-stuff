@@ -12,6 +12,8 @@ import { missionView, missionStreak, MISSION_XP } from './missions.js';
 import { nextUp } from './nextup.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
 import { isTouch } from './platform.js';
+import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, WEEKLY_XP_BASE } from './weekly.js';
+import { masteryOf, titleFor, STAR_COLORS, RACER_IDS, BODY_IDS } from './mastery.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
 const $ = (id) => document.getElementById(id);
@@ -59,6 +61,7 @@ export class UI {
         else if (action === 'mp') app.openMultiplayer();
         else if (action === 'career') app.openCareer();
         else if (action === 'daily') this.dailyScreen();
+        else if (action === 'weekly') this.weeklyScreen();
         else if (action === 'profile') this.profileScreen();
         else if (action === 'gumball') app.gumballUI.open('title');
         else if (action === 'wheel') app.wheelHost.open('title');
@@ -131,6 +134,10 @@ export class UI {
         if (action === 'race') app.startDaily();
         else app.toTitle();
         break;
+      case 'weekly':
+        if (action === 'race') app.startWeekly();
+        else app.toTitle();
+        break;
       case 'challenge':
         if (action === 'race') app.startChallenge();
         else app.toTitle();
@@ -176,6 +183,9 @@ export class UI {
     const done = dailyDoneToday(c);
     $('menu-daily').textContent = done ? `Done today ✓ · ${streak}-day streak` : `${d.mod.icon} ${d.mod.name} · +${dailyReward(streak + 1)} 🪙`;
     document.querySelector('[data-go="daily"]').classList.toggle('done', done);
+    const wk = weeklyFor(), wb = weeklyBest(c);
+    $('menu-weekly').innerHTML = `${wk.mod.icon} ${wk.mod.name}<br>${timeLeftText()} · ${wb ? `best ${wb}${ordinal(wb).toLowerCase()}` : 'not raced'}`;
+    document.querySelector('[data-go="weekly"]').classList.toggle('done', !!wb && wb <= 3);
     const nAch = Object.keys(c.ach || {}).length;
     this.missionsPanel();
     $('menu-trophies').textContent = `🏆 ${nAch}/${ACHIEVEMENTS.length}`;
@@ -226,6 +236,26 @@ export class UI {
     this.show('daily');
   }
 
+  // ---------------- Weekly Cup ----------------
+  weeklyScreen() {
+    const c = this.app.career;
+    const w = weeklyFor();
+    this._thumb($('weekly-thumb'), w.tracks.map(trackById), false);
+    const best = weeklyBest(c), streak = weeklyStreak(c);
+    const pl = (n) => `${n}${ordinal(n).toLowerCase()}`;
+    $('weekly-date').textContent = `Week ${weekNum(w.week)} · ${timeLeftText()}`;
+    $('weekly-icon').textContent = w.mod.icon;
+    $('weekly-mod').textContent = w.mod.name;
+    $('weekly-desc').textContent = w.mod.desc;
+    const cls = { chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[w.cls];
+    $('weekly-facts').innerHTML = `<div class="wide"><small>Tracks</small>${w.tracks.map((t) => trackById(t).name).join(' · ')}</div><div><small>Speed</small>${cls} · ${w.diff === 'hard' ? 'Hard' : 'Normal'}</div><div><small>Best this week</small>${best ? pl(best) : 'Not raced'}</div>`;
+    const wt = (c.weekly && c.weekly.trophies.length) || 0;
+    $('weekly-streak').innerHTML = `<span>${streak ? `🔥 ${streak} podium week${streak === 1 ? '' : 's'} in a row` : 'Finish on the podium to start a streak'}${wt ? ` · 🏅 ${wt} Weekly trophies` : ''}</span>`;
+    $('weekly-reward').innerHTML = `Cup points like the Grand Prix. Retry all week: your <b>best</b> counts. XP: <b>${WEEKLY_XP.join(' / ')}</b> for 1st / 2nd / 3rd, ${WEEKLY_XP_BASE} for finishing (only for beating your best). First podium: a <b>Week ${weekNum(w.week)} trophy</b> and a free capsule 🍬.`;
+    this.app.previewTrack(w.tracks[0], false);
+    this.show('weekly');
+  }
+
   // ---------------- Trophies ----------------
   profileScreen() {
     const app = this.app;
@@ -238,6 +268,7 @@ export class UI {
     $('prof-top').innerHTML = `<div class="lvbadge"><small>Level</small>${lv.level}</div>
       <div class="lvinfo"><div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div><small>${lv.into} / ${lv.need} XP to level ${lv.level + 1}</small>
       <div class="pstats"><span>🪙 ${c.coins.toLocaleString('en-US')}</span><span>🏁 ${n('races')} races</span><span>🥇 ${n('wins')} wins</span><span>🔥 best streak ${(c.daily && c.daily.best) || 0}</span><span>🎖️ ${medalCount(app.records)}/${medalMax()} medals</span></div></div>`;
+    $('prof-extra').innerHTML = this.profileExtra(c);
     $('ach-grid').innerHTML = ACHIEVEMENTS.map((a) => {
       const got = !!(c.ach && c.ach[a.id]);
       const [cur, max] = a.prog(c, app.records);
@@ -246,6 +277,36 @@ export class UI {
         ${got ? '<em>Unlocked</em>' : `<span class="abar"><i style="width:${pct}%"></i></span><em>${cur.toLocaleString('en-US')} / ${max.toLocaleString('en-US')} · 🪙 ${a.reward}</em>`}</span></div>`;
     }).join('');
     this.show('profile');
+  }
+
+  // Weekly Cup badges and the mastery list (racers and rides with progress bars).
+  profileExtra(c) {
+    const w = c.weekly || { trophies: [] };
+    const badges = w.trophies.slice(-12).reverse().map((k) => `<span class="wbadge">🏅 Week ${weekNum(k)}</span>`).join('');
+    const weekly = `<div class="prof-sec"><b>Weekly Cup</b><span>${w.trophies.length} trophies · 🔥 ${weeklyStreak(c)} week streak</span></div><div class="wbadges">${badges || '<small>Finish a Weekly Cup on the podium to earn a Week badge.</small>'}</div>`;
+    const rows = (kind, ids, name) => ids.map((id) => ({ id, ...masteryOf(c, kind, id), xp: ((c.mastery || {})[kind] || {})[id] || 0 })).filter((r) => r.xp > 0)
+      .sort((a, b) => b.xp - a.xp).map((r) => {
+        const title = kind === 'r' ? titleFor(r.id, r.level) : '';
+        const nextT = r.level < 3 ? 3 : r.level < 6 ? 6 : 10;
+        return `<div class="mrow"><span class="mst" style="--sc:${STAR_COLORS[r.level - 1] || 'transparent'}">★<b>${r.level}</b></span><span class="mm"><b>${name(r.id)}</b><small>${title || (kind === 'r' ? `Next title at level ${nextT}` : 'Ride mastery')}</small><i class="mbar2"><i style="width:${r.need ? Math.round((r.into / r.need) * 100) : 100}%"></i></i></span></div>`;
+      }).join('');
+    const rr = rows('r', RACER_IDS, (id) => charById(id).name), rb = rows('b', BODY_IDS, (id) => bodyById(id).name);
+    const m = c.mastery || { capLevels: 0 };
+    const mastery = `<div class="prof-sec"><b>Mastery</b><span>Free capsule every 5 levels · ${Math.floor(m.capLevels / 5)} earned</span></div>`
+      + (rr || rb ? `<div class="mast-grid">${rr}${rb}</div>` : '<div class="wbadges"><small>Race with a racer or ride to start its mastery. Mastery never changes your stats.</small></div>');
+    return weekly + mastery;
+  }
+
+  // Mastery gained in a race: the racer and ride, level-ups with new titles, a capsule.
+  masteryHtml(ms) {
+    const name = (p) => (p.kind === 'r' ? charById(p.id).name : bodyById(p.id).name);
+    let h = `<div class="rw-line rw-mast">★ Mastery +${ms.gain}: ${ms.parts.map((p) => `${esc(name(p))}${p.up ? ` ★${p.level}` : ''}`).join(' · ')}</div>`;
+    for (const p of ms.parts) if (p.up) {
+      const t = p.kind === 'r' && titleFor(p.id, p.level) !== titleFor(p.id, p.from) ? ` · new title <b>${titleFor(p.id, p.level)}</b>` : '';
+      h += `<div class="rw-ach rw-mast">★ <b>${esc(name(p))}</b> reached mastery level ${p.level}${t}</div>`;
+    }
+    if (ms.caps) h += '<div class="rw-line rw-mis done">🍬 Free prize capsule for 5 mastery levels!</div>';
+    return h;
   }
 
   // Coins, XP bar, level-ups and new trophies for a results screen.
@@ -271,8 +332,15 @@ export class UI {
       return `<div class="rw-up">⭐ LEVEL ${L}!${gets.length ? ` · ${gets.join(' · ')}` : ''}</div>`;
     }).join('') : '';
     const md = sum && sum.medal ? `<div class="rw-ach rw-medal">${sum.medal.medal.icon} <b>${sum.medal.medal.name} medal!</b> · a new time target beaten <span>+${sum.medal.xp} XP</span></div>` : '';
+    const ms = sum && sum.mastery ? this.masteryHtml(sum.mastery) : '';
     const ach = achs.map((a) => `<div class="rw-ach">🏆 ${a.icon} <b>${a.name}</b> · ${a.desc} <span>+${a.reward} 🪙</span></div>`).join('');
-    return `<div class="rewards">${top}${extra}${md}${mis}${ups}${ach}${next}</div>`;
+    return `<div class="rewards">${top}${extra}${md}${mis}${ms}${ups}${ach}${next}</div>`;
+  }
+
+  // A coloured mastery star with the level (nothing at level 1).
+  _star(el, level) {
+    el.textContent = level > 1 ? `★${level}` : '';
+    el.style.setProperty('--sc', STAR_COLORS[level - 1] || 'transparent');
   }
 
   // ---------------- Characters ----------------
@@ -289,7 +357,7 @@ export class UI {
         b.dataset.id = ch.id;
         b.style.background = ch.color;
         b.setAttribute('aria-label', `${ch.name} the ${ch.species}`);
-        b.innerHTML = `<img alt="" src="${app.portraits[ch.id] || ''}"><span class="nm">${ch.name}</span><span class="lk"></span>`;
+        b.innerHTML = `<img alt="" src="${app.portraits[ch.id] || ''}"><span class="nm">${ch.name}</span><span class="lk"></span><span class="ms"></span>`;
         b.addEventListener('click', () => {
           app.firstGesture('char');
           app.audio.play('select');
@@ -307,6 +375,7 @@ export class UI {
       const lock = charLocked(ch.id, lvl, app.career);
       c.classList.toggle('locked', !!lock);
       c.querySelector('.lk').textContent = lock ? '🔒 Career' : ch.lvl ? 'NEW' : '';
+      this._star(c.querySelector('.ms'), masteryOf(app.career, 'r', ch.id).level);
     });
     this.pickChar(app.settings.char);
     this.show('char');
@@ -319,6 +388,8 @@ export class UI {
     document.querySelectorAll('#char-grid .card').forEach((c) => c.classList.toggle('sel', c.dataset.id === ch.id));
     $('ci-name').textContent = ch.name;
     $('ci-species').textContent = ch.species;
+    const mr = masteryOf(this.app.career, 'r', ch.id), ti = titleFor(ch.id, mr.level);
+    $('ci-mast').innerHTML = `<span class="mst" style="--sc:${STAR_COLORS[mr.level - 1] || 'rgba(255,255,255,.35)'}">★</span> Mastery ${mr.level}${ti ? ` · <b>${ti}</b>` : mr.level < 3 ? ' · title at level 3' : ''}`;
     const lock = this._charLock();
     $('ci-tag').innerHTML = lock ? `${ch.tagline}<br><b class="lockline">🔒 ${lock}</b>` : ch.tagline;
     document.querySelector('#scr-char [data-go="next"]').classList.toggle('dim', !!lock);
@@ -337,7 +408,8 @@ export class UI {
     const id = this.app.menuLoadout().body;
     const b = bodyById(id);
     $('veh-ic').textContent = bodyIcon(b);
-    $('veh-nm').textContent = b.name;
+    const bl = masteryOf(this.app.career, 'b', id).level;
+    $('veh-nm').textContent = bl > 1 ? `${b.name} ★${bl}` : b.name;
     document.querySelectorAll('#vp-grid .vcard').forEach((c) => c.classList.toggle('sel', c.dataset.id === id));
     if (this.app.showroom) this.app.showroom.setChar(charById(this.app.settings.char), { body: preview || id });
   }
@@ -359,7 +431,7 @@ export class UI {
       const el = document.createElement('button');
       el.className = 'vcard' + (lock ? ' locked' : '');
       el.dataset.id = b.id;
-      el.innerHTML = `${FREE_BODIES.includes(b.id) ? '<span class="vf">FREE</span>' : ''}<span class="vi">${bodyIcon(b)}</span>${b.name}<span class="vs">${bar(b.stats.speed)}${bar(b.stats.accel)}${bar(b.stats.handling)}</span>`;
+      el.innerHTML = `${FREE_BODIES.includes(b.id) ? '<span class="vf">FREE</span>' : ''}<span class="vi">${bodyIcon(b)}</span>${b.name}<span class="ms"></span><span class="vs">${bar(b.stats.speed)}${bar(b.stats.accel)}${bar(b.stats.handling)}</span>`;
       el.addEventListener('click', () => {
         if (lock) {
           app.audio.play('wall', 5);
@@ -373,6 +445,7 @@ export class UI {
         saveSettings(app.settings);
         this._vehiclePicker(false);
       });
+      if (!lock) this._star(el.querySelector('.ms'), masteryOf(app.career, 'b', b.id).level);
       grid.appendChild(el);
     }
     this._syncVehicle();

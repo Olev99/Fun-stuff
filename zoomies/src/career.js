@@ -3,6 +3,8 @@ import { BODIES, kartStats } from './karts.js';
 import { trackById } from './tracks.js';
 import { fmtTime } from './util.js';
 import { levelOf, oldLevel } from './profile.js';
+import { emptyWeekly } from './weekly.js';
+import { RACER_IDS, BODY_IDS, MAX_XP, emptyMastery } from './mastery.js';
 import { partById, isPart, MAX_PARTS, MAX_SOCKETS } from './parts.js';
 import { normalize as normalizeShop, migrateUpgrades, grant as grantPart, kitOf } from './workshop.js';
 
@@ -266,6 +268,8 @@ export function newCareer() {
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
     xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
     missions: { day: '', prog: {}, done: [], streak: 0, last: '' }, // daily missions (missions.js)
+    weekly: emptyWeekly(), // Weekly Cup (weekly.js)
+    mastery: emptyMastery(), // racer and ride mastery (mastery.js)
     lvlPaid: 1, // highest level whose rewards were paid
     // gumball machine prizes: owned ids and what you're wearing
     cos: [], hat: 'nohat', trail: 'classic', horn: 'beep',
@@ -303,6 +307,23 @@ export function cleanMissions(m) {
   for (const [k, v] of Object.entries(m.prog && isObj(m.prog) ? m.prog : {}).slice(0, 12)) if (!UNSAFE.has(k) && k.length <= 16 && Number.isFinite(v)) prog[k] = count(v, 1000);
   const done = Array.isArray(m.done) ? [...new Set(m.done.filter((x) => typeof x === 'string' && x.length <= 16))].slice(0, 12) : [];
   return { day: day(m.day), prog, done, streak: count(m.streak, 10000), last: day(m.last) };
+}
+
+// Weekly Cup: week keys only, so a hostile save cannot smuggle in anything else.
+const WEEK = /^\d{4}-W\d\d$/;
+const week = (v) => (typeof v === 'string' && WEEK.test(v) ? v : '');
+const weekList = (v, n) => (Array.isArray(v) ? [...new Set(v.map(week).filter(Boolean))].sort().slice(-n) : []);
+export function cleanWeekly(w) {
+  if (!isObj(w)) return emptyWeekly();
+  const best = count(w.best, 8);
+  return { week: week(w.week), best, trophies: weekList(w.trophies, 200), streak: count(w.streak, 10000), last: week(w.last), capGiven: weekList(w.capGiven, 12) };
+}
+
+// Mastery: XP per known racer or ride id only, capped at level 10.
+export function cleanMastery(m) {
+  if (!isObj(m)) return emptyMastery();
+  const xps = (o, ids) => Object.fromEntries(ids.filter((id) => isObj(o) && Number.isFinite(o[id]) && o[id] > 0).map((id) => [id, count(o[id], MAX_XP)]));
+  return { r: xps(m.r, RACER_IDS), b: xps(m.b, BODY_IDS), capLevels: Math.floor(count(m.capLevels, 1000) / 5) * 5 };
 }
 
 export function cleanCareer(saved) {
@@ -349,6 +370,8 @@ export function cleanCareer(saved) {
   const d = isObj(saved.daily) ? saved.daily : {};
   c.daily = { done: isStr(d.done) ? d.done : '', streak: count(d.streak), best: count(d.best) };
   c.missions = cleanMissions(saved.missions);
+  c.weekly = cleanWeekly(saved.weekly);
+  c.mastery = cleanMastery(saved.mastery);
   const sy = saved.sync;
   if (isObj(sy) && isStr(sy.id) && isObj(sy.base)) {
     const b = sy.base;
