@@ -181,7 +181,7 @@ export class UI {
     $('pchip').innerHTML = `<b>Lv ${lv.level}</b><i class="pbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></i><span>🪙 ${c.coins.toLocaleString('en-US')}</span>${streak ? `<span>🔥 ${streak}</span>` : ''}`;
     const d = dailyFor();
     const done = dailyDoneToday(c);
-    $('menu-daily').textContent = done ? `Done today ✓ · ${streak}-day streak` : `${d.mod.icon} ${d.mod.name} · +${dailyReward(streak + 1)} 🪙`;
+    $('menu-daily').textContent = done ? `Done today ✓ · ${streak}-day streak` : `${d.mod.icon} ${d.mod.name} · +${150 + Math.round(dailyReward(streak + 1) / 2)} XP · 🍬`;
     document.querySelector('[data-go="daily"]').classList.toggle('done', done);
     const wk = weeklyFor(), wb = weeklyBest(c);
     $('menu-weekly').innerHTML = `${wk.mod.icon} ${wk.mod.name}<br>${timeLeftText()} · ${wb ? `best ${wb}${ordinal(wb).toLowerCase()}` : 'not raced'}`;
@@ -231,7 +231,7 @@ export class UI {
     $('daily-facts').innerHTML = `<div><small>Track</small>${dailyTrackName(d)}</div><div><small>Goal</small>${dailyGoalText(d)}</div><div><small>Speed</small>${cls} · ${d.diff === 'hard' ? 'Hard' : 'Normal'} racers</div>`;
     const flames = Array.from({ length: 7 }, (_, i) => `<i class="${i < streak ? 'on' : ''}">🔥</i>`).join('');
     $('daily-streak').innerHTML = `<div class="flames">${flames}</div><span>${streak ? `${streak}-day streak` : 'Start a streak today'}${done ? ' · done today ✓' : ''}</span>`;
-    $('daily-reward').innerHTML = done ? 'Completed! A new challenge arrives tomorrow. You can still race it for fun.' : `Reward: <b>+${dailyReward(streak + 1)} 🪙</b> and <b>+150 XP</b>. Longer streaks pay more.`;
+    $('daily-reward').innerHTML = done ? 'Completed! A new challenge arrives tomorrow. You can still race it for fun.' : `Reward: <b>+${150 + Math.round(dailyReward(streak + 1) / 2)} XP</b> and a <b>free prize capsule</b>. Longer streaks pay more XP.`;
     this.app.previewTrack(d.track, d.rev);
     this.show('daily');
   }
