@@ -96,7 +96,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Frost Ray ❄️: an icy beam that sends the first racer in it sliding. It can be aimed ahead or behind.
   - Thunder Drum 🥁: a shockwave that knocks nearby racers and knocks the items out of their hands.
   - Gem Burst 💎: five gems at once.
-  - The racers at the back get the catch-up items.
+  - The racers at the back get the catch-up items, and the odds change smoothly place by place: the leader mostly gets defence and traps, the back gets boosts and attacks. The Zap Cloud only goes to the back half and strikes about a second after it is used (with a warning), so a Bubble Shield, Pogo hop, Spook Mask or Rainbow Rush in time blocks it.
   - **Throwing behind:** when you hold an item that can be aimed, a **⤵️ THROW BACK** button appears next to ITEM. Tap it to throw or drop behind you. You can also swipe ITEM up or down, or hold BRAKE while tapping it.
 - **Prize orbs:** items come from spinning crystal orbs with a star inside, not boxes. Every regular shortcut has its own orbs as a reward for finding it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
