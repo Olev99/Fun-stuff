@@ -8,8 +8,12 @@ for (const [n, p] of [['A', A], ['B', B]]) {
   p.on('console', m => { if (m.type() === 'error' && !m.text().includes('Failed to load')) console.log(`[${n}]`, m.text().slice(0, 300)); });
 }
 const url = 'http://localhost:8000/index.html?net=local&lag=40';
-await A.goto(url); await B.goto(url);
-for (const p of [A, B]) await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
+// Load A first and freeze its menu demo race before B loads: a running software-rendered demo
+// starves the second page's load (it took ~28 s of the 30 s limit once the world got richer).
+await A.goto(url); await A.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
+await A.evaluate(() => { window.zoomies.paused = true; });
+await B.goto(url); await B.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
+await B.evaluate(() => { window.zoomies.paused = true; });
 await A.tap('[data-go="mp"]'); await A.waitForTimeout(400);
 await A.tap('#scr-lobby [data-go="host"]'); await A.waitForTimeout(1200);
 const code = await A.textContent('#room-code');
