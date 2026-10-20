@@ -52,6 +52,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 - **Modes:**
   - Career.
   - Daily Challenge: a new track, twist and goal every day.
+  - Weekly Cup: one special Grand Prix a week, with a twist.
   - Grand Prix: 9 cups of 4 races with points.
   - Quick Race.
   - Time Trial, with saved records, a ghost, medals on every track and "Challenge a friend" links.
@@ -67,6 +68,15 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Online too: every phone pops its own balloons, and steals, comebacks and knock-outs sync between phones. A ram is decided once, on the phone of the racer who was rammed, so a steal always takes a balloon from someone, even with lag. The host calls the end and sends everyone the results. A friend who is knocked out watches the rest of the fight.
 - **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Style points count for half. Each level takes longer than the last: a good racer needs about 25 races for level 10 and 100 for level 18. Each level-up shows what it unlocks: racers you can now hire, and a free prize capsule every 5th level. The daily reward also gives a free capsule. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
+- **Weekly Cup:** every ISO week (Monday to Sunday, UTC) has one special Grand Prix, the same for everyone and worked out from the week number: 4 different tracks of mixed size (no Epic adventures), a speed class, Normal or Hard racers and one twist from the Daily list (bombs only, black ice, moon gravity, turbo speed, no items and more; the Gem Rush goal stays Daily-only). Cup points work like a normal Grand Prix. Retry the whole cup as often as you like: your **best** placing of the week counts. The title screen has a Weekly Cup card next to Daily with the twist, the time left and your best placing.
+  - No coins. XP by cup placing: 1st 500, 2nd 350, 3rd 250, finished 150, paid only for the part you improve on this week's best, so a week pays 500 XP at most however often you retry.
+  - The first podium of a week adds a **Week N** badge to your profile and gives a free prize capsule (once a week). A 🔥 streak counts consecutive weeks with a podium.
+  - Saved as `weekly` (week, best, trophies, streak, last, capGiven). Syncing two devices keeps the better placing of the same week, every trophy and capsule, and the streak of the device that played a podium last.
+- **Mastery:** every racer and every ride (kart or bike body) earns Mastery XP in any race that pays XP (not Driving School): 20 for finishing, up to 15 for a win (8 for 2nd, 4 for 3rd), up to 20 for style points and 15 per medal tier gained.
+  - Levels 1 to 10 at 60, 180, 360, 600, 900, 1260, 1680, 2160 and 2700 XP: level 3 takes about 5 races, level 6 about 25 and level 10 about 70 with one racer and ride. Mastery never changes stats or balance.
+  - Every racer has a funny **title** at levels 3, 6 and 10 (Mochi: Whisker Rookie, Nine-Lives Drifter, Grand Cat of the Circuit), shown on the racer screen and the profile. A coloured ★ with the level shows on the racer and ride cards (bronze, silver, gold, mint, pink for level 10).
+  - The profile has a mastery list with progress bars. Every 5 mastery levels gained across all racers and rides give a free prize capsule. The results screen shows the mastery gained and any level-up or title.
+  - Saved as `mastery` (`r` racers, `b` rides, `capLevels`); syncing keeps the higher XP of each.
 - **Trophies:** 42 achievements with progress bars, from your first win to beating every rival, finding every shortcut, winning online and earning Gold and Zoomie medals. Each pays coins and XP. Tap 🏆 on the title screen.
 - **Medals:** every track has four time targets for your best Time Trial: 🥉 Bronze, 🥈 Silver, 🥇 Gold and ⚡ Zoomie. Gold matches what a Hard computer racer can do in the stock Zoom Classic. Zoomie is 6% faster than that, so it needs the shortcuts and a clean lap. The track cards show your medal and (in Time Trial) all four times, the Time Trial results show your medal and "next medal in X.XXs", and the Trophies screen shows your medal total (a Gold track counts 3). Improving your tier pays a one-off XP bonus (Bronze 50, Silver 100, Gold 200, Zoomie 400). Medals are worked out from your best time, so nothing extra is saved. Reverse laps don't have medals.
 - **Daily missions:** three small goals a day, the same for everyone (drift-boost 10 times, finish 3 races, win on a bike, collect 25 gems, pop balloons in a battle and more), shown with progress bars on the title screen. Each pays 100 XP, and finishing all three gives a free prize capsule. A 🔥 streak counts days in a row with all three done.
@@ -86,7 +96,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Frost Ray ❄️: an icy beam that sends the first racer in it sliding. It can be aimed ahead or behind.
   - Thunder Drum 🥁: a shockwave that knocks nearby racers and knocks the items out of their hands.
   - Gem Burst 💎: five gems at once.
-  - The racers at the back get the catch-up items.
+  - The racers at the back get the catch-up items, and the odds change smoothly place by place: the leader mostly gets defence and traps, the back gets boosts and attacks. The Zap Cloud only goes to the back half and strikes about a second after it is used (with a warning), so a Bubble Shield, Pogo hop, Spook Mask or Rainbow Rush in time blocks it.
   - **Throwing behind:** when you hold an item that can be aimed, a **⤵️ THROW BACK** button appears next to ITEM. Tap it to throw or drop behind you. You can also swipe ITEM up or down, or hold BRAKE while tapping it.
 - **Prize orbs:** items come from spinning crystal orbs with a star inside, not boxes. Every regular shortcut has its own orbs as a reward for finding it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.

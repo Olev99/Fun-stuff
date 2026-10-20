@@ -132,6 +132,19 @@ export function mergeCareer(A, B) {
     m.missions.done = union(ma.done, mb.done);
     m.missions.streak = Math.max(...[ma, mb].filter((x) => x.last === lastM.last).map((x) => x.streak || 0));
   }
+  // Weekly Cup: the newer week wins (same week: best placing, 0 = none). Streak
+  // and last podium week come from the save that played a podium latest.
+  const wa = a.weekly || {}, wb = b.weekly || {};
+  const wNew = (wa.week || '') >= (wb.week || '') ? wa : wb;
+  const wLast = (wa.last || '') > (wb.last || '') ? wa : (wb.last || '') > (wa.last || '') ? wb : null;
+  const wBest = [wa, wb].filter((x) => x.week === wNew.week && x.best > 0).map((x) => x.best);
+  m.weekly = {
+    week: wNew.week || '', best: wBest.length ? Math.min(...wBest) : 0, trophies: union(wa.trophies, wb.trophies).sort().slice(-200),
+    streak: wLast ? wLast.streak || 0 : Math.max(num(wa.streak), num(wb.streak)), last: wLast ? wLast.last : wa.last || '', capGiven: union(wa.capGiven, wb.capGiven).sort().slice(-12),
+  };
+  // Mastery: the higher XP of each racer and ride; capsules already paid is the higher count.
+  const xa = a.mastery || {}, xb = b.mastery || {};
+  m.mastery = { r: maxOf(xa.r, xb.r), b: maxOf(xa.b, xb.b), capLevels: Math.max(num(xa.capLevels), num(xb.capLevels)) };
   // Make sure what you're driving is something you own.
   if (!m.racers.includes(m.racer)) m.racer = m.racers[0];
   if (!m.bodies.includes(m.body)) m.body = m.bodies[0];

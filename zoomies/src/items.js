@@ -32,13 +32,25 @@ export const ITEM_ICONS = Object.values(ITEMS).map((i) => i.icon);
 // the ones you can aim (swipe the ITEM button, or hold BRAKE to throw back).
 export const AIM_DEFAULT = { honey: -1, oil: -1, ball: 1, boomerang: 1, bomb: 1, firework: 1, freeze: 1 };
 
-// Odds depend on race position: leaders get defence, stragglers get catch-up.
-const TABLES = [
-  { honey: 22, ball: 18, bubble: 16, chili: 8, boomerang: 9, oil: 11, horn: 7, drum: 6, freeze: 6 },
-  { honey: 11, ball: 12, bee: 9, chili: 12, bubble: 6, chili3: 6, boomerang: 9, magnet: 5, oil: 7, bomb: 7, firework: 6, horn: 4, pogo: 6, freeze: 6, drum: 4, gems: 5 },
-  { chili: 9, chili3: 12, bee: 12, rainbow: 7, ball: 5, storm: 4, bubble: 4, magnet: 7, warp: 6, boomerang: 4, bomb: 7, firework: 5, twister: 5, ghost: 5, pogo: 5, mirror: 6, gems: 6 },
-  { chili3: 18, rainbow: 14, rocket: 14, bee: 10, storm: 7, warp: 7, magnet: 4, twister: 7, ghost: 7, mirror: 10, gems: 4 },
-];
+// Odds depend on race position and change smoothly from the leader to the
+// last kart (each place blends the three tables below, so there is no cliff
+// between places). The leader mostly gets defence and traps to throw behind,
+// the middle gets a bit of everything, the back gets a mix of catch-up boosts
+// and attacks. The attacks that hit everyone at once (Zap Cloud) or home in on
+// the racer ahead (Buzz Bee) are kept for the back half.
+const TABLE_LEADER = { honey: 18, oil: 12, bubble: 16, chili: 9, horn: 7, drum: 5, ball: 8, boomerang: 8, freeze: 4, magnet: 4, pogo: 5, gems: 4 };
+const TABLE_MID = { honey: 8, oil: 5, bubble: 6, chili: 8, horn: 3, ball: 6, boomerang: 5, bee: 8, chili3: 8, magnet: 5, bomb: 6, firework: 5, pogo: 5, gems: 5, freeze: 4, rainbow: 4, mirror: 3, warp: 2, twister: 2, ghost: 2 };
+const TABLE_BACK = { chili3: 13, rainbow: 11, rocket: 9, warp: 7, mirror: 8, bee: 8, storm: 3, twister: 5, ghost: 6, ball: 5, bomb: 5, firework: 5, boomerang: 4, freeze: 4, magnet: 4, pogo: 3 };
+
+// The weights a kart in this place rolls from (exported so tools/balance.mjs can print them).
+export function rollTable(place, n) {
+  const p = n > 1 ? (place - 1) / (n - 1) : 0;
+  const [a, b, t] = p <= 0.5 ? [TABLE_LEADER, TABLE_MID, p * 2] : [TABLE_MID, TABLE_BACK, p * 2 - 1];
+  const out = {};
+  for (const k in a) out[k] = a[k] * (1 - t);
+  for (const k in b) out[k] = (out[k] || 0) + b[k] * t;
+  return out;
+}
 
 function weighted(table) {
   let sum = 0;
@@ -393,10 +405,7 @@ export class ItemSystem {
     const pool = this.race.mods && this.race.mods.items;
     if (pool) return pool[Math.floor(Math.random() * pool.length)];
     if (this.race.battle) return this.race.battle.roll(kart);
-    const n = this.race.karts.length;
-    const p = n > 1 ? (kart.place - 1) / (n - 1) : 0;
-    const table = kart.place === 1 ? TABLES[0] : p < 0.45 ? TABLES[1] : p < 0.8 ? TABLES[2] : TABLES[3];
-    return weighted(table);
+    return weighted(rollTable(kart.place, this.race.karts.length));
   }
 
   // Item Pouch (special part): a kart already holding an item can pick up a second one.
@@ -541,7 +550,7 @@ export class ItemSystem {
   surprise(kart) {
     if (kart.item || kart.rolling > 0) return;
     if (this.replica) { if (kart.isPlayer) this.race.net.claimBox(-1); return; }
-    this.give(kart, weighted(TABLES[2]));
+    this.give(kart, weighted(TABLE_MID));
   }
 
   // Explosion or shockwave. Hits the karts this device simulates and tells

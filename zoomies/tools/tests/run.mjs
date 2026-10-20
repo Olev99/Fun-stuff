@@ -4,6 +4,7 @@
 //   node run.mjs              quick suites (about 5 minutes)
 //   node run.mjs full         every suite (about 25 minutes)
 //   node run.mjs battle-sim crater   one suite, with its own arguments
+//   node run.mjs balance      opt-in: seeded AI races, balance bands (report: node ../balance.mjs)
 //
 // It serves zoomies/ on http://localhost:8000 (or uses a server already
 // running there) and runs each script in zoomies/test-out/, where the
@@ -33,8 +34,10 @@ const SUITES = {
   online: ['online.mjs', [], 10],
   shortcuts: ['shortcuts.mjs', [], 25],
   phase2: ['phase2.mjs', [], 20],
+  phase2b: ['phase2b.mjs', [], 20],
   onboarding: ['onboarding.mjs', [], 12],
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
+  balance: ['balance-check.mjs', [], 12], // opt-in: seeded AI races, checks the balance bands
 };
 const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];
 
@@ -77,7 +80,7 @@ function run(name, script, args, mins) {
 const argv = process.argv.slice(2);
 let plan;
 if (argv[0] && SUITES[argv[0]]) plan = [[argv[0], argv.length > 1 ? argv.slice(1) : null]];
-else plan = (argv[0] === 'full' ? Object.keys(SUITES).filter((n) => n !== 'visual-audit') : QUICK).map((n) => [n, null]);
+else plan = (argv[0] === 'full' ? Object.keys(SUITES).filter((n) => n !== 'visual-audit' && n !== 'balance') : QUICK).map((n) => [n, null]);
 
 for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv']) await mkdir(join(out, d), { recursive: true });
 const srv = await serve();
