@@ -5,6 +5,7 @@ import { rng } from './util.js';
 import { medalCount, bestTier, medalMax } from './medals.js';
 import { bumpMissions } from './missions.js';
 import { addMastery } from './mastery.js';
+import { LEAGUE, LEAGUE_EVENTS, legendRank, MAX_RANK } from './league.js';
 
 // The player profile lives in the career save (one wallet for everything):
 // XP and levels from every race, coins from the career, lifetime stats,
@@ -168,6 +169,11 @@ export const ACHIEVEMENTS = [
   { id: 'legend', icon: '🦄', name: 'Lucky Dip', desc: 'Win a legendary prize', reward: 250, prog: (c) => [(c.cos || []).some((id) => (cosmeticById(id) || {}).rarity === 'legendary') ? 1 : 0, 1] },
   { id: 'garage', icon: '🏎️', name: 'Full Garage', desc: 'Own every kart', reward: 800, prog: (c) => [c.bodies.length, BODY_LIST.length] },
   { id: 'champ', icon: '🥇', name: 'Golden Wheel', desc: 'Become the career champion', reward: 1000, prog: (c) => [c.champion ? 1 : 0, 1] },
+  // Legends League (league.js)
+  { id: 'lgfirst', icon: '🎪', name: 'League Debut', desc: 'Clear a Legends League event', reward: 200, prog: (c) => [LEAGUE_EVENTS.some((e) => c.done && c.done[e.id]) ? 1 : 0, 1] },
+  { id: 'lgseasons', icon: '📆', name: 'Three-Season Run', desc: 'Clear all 3 Legends League seasons', reward: 500, prog: (c) => [LEAGUE.filter((s) => c.done && c.done[s.events.find((e) => e.boss).id]).length, LEAGUE.length] },
+  { id: 'lgstars', icon: '🌟', name: 'Perfect League', desc: `Earn 3 stars on all ${LEAGUE_EVENTS.length} League events`, reward: 800, prog: (c) => [LEAGUE_EVENTS.filter((e) => c.stars && c.stars[e.id] >= 3).length, LEAGUE_EVENTS.length] },
+  { id: 'lgrank', icon: '🏛️', name: 'Living Legend', desc: `Reach Legend Rank ${MAX_RANK}`, reward: 600, prog: (c) => [legendRank(c), MAX_RANK] },
 ];
 
 // Unlock any achievements that are now complete; pays their rewards.

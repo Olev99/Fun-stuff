@@ -10,6 +10,8 @@ export const RARITY = {
   legendary: { name: 'Legendary', weight: 2, refund: 300, color: '#ffd23f' },
   // Real prizes (racers, rides, paint, parts, coins): rolled first, see prizes.js.
   jackpot: { name: 'Jackpot', weight: 0, refund: 0, color: '#ff5ad8' },
+  // Legends League rank rewards (league.js): never in the machine, owned when the rank is reached.
+  league: { name: 'Legend', weight: 0, refund: 0, color: '#ffd23f' },
 };
 
 export const CAPSULE_PRICE = 600;
@@ -184,6 +186,39 @@ export const HATS = [
       for (const s of [-1, 1]) B.add(cone(0.08, 0.16, 6), '#ffffff', [s * 0.3, 0.08, -0.05], [0, 0, -s * 0.5], 1, 'fabric');
     },
   },
+  // Legends League rewards (rank in `rank`)
+  {
+    id: 'lg_laurel', name: 'Champion\'s Laurel', rarity: 'league', rank: 2, icon: '🌿',
+    build: (B) => {
+      B.add(ring(0.36, 0.03, 28), '#d9a520', [0, 0, 0], [Math.PI / 2, 0, 0], 1, 'metal');
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        if (Math.cos(a) > 0.85) continue; // open at the back like a wreath
+        B.add(ball(0.09), i % 2 ? '#3fbf5a' : '#8fe06a', [Math.sin(a) * 0.37, 0.03, Math.cos(a) * 0.37], [0, a, 0], [0.6, 0.35, 1.4], 'fabric');
+      }
+    },
+  },
+  {
+    id: 'lg_checker', name: 'Checkered Topper', rarity: 'league', rank: 6, icon: '🏁',
+    build: (B) => {
+      B.add(cyl(0.4, 0.4, 0.04, 28), '#1d1a22', [0, 0.02, 0], [0, 0, 0], 1, 'plastic');
+      B.add(cyl(0.26, 0.26, 0.42, 24), '#f4f1ea', [0, 0.25, 0], [0, 0, 0], 1, 'plastic');
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        B.add(new THREE.BoxGeometry(0.16, 0.14, 0.05), '#1d1a22', [Math.sin(a) * 0.26, 0.2 + (i % 2) * 0.14, Math.cos(a) * 0.26], [0, a, 0], 1, 'plastic');
+      }
+      B.add(cyl(0.23, 0.26, 0.04, 24), '#ff3d3d', [0, 0.47, 0], [0, 0, 0], 1, 'plastic');
+    },
+  },
+  {
+    id: 'lg_crest', name: 'Legend\'s Crest', rarity: 'league', rank: 10, icon: '🌟',
+    build: (B) => {
+      B.add(cyl(0.33, 0.3, 0.14, 24), '#ffd23f', [0, 0.04, 0], [0, 0, 0], 1, 'metal');
+      for (const s of [-1, 0, 1]) B.add(cone(0.08, s ? 0.24 : 0.34, 4), '#fff3a0', [s * 0.17, s ? 0.21 : 0.26, s ? 0.2 : 0.26], [0.15, 0, -s * 0.35], 1, 'metal');
+      B.add(ball(0.07), '#ff3d6a', [0, 0.06, 0.3], [0, 0, 0], [1, 1, 0.6], 'gloss');
+      for (const s of [-1, 1]) B.add(new THREE.BoxGeometry(0.34, 0.07, 0.03), '#fff3a0', [s * 0.36, 0.14, -0.06], [0, s * 0.35, -s * 0.5], 1, 'glow');
+    },
+  },
 ];
 
 // Boost flame colours, and the sparkles left behind while boosting.
@@ -198,6 +233,8 @@ export const TRAILS = [
   { id: 'inferno', name: 'Inferno', rarity: 'epic', icon: '🌋', cols: ['#ffffff', '#ff3d3d', '#b01010', '#ffb020'], spark: '#ff5a1a', big: 1.35 },
   { id: 'galaxy', name: 'Galaxy', rarity: 'epic', icon: '🌌', cols: ['#ffffff', '#8f5cff', '#36a9ff', '#ff5ad8'], spark: '#ffffff' },
   { id: 'rainbow', name: 'Prism Streak', rarity: 'legendary', icon: '🌈', cols: ['#ff5a5f', '#ffd23f', '#19e3b1', '#36a9ff', '#c77dff'], spark: 'rainbow', big: 1.25 },
+  { id: 'lg_flare', name: 'Comeback Flare', rarity: 'league', rank: 4, icon: '💫', cols: ['#ffffff', '#7dffe0', '#1fcfae', '#1a8fff'], spark: '#9dfff0' },
+  { id: 'lg_aurora', name: 'Legend Aurora', rarity: 'league', rank: 8, icon: '🌠', cols: ['#ffffff', '#ffd23f', '#ff5ad8', '#7a3cff'], spark: '#ffe680', big: 1.3 },
 ];
 
 // Honked when you overtake someone and when you cross the line.
@@ -212,6 +249,8 @@ export const HORNS = [
   { id: 'airhorn', name: 'Air Horn', rarity: 'epic', icon: '📯' },
   { id: 'fanfare', name: 'Fanfare', rarity: 'epic', icon: '🎺' },
   { id: 'dino', name: 'Dino Roar', rarity: 'legendary', icon: '🦖' },
+  { id: 'lg_gong', name: 'Victory Gong', rarity: 'league', rank: 2, icon: '🔔' },
+  { id: 'lg_stadium', name: 'Stadium Roar', rarity: 'league', rank: 6, icon: '🏟️' },
 ];
 
 export const KINDS = [
@@ -221,6 +260,8 @@ export const KINDS = [
 ];
 
 const ALL = KINDS.flatMap((k) => k.list.map((it) => ({ ...it, kind: k.id })));
+// The gumball machine and its collection count leave the League rewards out.
+const GUM = ALL.filter((it) => it.rarity !== 'league');
 
 export const hatById = (id) => HATS.find((h) => h.id === id) || HATS[0];
 export const trailById = (id) => TRAILS.find((t) => t.id === id) || TRAILS[0];
@@ -268,10 +309,11 @@ export function owns(c, id) {
 }
 
 export function ownedCount(c) {
-  return ALL.filter((it) => !STARTER.includes(it.id) && owns(c, it.id)).length;
+  return GUM.filter((it) => !STARTER.includes(it.id) && owns(c, it.id)).length;
 }
 
-export const COSMETIC_TOTAL = ALL.length - STARTER.length;
+export const COSMETIC_TOTAL = GUM.length - STARTER.length;
+export const LEAGUE_COSMETICS = ALL.filter((it) => it.rarity === 'league');
 
 // One turn of the gumball machine. Costs a free capsule if you have one,
 // otherwise CAPSULE_PRICE coins. Duplicates pay back coins. `jackpot` may
@@ -288,7 +330,7 @@ export function spinGumball(c, rnd = Math.random, jackpot = null) {
     c.stats.jackpots = (c.stats.jackpots || 0) + 1;
     return { item: jp, dup: false, refund: 0, free, jackpot: true };
   }
-  const pool = ALL.filter((it) => !STARTER.includes(it.id));
+  const pool = GUM.filter((it) => !STARTER.includes(it.id));
   const tiers = Object.entries(RARITY).filter(([, v]) => v.weight > 0);
   let r = rnd() * tiers.reduce((a, [, v]) => a + v.weight, 0);
   let rarity = 'common';

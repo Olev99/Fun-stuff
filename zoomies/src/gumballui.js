@@ -94,7 +94,7 @@ export class GumballUI {
       const r = RARITY[it.rarity];
       const sw = kind.id === 'trail' && own ? `<span class="tsw">${it.cols.map((col) => `<i style="background:${col}"></i>`).join('')}</span>` : '';
       return `<button class="cos${own ? '' : ' locked'}${on ? ' on' : ''}" data-cos="${it.id}" style="--r:${r.color}">
-        <span class="ci">${own ? it.icon : '❔'}</span><span class="cn">${own ? it.name : r.name}</span>${sw}${on ? '<em>On</em>' : ''}</button>`;
+        <span class="ci">${own ? it.icon : '❔'}</span><span class="cn">${own ? it.name : it.rank ? `Legend Rank ${it.rank}` : r.name}</span>${sw}${on ? '<em>On</em>' : ''}</button>`;
     }).join('')}</div>`;
   }
 
@@ -160,7 +160,7 @@ export class GumballUI {
     if (!it) return;
     if (!owns(c, id)) {
       this.app.audio.play('uiBack');
-      this._note(`Win it from the gumball machine (${RARITY[it.rarity].name})`);
+      this._note(it.rank ? `Reach Legend Rank ${it.rank} in the Legends League` : `Win it from the gumball machine (${RARITY[it.rarity].name})`);
       return;
     }
     const kind = KINDS.find((k) => k.id === it.kind);
