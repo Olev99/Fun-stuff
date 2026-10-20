@@ -30,7 +30,7 @@ const STATE_HZ = 30;
 // 256 ghost, 512 out of a battle, 1024 ramming (battle), 2048 can't be hit,
 // 4096 down in a battle and waiting to come back (sent with 512).
 // a[22]: balloons.
-function kartState(k) {
+export function kartState(k) {
   const r = (v) => Math.round(v * 100) / 100;
   const flags = (k.grounded ? 1 : 0) | (k.drifting ? 2 : 0) | (k.boostTime > 0 ? 4 : 0) | (k.offroad ? 8 : 0) |
     (k.gliding ? 16 : 0) | (k.finished ? 32 : 0) | (k.trickAnim > 0 ? 64 : 0) | (k.respawnT > 0 ? 128 : 0) | (k.ghostTime > 0 ? 256 : 0) |
@@ -49,7 +49,7 @@ const STATE_RANGE = [
   [-1, 999], [0, 1e5], [-1, MAX_BALLOONS],
 ];
 const STATE_INT = new Set([7, 8, 9, 11, 13, 14, 20, 22]); // flags, drift, laps, place, gems, path, balloons
-function cleanState(a) {
+export function cleanState(a) {
   if (!Array.isArray(a) || a.length !== STATE_RANGE.length) return null;
   const out = new Array(a.length);
   for (let i = 0; i < a.length; i++) {

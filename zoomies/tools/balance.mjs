@@ -14,7 +14,10 @@ const tracks = arg('tracks', DEFAULT_TRACKS.join(',')).split(',');
 const diffs = arg('diffs', 'normal,hard').split(',');
 const n = +arg('n', 3), seed = +arg('seed', 1);
 
-const recs = await runRaces({ tracks, diffs, n, seed, log: (s) => console.error(s) });
+// --tuned: the computer-driven player runs a fully fitted ride (classic: 3 sockets; bolt: 5) instead of stock stats.
+const KITS = { boltstock: { body: 'bolt', parts: [] }, classic: { body: 'classic', parts: ['engine3', 'turbo3', 'tyres3'] }, bolt: { body: 'bolt', parts: ['engine3', 'turbo3', 'tyres3', 'armor3', 'driftSpring'] } };
+const kit = KITS[arg('tuned', '')] || null;
+const recs = await runRaces({ tracks, diffs, n, seed, kit, log: (s) => console.error(s) });
 const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : 'n/a');
 console.log(`Balance report: ${tracks.length} tracks x ${diffs.join('+')} x ${n} races, seed ${seed}, 8 karts, mixed racers, the player kart is computer-driven too.`);
 console.log(`tracks: ${tracks.join(', ')}\n`);
@@ -25,6 +28,7 @@ for (const diff of [...diffs, 'all']) {
   console.log(`gap 1st to last: ${f(m.gapLastS)} s = ${f(m.gapLastPct)}% of race time`);
   console.log(`gap 1st to 2nd: ${f(m.gapSecondS)} s`);
   console.log(`median leader's lead at start of last lap: ${f(m.leadLastLapS)} s`);
+  console.log(`the player (${kit ? arg('tuned', '') : 'stock classic'}): average place ${f(rs.reduce((a, r) => a + r.playerPlace, 0) / rs.length, 2)}, won ${f(100 * rs.filter((r) => r.playerPlace === 1).length / rs.length, 0)}%, finish time ${f(100 * rs.reduce((a, r) => a + r.playerTime / r.fieldTime, 0) / rs.length, 1)}% of the field's median`);
   console.log(`front starter won: ${f(m.poleWinPct, 0)}%   (computer-driven player won: ${f(m.playerWinPct, 0)}%)`);
   console.log(`last at end of lap 1: gained ${f(m.lastGain, 2)} places on average, won ${f(m.lastWinPct, 0)}% of races`);
   console.log(`places changed (overtakes) per race: ${f(m.overtakes)}`);

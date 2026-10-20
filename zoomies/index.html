@@ -171,6 +171,7 @@ html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 }
 .card.sel { border-color: var(--sun); transform: translateY(-3px) scale(1.04); box-shadow: 0 0 0 3px var(--ink), 0 7px 0 var(--ink); }
 .card:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.ws-line { margin-right: auto; font-weight: 800; font-size: 12px; color: var(--muted); }
 .bottom-bar { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
 
 /* Track select */
@@ -292,6 +293,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .res .pts { font-family: var(--font-display); font-size: 13px; min-width: 44px; text-align: right; }
 .res .plus { font-size: 12px; color: var(--mint); min-width: 30px; text-align: right; }
 .res.me .plus { color: var(--ink); }
+.res .plus.down { color: var(--berry); font-weight: 800; letter-spacing: .04em; }
+.pod-names small { font-family: var(--font-body); font-size: 11px; opacity: .85; }
 .trophy { font-size: 46px; line-height: 1; text-align: center; }
 .big-msg { font-family: var(--font-display); font-size: clamp(22px, calc(7 * var(--vh)), 36px); color: var(--cream); text-align: center; line-height: 1.05; text-shadow: 0 4px 0 var(--ink); }
 .big-msg em { font-style: normal; color: var(--sun); }
@@ -1123,6 +1126,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
   </div>
   <div class="track-row" id="track-row"></div>
   <div class="bottom-bar">
+    <span class="ws-line" id="ws-line"></span>
     <button class="btn ghost small" data-go="back">Back</button>
     <button class="btn hot" data-go="race">Race!</button>
   </div>
@@ -1369,6 +1373,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
         <div class="players" id="lobby-players"></div>
         <div class="lobby-settings" id="lobby-settings"></div>
       </div>
+      <p class="ws-line" id="lobby-ws"></p>
     </div>
     <div class="bottom-bar" id="lobby-buttons"></div>
   </div>
@@ -1423,7 +1428,8 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <div class="row"><div class="lbl">Show FPS</div><label class="toggle"><input type="checkbox" id="set-fps" aria-label="Show FPS"></label></div>
       <div class="row"><div><div class="lbl">Screen shake</div><div class="hint">Camera shake, the boost zoom, the short freeze on big hits and phone buzzes.</div></div>
         <div class="seg" id="set-shake"><button data-v="off">Off</button><button data-v="low">Low</button><button data-v="normal">Normal</button></div></div>
-      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes.</div></div>
+      <div class="row"><div><div class="lbl">Use Workshop parts in quick modes</div><div class="hint">Your fitted parts count in Quick Race, Grand Prix, Balloon Battle and online. Time Trial, the Daily Challenge, the Weekly Cup and Driving School always use stock stats.</div></div><label class="toggle"><input type="checkbox" id="set-ws" aria-label="Use Workshop parts in quick modes"></label></div>
+      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes, stock stats.</div></div>
         <button class="btn mint small" data-go="school">Practice</button></div>
       <div class="row no-pause"><div><div class="lbl">Replay intro</div><div class="hint">The first-run controls check again.</div></div>
         <button class="btn alt small" data-go="intro">Replay</button></div>
