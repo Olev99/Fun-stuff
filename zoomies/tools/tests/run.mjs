@@ -28,6 +28,7 @@ const SUITES = {
   picker: ['picker.mjs', [], 5],
   'race-sim': ['race-sim.mjs', ['sprout,odyssey'], 15],
   career: ['career.mjs', [], 15],
+  league: ['league.mjs', [], 15],
   cup: ['cup.mjs', [], 10],
   racers: ['racers.mjs', [], 6],
   'battle-online': ['battle-online.mjs', [], 10],
