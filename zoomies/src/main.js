@@ -8,6 +8,8 @@ import { CareerUI } from './careerui.js';
 import { GumballUI } from './gumballui.js';
 import { WheelHost, WheelPad } from './wheel.js';
 import { Sync } from './sync.js';
+import { Pwa } from './pwa.js';
+import { SafeUI } from './safeui.js';
 import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { BODIES, bodyLocked } from './karts.js';
@@ -102,6 +104,7 @@ class App {
     this.audio.musicOn = this.settings.music;
     this.audio.musicVol = this.settings.musicVol ?? 0.7;
     this.audio.sfxOn = this.settings.sfx;
+    this.audio.sfxVol = this.settings.sfxVol ?? 1;
     this.input = new Input(this.settings);
     this.input.bindTouch($('controls'));
     this.hud = new HUD(this);
@@ -114,6 +117,8 @@ class App {
     this.wheelPad = new WheelPad(this);
     this.input.wheel = this.wheelHost;
     this.sync = new Sync(this);
+    this.safeUI = new SafeUI(this, VERSION);
+    this.pwa = new Pwa(this, VERSION);
     this.showroom = new Showroom(this);
     this.portraits = this.showroom.portraits(r, 112);
     $('fps').hidden = !this.settings.showFps;

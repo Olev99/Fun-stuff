@@ -13,6 +13,7 @@ export const DEFAULTS = {
   music: true,
   musicVol: 0.7,
   sfx: true,
+  sfxVol: 1,
   showFps: false,
   speedClass: 'zoom',
   difficulty: 'normal',

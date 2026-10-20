@@ -167,6 +167,16 @@ Your progress lives on each device, with no account needed. To bring two devices
 
 Sync again whenever you switch devices. Pairing uses the same free WebRTC setup as multiplayer, so it needs the full page (not inside another page), as tilt does.
 
+## Offline, backups and updates
+
+- **Keeping your progress:** iPhone Safari can erase a website's saved data after about a week without use, unless the game is on the Home Screen. The game asks the browser to protect its data (Settings shows **Progress protected: yes, no or unknown**). On an iPhone in a plain Safari tab, a one-time card after your first race explains the two taps (Share, Add to Home Screen). It never shows during a race, and never again once you close it or install.
+- **Backup code:** **Settings → Back up** makes one line of text with your Career, coins, karts, trophies, records and the settings worth keeping (not steering or graphics). Tick **Include best-lap ghosts** to add some of them (the code gets longer). **Copy** it or **Share** it into Notes or a message. **Settings → Restore** takes a pasted code, checks it (size, checksum, version, every part is validated like a synced save, nothing unsafe is trusted), shows its level, coins, chapters done and League rank, and offers **Merge with this device** (keeps the best of both) or **Replace this device** (asks twice). After your first finished chapter, and then at most every 14 days while the game is not on the Home Screen, a note on the title screen offers **Back up now**.
+- **Offline play:** after one visit over the internet the whole game works without a connection (races, Career, Time Trial, battles against the computer; online play and syncing still need the internet). A service worker (`sw.js`, only on https or localhost) keeps a copy of every game file; each code file has the hash of its contents in its address, so a stored copy is never the wrong one. The game page and `version.json` are always fetched fresh when you are online.
+- **Updates:** a new version downloads quietly in the background and takes over the next time you open the game. If the game stays open, a **Update ready, tap to restart** note shows on the title screen (never during a race or in a lobby). If a download fails, the version you have keeps working. Old files are deleted when the new version takes over.
+- **If something looks stuck:** **Settings → Repair** (or open the game with `?nosw` added to the address) removes the stored files and reloads; your progress stays.
+- **About:** **Settings → About** (or the small version label on the title screen) shows the version, credits and licences, a plain privacy note (no accounts, no tracking, no ads; progress stays on your device) and the backup and repair buttons.
+- **Volume:** Settings has separate **Music volume** and **Sound effects volume** sliders. Sound pauses while the page is hidden. Held upright, a phone shows a "Turn your phone sideways" screen.
+
 ## Racing with friends
 
 1. Everyone opens the game (same link), taps **Multiplayer** and types a name. The name floats over your kart on your friends' screens.
@@ -234,6 +244,10 @@ zoomies/
   src/platform.js     phone or computer (Mac) detection
   src/wheel.js        a phone as the steering wheel for a computer
   src/sync.js         syncing progress between devices
+  src/backup.js       backup codes: build, read (hostile input) and restore
+  src/pwa.js          persistent storage, service worker registration, title-screen notes
+  src/safeui.js       the Backup and About screens
+  sw.js               service worker: offline cache and safe updates (file list in precache.json, written by tools/stamp.mjs)
   src/race.js         race loop, laps, positions, collisions, camera, network sync
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
   src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur

@@ -27,10 +27,10 @@ const union = (a, b) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.i
 // The other device's data is checked before it is merged or stored.
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
-const GHOST_KEY = /^[a-z0-9-]{1,48}$/i; // track id, '-r' for reverse
+export const GHOST_KEY = /^[a-z0-9-]{1,48}$/i; // track id, '-r' for reverse
 
 // Records: { trackKey: { tt, lap }, 'cup:id': '1st', battle: { arena: wins }, found: { track: [names] } }.
-function cleanRecords(r) {
+export function cleanRecords(r) {
   const out = {};
   if (!isObj(r)) return out;
   const field = (x) => x === null || Number.isFinite(x) || (Array.isArray(x) && x.length <= 100 && x.every((y) => (typeof y === 'string' && y.length <= 64) || Number.isFinite(y)));
@@ -198,7 +198,7 @@ function readGhost(key) {
   try { return localStorage.getItem(GHOST + key); } catch (e) { return null; }
 }
 
-function writeGhost(key, raw) {
+export function writeGhost(key, raw) {
   if (typeof key !== 'string' || !GHOST_KEY.test(key)) return;
   const g = parseGhost(raw);
   if (!g) return;

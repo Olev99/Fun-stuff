@@ -37,14 +37,12 @@ export class UI {
     $('btn-pause').addEventListener('click', () => this.app.pause());
     this._bindSettings();
     this._bindTrackOptions();
-    const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
-    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    $('install-tip').hidden = !(ios && !standalone);
   }
 
   show(name) {
     document.querySelectorAll('.screen').forEach((sc) => { sc.hidden = sc.id !== `scr-${name}`; });
     this.current = name;
+    if (this.app.pwa) this.app.pwa.screen(name);
   }
 
   hideAll() {
@@ -66,6 +64,7 @@ export class UI {
         else if (action === 'profile') this.profileScreen();
         else if (action === 'gumball') app.gumballUI.open('title');
         else if (action === 'wheel') app.wheelHost.open('title');
+        else if (action === 'about') app.safeUI.open('about');
         else if (action === 'story') app.startIntro();
         else { this.mode = action; this.charSelect(); }
         break;
@@ -92,6 +91,7 @@ export class UI {
         if (action === 'wheelpad') app.wheelPad.open();
         else if (action === 'sync') app.sync.open('settings');
         else if (action === 'school') app.startSchool('title');
+        else if (['backup', 'restore', 'about', 'repair'].includes(action)) app.safeUI.open(action);
         else if (action === 'intro') {
           const from = this.returnTo;
           this.intro(() => this.overlay('settings', from));
@@ -102,6 +102,10 @@ export class UI {
         break;
       case 'sync':
         app.sync.close();
+        break;
+      case 'backup':
+      case 'about':
+        app.safeUI.action(screen, action);
         break;
       case 'help':
         this.closeOverlay();
@@ -172,6 +176,7 @@ export class UI {
     $('scr-title').classList.toggle('first-run', !this.app.settings.introDone);
     this.refreshChip();
     this.show('title');
+    if (this.app.pwa) this.app.pwa.onTitle();
   }
 
   // Level, coins and streak in the corner of the title screen.
@@ -751,6 +756,7 @@ export class UI {
     $('set-music').addEventListener('change', (e) => { s().music = e.target.checked; app.audio.setMusic(s().music); saveSettings(s()); });
     $('set-musicvol').addEventListener('input', (e) => { s().musicVol = +e.target.value; app.audio.setMusicVolume(s().musicVol); saveSettings(s()); });
     $('set-sfx').addEventListener('change', (e) => { s().sfx = e.target.checked; app.audio.setSfx(s().sfx); saveSettings(s()); });
+    $('set-sfxvol').addEventListener('input', (e) => { s().sfxVol = +e.target.value; app.audio.setSfxVolume(s().sfxVol); saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
     $('set-reset-career').addEventListener('click', () => {
       if (!confirm('Start over? Your level, coins, trophies, karts, racers and career progress will be lost.')) return;
@@ -774,6 +780,8 @@ export class UI {
     $('set-music').checked = s.music;
     $('set-musicvol').value = s.musicVol ?? 0.7;
     $('set-sfx').checked = s.sfx;
+    $('set-sfxvol').value = s.sfxVol ?? 1;
+    $('set-persist').textContent = this.app.pwa ? this.app.pwa.persistLabel : 'unknown';
     $('set-fps').checked = s.showFps;
     $('set-reset-career').textContent = 'Reset';
     $('set-about').textContent = this.app.versionInfo;
