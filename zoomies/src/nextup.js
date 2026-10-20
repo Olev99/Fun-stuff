@@ -2,7 +2,7 @@ import { missionView } from './missions.js';
 import { MEDALS, REF, medalTimes, medalTier } from './medals.js';
 import { levelOf } from './profile.js';
 import { CHARACTERS } from './characters.js';
-import { CHAPTERS, eventUnlocked } from './career.js';
+import { CHAPTERS, LEAGUE, eventUnlocked } from './career.js';
 import { trackById } from './tracks.js';
 import { fmtTime } from './util.js';
 
@@ -42,6 +42,12 @@ export function nextUp(c, records) {
     if (ei >= 0) {
       cands.push({ score: 0.3, icon: '🏁', text: `Career: ${CHAPTERS[ci].events[ei].title}` });
       break;
+    }
+  }
+  if (c.champion) {
+    for (let si = 0; si < LEAGUE.length; si++) {
+      const ei = LEAGUE[si].events.findIndex((e, i) => !c.done[e.id] && eventUnlocked(c, si, i, LEAGUE));
+      if (ei >= 0) { cands.push({ score: 0.28, icon: '🏛️', text: `Legends League: ${LEAGUE[si].events[ei].title}` }); break; }
     }
   }
   cands.push({ score: 0.1, icon: '📅', text: 'Try today\'s Daily Challenge' });

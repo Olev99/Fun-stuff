@@ -306,6 +306,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   font-family: var(--font-display); font-size: 12.5px; box-shadow: 0 3px 0 rgba(0,0,0,.3);
 }
 .pchip b { font-weight: 400; color: var(--sun); }
+.ptitle { font-style: normal; font-family: var(--font-display); font-size: 11px; color: var(--ink); background: linear-gradient(90deg, #ffd23f, #ff9d3f); border-radius: 8px; padding: 2px 7px 1px; }
+.ptitle.big { justify-self: start; font-size: 13px; }
 .pchip .pbar { display: inline-block; width: 54px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.15); overflow: hidden; }
 .pchip .pbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--mint), var(--sky)); }
 .daily-btn { background: linear-gradient(135deg, #ffd23f, #ff9ecb 60%, #c77dff); }
@@ -716,6 +718,21 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .pips { display: inline-flex; gap: 3px; }
 .pips i { width: 16px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
 .pips i.on { background: var(--mint); }
+.pips.rank i { width: 15px; } .pips.rank i.rw { height: 11px; box-shadow: 0 0 0 1px rgba(255,210,63,.55); } .pips.rank i.on { background: var(--sun); }
+.ev .twist { font-size: 11.5px; font-weight: 700; line-height: 1.25; color: var(--cream); } .ev .twist b { color: var(--mint); }
+.leaguecard { display: grid; gap: 1px; text-align: left; padding: 6px 10px; border: 3px solid var(--ink); border-radius: 12px; cursor: pointer; color: var(--cream); background: linear-gradient(90deg, rgba(217,165,32,.45), rgba(120,40,90,.7)); box-shadow: 0 3px 0 var(--ink); }
+.leaguecard b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--sun); }
+.leaguecard small { font-weight: 800; font-size: 11.5px; color: var(--cream); }
+.leaguecard.locked { background: rgba(255,255,255,.08); box-shadow: none; } .leaguecard.locked b, .leaguecard.locked small { color: var(--muted); }
+.leaguecard.back { background: rgba(44,35,82,.92); }
+#scr-career.league .chap-name { color: #ffd23f; }
+.car-rank { display: grid; gap: 4px; margin: 0; padding: 6px 10px; border-radius: 12px; background: rgba(217,165,32,.18); font-weight: 700; font-size: 12px; }
+.car-rank.up { background: linear-gradient(90deg, rgba(217,165,32,.4), rgba(255,90,216,.25)); }
+.car-rank .rt b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--sun); display: block; }
+.car-rank .rt small { color: var(--muted); font-size: 11.5px; }
+.car-rank .rbar { display: block; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; } .car-rank .rbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--sun), #ff9d3f); }
+.car-rank .rgifts { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; } .car-rank .rgifts i { font-style: normal; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 9px; background: rgba(255,255,255,.12); color: var(--cream); }
+.car-rank .rgifts u { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: -1px; border: 1px solid var(--ink); } .car-rank .rgifts small { flex-basis: 100%; color: var(--muted); font-size: 11px; }
 /* Story */
 #scr-story { align-items: flex-end; justify-content: center; cursor: pointer; }
 #scr-story::before { background: linear-gradient(0deg, rgba(20,14,40,.9), rgba(20,14,40,.25) 60%); }
@@ -1121,6 +1138,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <div class="chap-rival"><img id="chap-rival-img" alt=""><span id="chap-rival"></span></div>
       <div class="chap-meta" id="chap-meta"></div>
       <div class="chap-story" id="chap-story"></div>
+      <button class="leaguecard" id="chap-league" data-go="league"></button>
     </div>
   </div>
   <div class="car-right">

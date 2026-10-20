@@ -1,11 +1,13 @@
 import { CHARACTERS, charById } from './characters.js';
 import { BODY_LIST, bodyById, kartStats } from './karts.js';
 import {
-  CHAPTERS, TYPE_ICON, SPEAKERS, PAINTS, RACER_PRICE, paintById, eventStars, chapterStars, totalStars, MAX_STARS, chapterUnlocked,
+  CHAPTERS, LEAGUE, modOf, TYPE_ICON, SPEAKERS, PAINTS, RACER_PRICE, paintById, eventStars, chapterStars, totalStars, MAX_STARS, chapterUnlocked,
   eventUnlocked, currentChapter, rivalFor, goalLabel, starHints, trackLabel, racerAvailable, saveCareer, BOSS_NEEDS,
   trackTraits, grampsTip, chaptersDone, storyClues,
 } from './career.js';
 import { PART_LIST, partById, TIER_NAME } from './parts.js';
+import { rankInfo, leagueStars, LEAGUE_MAX_STARS, RANK_REWARDS, REWARD_RANKS, MAX_RANK, RANK_STARS } from './league.js';
+import { cosmeticById } from './cosmetics.js';
 import {
   loadout, socketsOf, owned, freeCopies, fittedCount, equip, unequip, savePreset, loadPreset, buy, sell, sellValue, inStock,
   chassisCost, buyChassis, PRESET_NAMES,
@@ -41,6 +43,7 @@ export class CareerUI {
     this.app = app;
     this.ui = ui;
     this.ci = null;
+    this.league = false; // the hub shows the Legends League map instead of the story chapters
     this.sel = null;
     this.tab = 'karts';
     this.pick = {};
@@ -108,24 +111,27 @@ export class CareerUI {
   }
 
   get c() { return this.app.career; }
+  get list() { return this.league ? LEAGUE : CHAPTERS; }
 
   // ---------------- hub ----------------
   open() {
     const c = this.c;
-    if (this.ci === null || !chapterUnlocked(c, this.ci)) this.ci = currentChapter(c);
+    if (this.league && !c.champion) this.league = false;
+    const list = this.list;
+    if (this.ci === null || this.ci >= list.length || !chapterUnlocked(c, this.ci, list)) this.ci = currentChapter(c, list);
     const stories = [];
     const pending = this.app.pendingStories.splice(0);
     if (pending.length) {
       stories.push(...pending);
-      this.ci = currentChapter(c);
+      this.ci = currentChapter(c, list);
       this.sel = null;
     }
-    const ch = CHAPTERS[currentChapter(c)];
+    const ch = list[currentChapter(c, list)];
     // The very first visit starts with the scrapyard scene (not for saves that are already under way).
     if (ch.prologue && !c.seen[`${ch.id}-prologue`] && !c.seen[`${ch.id}-intro`] && !totalStars(c)) stories.push({ key: `${ch.id}-prologue`, lines: ch.prologue, title: 'Prologue' });
     if (!c.seen[`${ch.id}-intro`]) {
       stories.push({ key: `${ch.id}-intro`, lines: ch.intro, title: ch.name });
-      this.ci = currentChapter(c);
+      this.ci = currentChapter(c, list);
     }
     this.render();
     this.ui.show('career');
@@ -134,34 +140,38 @@ export class CareerUI {
 
   render() {
     const c = this.c;
-    const ch = CHAPTERS[this.ci];
-    const unlocked = chapterUnlocked(c, this.ci);
+    const list = this.list, lg = this.league;
+    const ch = list[this.ci];
+    const unlocked = chapterUnlocked(c, this.ci, list);
     $('car-coins').textContent = c.coins.toLocaleString('en-US');
-    $('car-stars').textContent = `${totalStars(c)}/${MAX_STARS}`;
-    $('chap-num').textContent = `Chapter ${this.ci + 1} of ${CHAPTERS.length}`;
+    $('car-stars').textContent = lg ? `${leagueStars(c)}/${LEAGUE_MAX_STARS}` : `${totalStars(c)}/${MAX_STARS}`;
+    $('chap-num').textContent = lg ? `League · Season ${this.ci + 1} of ${list.length}` : `Chapter ${this.ci + 1} of ${list.length}`;
     $('chap-name').textContent = ch.name;
-    $('chap-blurb').textContent = unlocked ? ch.blurb : `Beat the rival in chapter ${this.ci} to unlock.`;
+    $('chap-blurb').textContent = unlocked ? ch.blurb : `Beat the rival in ${lg ? 'season' : 'chapter'} ${this.ci} to unlock.`;
+    $('scr-career').classList.toggle('league', lg);
     const rival = rivalFor(c, ch);
     $('chap-rival-img').src = this.app.portraits[rival] || '';
     $('chap-rival').innerHTML = `Rival <b>${charById(rival).name}</b>`;
     const cleared = ch.events.filter((e) => c.done[e.id]).length;
     $('chap-meta').innerHTML = `${CLASS_NAME[ch.cls]} class · ${DIFF_NAME[ch.diff]} racers<br>${cleared}/${ch.events.length} cleared · ★ ${chapterStars(c, ch)}/${ch.events.length * 3}`;
-    if (c.champion) $('chap-meta').innerHTML += '<br><b class="champ">🏆 Golden Wheel champion</b>';
-    // Story progress: one pip per finished chapter and the latest clue.
-    const done = chaptersDone(c);
-    const clues = storyClues(c);
-    $('chap-story').innerHTML = `<span class="pips">${CHAPTERS.map((_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('')}</span><span class="clue">${clues.length ? `<b>Clue:</b> ${esc(clues[clues.length - 1])}` : 'Win races to uncover the story.'}</span>`;
+    if (c.champion && !lg) $('chap-meta').innerHTML += '<br><b class="champ">🏆 Golden Wheel champion</b>';
+    // Story progress: one pip per finished chapter and the latest clue (the League shows its Legend Rank instead).
+    const done = chaptersDone(c, list);
+    const clues = storyClues(c, list);
+    $('chap-story').innerHTML = lg ? this._rankStrip()
+      : `<span class="pips">${list.map((_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('')}</span><span class="clue">${clues.length ? `<b>Clue:</b> ${esc(clues[clues.length - 1])}` : 'Win races to uncover the story.'}</span>`;
+    this._leagueCard();
     $('chap-prev').disabled = this.ci === 0;
-    $('chap-next').disabled = this.ci >= CHAPTERS.length - 1;
+    $('chap-next').disabled = this.ci >= list.length - 1;
     $('scr-career').classList.toggle('locked', !unlocked);
     $('car-ws-badge').hidden = !c.pnew;
 
     if (!this.sel || !ch.events.some((e) => e.id === this.sel)) {
-      const firstOpen = ch.events.findIndex((e, i) => eventUnlocked(c, this.ci, i) && !c.done[e.id]);
+      const firstOpen = ch.events.findIndex((e, i) => eventUnlocked(c, this.ci, i, list) && !c.done[e.id]);
       this.sel = ch.events[firstOpen >= 0 ? firstOpen : 0].id;
     }
     $('ev-list').innerHTML = ch.events.map((ev, i) => {
-      const open = eventUnlocked(c, this.ci, i);
+      const open = eventUnlocked(c, this.ci, i, list);
       const st = eventStars(c, ev.id);
       const where = ev.type === 'cup' ? ev.tracks.map((t) => trackLabel(t)).join(' · ') : trackLabel(ev.track, ev.rev);
       const right = !open
@@ -180,10 +190,31 @@ export class CareerUI {
         ${right}</button>`;
     }).join('');
     const selIdx = ch.events.findIndex((e) => e.id === this.sel);
-    const canGo = unlocked && eventUnlocked(c, this.ci, selIdx);
+    const canGo = unlocked && eventUnlocked(c, this.ci, selIdx, list);
     $('car-go').disabled = !canGo;
     $('car-go').classList.toggle('dim', !canGo);
     this._previewSel();
+  }
+
+  // The League card under the chapter panel: locked until the Golden Wheel, then a way into the League map (and back).
+  _leagueCard() {
+    const c = this.c, b = $('chap-league');
+    b.classList.toggle('locked', !c.champion);
+    b.classList.toggle('back', this.league);
+    if (this.league) { b.innerHTML = '<b>◀ Story map</b><small>Back to the chapters</small>'; return; }
+    const ri = rankInfo(c);
+    const sub = !c.champion ? '🔒 Win the Golden Wheel to enter' : c.seen['L1-intro'] ? `Legend Rank ${ri.rank} · ★ ${ri.stars}/${LEAGUE_MAX_STARS}` : 'NEW: the post-game is open!';
+    b.innerHTML = `<b>🏛️ Legends League</b><small>${sub}</small>`;
+  }
+
+  // The Legend Rank strip on the League map: ten pips, the reward ranks marked, and the next reward.
+  _rankStrip() {
+    const ri = rankInfo(this.c);
+    const pips = [...Array(MAX_RANK)].map((_, i) => `<i class="${i < ri.rank ? 'on' : ''}${RANK_REWARDS[i + 1] ? ' rw' : ''}"></i>`).join('');
+    const nextR = REWARD_RANKS.find((r) => r > ri.rank);
+    const names = (r) => [...RANK_REWARDS[r].cos.map((id) => (cosmeticById(id) || {}).icon || ''), ...RANK_REWARDS[r].paints.map(() => '🎨')].join('');
+    const nx = nextR ? `Rank ${nextR} (★ ${RANK_STARS[nextR - 1]}) gives ${names(nextR)}${RANK_REWARDS[nextR].title ? ' and the Legend title' : ''}` : 'Every rank reward earned!';
+    return `<span class="pips rank">${pips}</span><span class="clue"><b>Legend Rank ${ri.rank}</b> · ★ ${ri.stars}/${LEAGUE_MAX_STARS}${ri.next ? ` · next rank at ★ ${ri.next}` : ''}<br>${nx}</span>`;
   }
 
   // Track traits, what the event drops and a tip from Gramps about which parts suit it.
@@ -191,6 +222,8 @@ export class CareerUI {
     const c = this.c;
     const traits = trackTraits(ev.type === 'cup' ? ev.tracks[0] : ev.track);
     let h = traits.length ? `<span class="traits">${traits.map((t) => `<i>${t.icon} ${t.label}</i>`).join('')}</span>` : '';
+    const mod = modOf(ev);
+    if (mod) h += `<span class="twist"><b>${mod.icon} Twist: ${mod.name}.</b> ${esc(mod.desc)}</span>`;
     const p = ev.drop && partById(ev.drop);
     if (p) {
       const got = !!c.drops[ev.id];
@@ -201,7 +234,7 @@ export class CareerUI {
   }
 
   _previewSel() {
-    const ev = CHAPTERS[this.ci].events.find((e) => e.id === this.sel);
+    const ev = this.list[this.ci].events.find((e) => e.id === this.sel);
     if (!ev) return;
     this.app.previewTrack(ev.type === 'cup' ? ev.tracks[0] : ev.track, !!ev.rev);
   }
@@ -221,11 +254,17 @@ export class CareerUI {
     else if (a === 'gumball') this.app.gumballUI.open('career');
     else if (a === 'school') this.app.startSchool('career');
     else if (a === 'prev' && this.ci > 0) { this.ci--; this.sel = null; this.render(); }
-    else if (a === 'next' && this.ci < CHAPTERS.length - 1) { this.ci++; this.sel = null; this.render(); }
-    else if (a === 'race') {
-      const ch = CHAPTERS[this.ci];
+    else if (a === 'next' && this.ci < this.list.length - 1) { this.ci++; this.sel = null; this.render(); }
+    else if (a === 'league') {
+      if (!c.champion) { this.app.audio.play('uiBack'); this.app.hud.toast('Win the Golden Wheel to enter'); return; }
+      this.league = !this.league;
+      this.ci = null;
+      this.sel = null;
+      this.open();
+    } else if (a === 'race') {
+      const ch = this.list[this.ci];
       const idx = ch.events.findIndex((e) => e.id === this.sel);
-      if (idx < 0 || !eventUnlocked(c, this.ci, idx)) return;
+      if (idx < 0 || !eventUnlocked(c, this.ci, idx, this.list)) return;
       const ev = ch.events[idx];
       const key = `${ch.id}-boss`;
       if (ev.boss && !c.seen[key]) this.playStories([{ key, lines: ch.bossIntro, title: ev.title }], () => this.app.startCareerEvent(ev.id));
@@ -342,14 +381,14 @@ export class CareerUI {
     } else if (this.tab === 'paint') {
       paint = this.pick.paint;
       const p = paintById(paint);
-      name = p.name; blurb = 'A fresh coat for your kart. Paint stays when you switch karts.'; kind = 'Paint';
+      name = p.name; blurb = p.league ? `Reach Legend Rank ${p.league} in the Legends League to win this paint.` : 'A fresh coat for your kart. Paint stays when you switch karts.'; kind = 'Paint';
       list.innerHTML = PAINTS.map((pt) => {
         const own = c.paints.includes(pt.id);
-        const tag = pt.id === c.paint ? 'On' : own ? 'Owned' : coins(pt.price);
+        const tag = pt.id === c.paint ? 'On' : own ? 'Owned' : pt.league ? `Rank ${pt.league}` : coins(pt.price);
         const sw = pt.color || charById(c.racer).color;
         return `<button class="gcard pcard${pt.id === paint ? ' sel' : ''}" data-pick="${pt.id}"><span class="sw" style="background:${sw}"></span><span class="gn">${pt.name}</span><span class="gt">${tag}</span></button>`;
       }).join('');
-      if (!c.paints.includes(paint)) act = [`Buy ${coins(p.price)}`, c.coins >= p.price, 'buy-paint'];
+      if (!c.paints.includes(paint)) act = p.league ? [`Legend Rank ${p.league}`, false, ''] : [`Buy ${coins(p.price)}`, c.coins >= p.price, 'buy-paint'];
       else if (paint !== c.paint) act = ['Apply', true, 'equip-paint'];
       else act = ['Applied', false, ''];
     }
@@ -614,17 +653,32 @@ export class CareerUI {
       const p = partById(ev.drop);
       drop = `<p class="car-drop dim"><span class="di">${p.icon}</span><span><b>3 stars drops ${p.name}</b><small>Win bigger to earn it.</small></span></p>`;
     }
+    const rank = out.rank ? this._rankResult(out.rank) : '';
     if (out.blueprint) drop += '<p class="car-drop gold"><span class="di">📜</span><span><b>Starbolt Blueprint recovered!</b><small>Gramps now sells race-spec Tier III parts in the Workshop.</small></span></p>';
     this.ui.results({
       title,
       sub: `${out.chapter.name} · ${ev.title}`,
       html: `<div class="car-res"><div class="car-stars">${starRow(out.stars, out.prevStars)}</div>
         <div class="car-goal">${goalLabel(ev, this.c)}</div>${extraHtml}
-        <div class="car-coins">${lines}<div class="tot"><span>Total</span><b>${coins(out.coins)}</b></div></div></div>${drop}${unlock}${tip}${rowsHtml}`,
+        <div class="car-coins">${lines}<div class="tot"><span>Total</span><b>${coins(out.coins)}</b></div></div></div>${out.rank && out.rank.up ? rank + drop : drop + rank}${unlock}${tip}${rowsHtml}`,
       buttons: out.pass
         ? [[out.drop ? 'workshop' : 'garage', out.drop ? 'Workshop' : 'Garage', 'ghost small'], ['retry', 'Retry', 'alt small'], ['career', 'Continue', 'hot']]
         : [['career', 'Career', 'ghost small'], ['garage', 'Garage', 'alt small'], ['retry', 'Retry', 'hot']],
     });
+  }
+
+  // Legend Rank progress under a League result, and any rank-up rewards.
+  _rankResult(r) {
+    const ri = rankInfo(this.c);
+    const bar = `<span class="rbar"><i style="width:${ri.next ? Math.round((ri.into / ri.need) * 100) : 100}%"></i></span>`;
+    const head = `<b>${r.up ? `RANK UP! Legend Rank ${r.to}` : `Legend Rank ${ri.rank}`}</b><small>★ ${ri.stars}/${LEAGUE_MAX_STARS}${ri.next ? ` · ${ri.next - ri.stars} more to rank ${ri.rank + 1}` : ' · top rank!'}</small>`;
+    const chips = [
+      ...r.cos.map((id) => cosmeticById(id)).filter(Boolean).map((it) => `<i>${it.icon} ${esc(it.name)}</i>`),
+      ...r.paints.map((id) => paintById(id)).map((p) => `<i><u style="background:${p.color}"></u> ${esc(p.name)}</i>`),
+    ];
+    if (r.to >= MAX_RANK && r.up) chips.push('<i>🏛️ Title: Legend</i>');
+    const gifts = chips.length ? `<span class="rgifts">${chips.join('')}<small>Wear them in the Gumball machine (hats, trails, horns) and Garage (paint).</small></span>` : '';
+    return `<p class="car-rank${r.up ? ' up' : ''}"><span class="rt">${head}</span>${bar}${gifts}</p>`;
   }
 
   _tip(out) {
