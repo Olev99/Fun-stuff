@@ -2,7 +2,8 @@ import { CHARACTERS, charById } from './characters.js';
 import { BODIES, kartStats } from './karts.js';
 import { trackById } from './tracks.js';
 import { fmtTime } from './util.js';
-import { levelOf, oldLevel } from './profile.js';
+import { levelOf, oldLevel, DAILY_MODS } from './profile.js';
+import { LEAGUE, legendRank, grantLeagueRewards, enforceLeagueRewards } from './league.js';
 import { emptyWeekly } from './weekly.js';
 import { RACER_IDS, BODY_IDS, MAX_XP, emptyMastery } from './mastery.js';
 import { partById, isPart, MAX_PARTS, MAX_SOCKETS } from './parts.js';
@@ -31,6 +32,9 @@ export const PAINTS = [
   { id: 'midnight', name: 'Midnight', color: '#23284a', price: 300 },
   { id: 'pearl', name: 'Pearl', color: '#f4f1ea', price: 350 },
   { id: 'gold', name: 'Gold Rush', color: '#d9a520', price: 900 },
+  // Legends League rank rewards (league.js): never for sale, owned once the rank is reached.
+  { id: 'lg_teal', name: 'Comeback Teal', color: '#1fcfae', price: 0, league: 4 },
+  { id: 'lg_plum', name: 'Legend Plum', color: '#6d2bd1', price: 0, league: 8 },
 ];
 export const paintById = (id) => PAINTS.find((p) => p.id === id) || PAINTS[0];
 
@@ -233,8 +237,8 @@ export const CHAPTERS = [
     ],
     epilogue: [
       ['gramps', 'The Starbolt plans are back where they belong. Race-spec parts are on my shelves now, Tier III, no questions asked.'],
-      ['mic', 'But wait! A letter from the Circuit: the Zoomies League begins soon, with harder tracks, wilder rivals and a brand new adventure!'],
-      ['gramps', 'Coming soon. The Bucket is retired. Well, parked. Well, still racing. Polish that trophy, champ.'],
+      ['mic', 'But wait! A letter from the Baron: the Legends League is open. A new circuit run by racers, with harder tracks and wilder rivals!'],
+      ['gramps', 'Find it on the Career hub, under the chapter map. The Bucket is parked, not retired. Polish that trophy, champ.'],
     ],
     events: [
       { id: 'c7-1', type: 'race', track: 'moon', goal: 3, title: 'One Small Step', reward: 560 },
@@ -246,13 +250,21 @@ export const CHAPTERS = [
   },
 ];
 
-export const TYPE_ICON = { race: '🏁', gems: '💎', time: '⏱️', duel: '⚔️', cup: '🏆' };
+export const TYPE_ICON = { race: '🏁', gems: '💎', time: '⏱️', duel: '⚔️', cup: '🏆', battle: '🎈' };
 
+export { LEAGUE };
+
+// The twist of an event (a DAILY_MODS entry) or null.
+export const modOf = (ev) => (ev && ev.mod && DAILY_MODS.find((m) => m.id === ev.mod)) || null;
+
+// Story chapters first, then the Legends League seasons (ci is the index in its own list).
 export function eventById(id) {
-  for (let ci = 0; ci < CHAPTERS.length; ci++) {
-    const ch = CHAPTERS[ci];
-    const ei = ch.events.findIndex((e) => e.id === id);
-    if (ei >= 0) return { chapter: ch, ev: ch.events[ei], ci, ei };
+  for (const list of [CHAPTERS, LEAGUE]) {
+    for (let ci = 0; ci < list.length; ci++) {
+      const ch = list[ci];
+      const ei = ch.events.findIndex((e) => e.id === id);
+      if (ei >= 0) return { chapter: ch, ev: ch.events[ei], ci, ei };
+    }
   }
   return null;
 }
@@ -372,6 +384,8 @@ export function cleanCareer(saved) {
   c.missions = cleanMissions(saved.missions);
   c.weekly = cleanWeekly(saved.weekly);
   c.mastery = cleanMastery(saved.mastery);
+  // Legend Rank rewards follow from the League stars, so a merged or imported save has exactly the ones it has earned.
+  enforceLeagueRewards(c);
   const sy = saved.sync;
   if (isObj(sy) && isStr(sy.id) && isObj(sy.base)) {
     const b = sy.base;
@@ -409,30 +423,32 @@ export const chapterStars = (c, ch) => ch.events.reduce((a, e) => a + eventStars
 export const totalStars = (c) => CHAPTERS.reduce((a, ch) => a + chapterStars(c, ch), 0);
 export const MAX_STARS = CHAPTERS.reduce((a, ch) => a + ch.events.length * 3, 0);
 
-export function chapterUnlocked(c, ci) {
-  return ci === 0 || !!c.done[CHAPTERS[ci - 1].events.find((e) => e.boss).id];
+// `list` is CHAPTERS (the story) or LEAGUE (opens with the Golden Wheel).
+export function chapterUnlocked(c, ci, list = CHAPTERS) {
+  if (list === LEAGUE && !c.champion) return false;
+  return ci === 0 || !!c.done[list[ci - 1].events.find((e) => e.boss).id];
 }
 
 // The boss event opens once three of the chapter's other events are cleared.
 export const BOSS_NEEDS = 3;
-export function eventUnlocked(c, ci, ei) {
-  if (!chapterUnlocked(c, ci)) return false;
-  const ch = CHAPTERS[ci];
+export function eventUnlocked(c, ci, ei, list = CHAPTERS) {
+  if (!chapterUnlocked(c, ci, list)) return false;
+  const ch = list[ci];
   const ev = ch.events[ei];
   if (!ev.boss) return true;
   return ch.events.filter((e) => !e.boss && c.done[e.id]).length >= BOSS_NEEDS;
 }
 
 // The chapter to show first: the newest unlocked one that is not finished.
-export function currentChapter(c) {
+export function currentChapter(c, list = CHAPTERS) {
   let ci = 0;
-  while (ci + 1 < CHAPTERS.length && chapterUnlocked(c, ci + 1)) ci++;
+  while (ci + 1 < list.length && chapterUnlocked(c, ci + 1, list)) ci++;
   return ci;
 }
 
 // Story so far: how many chapters are finished and the clues they gave.
-export const chaptersDone = (c) => CHAPTERS.filter((ch) => c.done[ch.events.find((e) => e.boss).id]).length;
-export const storyClues = (c) => CHAPTERS.filter((ch) => c.done[ch.events.find((e) => e.boss).id]).map((ch) => ch.clue);
+export const chaptersDone = (c, list = CHAPTERS) => list.filter((ch) => c.done[ch.events.find((e) => e.boss).id]).length;
+export const storyClues = (c, list = CHAPTERS) => list.filter((ch) => c.done[ch.events.find((e) => e.boss).id]).map((ch) => ch.clue);
 
 export function rivalFor(c, chapter) {
   return chapter.rival === c.racer ? chapter.alt : chapter.rival;
@@ -500,6 +516,7 @@ export function grampsTip(ev) {
   else if (ev.type === 'time') tips.push('Drift Spring and Rocket Pill shave seconds off a solo lap.');
   else if (ev.type === 'duel') tips.push('Bumper Plate wins shoving matches, and a Turbo Coil wins the sprint.');
   else if (ev.type === 'cup') tips.push('Four tracks, four builds. Swap parts between races in the Workshop.');
+  else if (ev.type === 'battle') tips.push('Bumper Plate wins the shoving, Armour keeps your balloons, and a Comeback Spring never hurts.');
   for (const k of ['ice', 'mud', 'sand', 'oil', 'glide', 'lowg', 'shortcuts', 'narrow']) if (traits.has(k) && tips.length < 2) tips.push(TIPS[k]);
   if (!tips.length) tips.push('Engine for the straights, Tyres for the bends. Try both.');
   return tips.join(' ');
@@ -526,23 +543,26 @@ export function goalLabel(ev, c) {
   switch (ev.type) {
     case 'race': return ev.goal === 1 ? 'Win the race' : ev.goal >= 8 ? 'Finish the race' : `Finish in the top ${ev.goal}`;
     case 'gems': return `Grab ${ev.n} gems and finish`;
-    case 'time': return `Finish under ${fmtTime(ev.target)}`;
+    case 'time': return ev.gold ? `Gold medal time: under ${fmtTime(ev.target)}` : `Finish under ${fmtTime(ev.target)}`;
     case 'duel': {
       const ch = eventById(ev.id).chapter;
       return `Beat ${charById(c ? rivalFor(c, ch) : ch.rival).name} one on one`;
     }
     case 'cup': return 'Win the cup overall';
+    case 'battle': return ev.goal === 1 ? 'Win the Balloon Battle' : `Balloon Battle: finish in the top ${ev.goal}`;
   }
   return '';
 }
 
+const TM = [0.96, 0.92]; // star multipliers of a time event's target
 export function starHints(ev) {
   switch (ev.type) {
     case 'race': return ev.goal > 2 ? [goalLabel(ev), 'Top 2', 'Win'] : [goalLabel(ev), 'Win', 'Win by 3 s'];
     case 'gems': return [`${ev.n} gems and finish`, `${ev.n} gems, top 3`, `${ev.n + 6} gems, win`];
-    case 'time': return [`Under ${fmtTime(ev.target)}`, `Under ${fmtTime(ev.target * 0.96)}`, `Under ${fmtTime(ev.target * 0.92)}`];
+    case 'time': return [`Under ${fmtTime(ev.target)}`, `Under ${fmtTime(ev.target * (ev.tm || TM)[0])}`, `Under ${fmtTime(ev.target * (ev.tm || TM)[1])}`];
     case 'duel': return ['Win', 'Win by 2 s', 'Win by 5 s'];
     case 'cup': return ['Win the cup', 'Win 2 races', 'Win 3 races'];
+    case 'battle': return [ev.goal === 1 ? 'Win' : `Top ${ev.goal}`, 'Win', 'Win with 3 balloons left'];
   }
   return [];
 }
@@ -551,9 +571,13 @@ export function starHints(ev) {
 export function hudGoal(ev, race) {
   const p = race.player;
   if (!p) return '';
-  if (ev.type === 'gems') return `💎 ${Math.min(p.gemsGot || 0, 99)} / ${ev.n}`;
+  const mod = modOf(ev);
+  const twist = mod ? ` · ${mod.icon} ${mod.name}` : '';
+  if (ev.type === 'gems') return `💎 ${Math.min(p.gemsGot || 0, 99)} / ${ev.n}${twist}`;
   if (ev.type === 'time') return `Target ${fmtTime(ev.target)}`;
-  if (ev.type === 'race') return ev.goal === 1 ? 'Goal: win' : ev.goal >= 8 ? 'Goal: finish' : `Goal: top ${ev.goal}`;
+  if (ev.type === 'race') return (ev.goal === 1 ? 'Goal: win' : ev.goal >= 8 ? 'Goal: finish' : `Goal: top ${ev.goal}`) + twist;
+  if (ev.type === 'cup') return twist.slice(3);
+  if (ev.type === 'battle') return `Battle: top ${ev.goal} 🎈${Math.max(0, p.balloons || 0)}${twist}`;
   if (ev.type === 'duel') return `Duel: beat ${race.karts.find((k) => !k.isPlayer)?.ch.name || 'your rival'}`;
   return '';
 }
@@ -574,7 +598,11 @@ export function scoreEvent(ev, res, mult) {
       break;
     case 'time':
       pass = res.time <= ev.target;
-      stars = pass ? 1 + (res.time <= ev.target * 0.96 ? 1 : 0) + (res.time <= ev.target * 0.92 ? 1 : 0) : 0;
+      stars = pass ? 1 + (res.time <= ev.target * (ev.tm || TM)[0] ? 1 : 0) + (res.time <= ev.target * (ev.tm || TM)[1] ? 1 : 0) : 0;
+      break;
+    case 'battle':
+      pass = res.place <= ev.goal;
+      stars = pass ? 1 + (res.place === 1 ? 1 : 0) + (res.place === 1 && res.balloons >= 3 ? 1 : 0) : 0;
       break;
     case 'duel':
       pass = res.place === 1;
@@ -603,7 +631,8 @@ export const chapterMult = (ci) => 1 + ci * 0.3;
 // Apply a result to the save. Returns what changed, for the results screen.
 export function applyResult(c, evId, res) {
   const { ev, ci, chapter } = eventById(evId);
-  const sc = scoreEvent(ev, res, chapterMult(ci));
+  const sc = scoreEvent(ev, res, chapter.mult || chapterMult(ci));
+  const rank0 = chapter.league ? legendRank(c) : 0;
   const prevStars = eventStars(c, evId);
   const firstClear = sc.pass && !c.done[evId];
   const newStars = Math.max(0, sc.stars - prevStars);
@@ -624,7 +653,7 @@ export function applyResult(c, evId, res) {
     const joiners = chapter.joins || [chapter.rival, rivalFor(c, chapter)];
     for (const j of joiners) if (!c.beaten.includes(j)) c.beaten.push(j);
     unlocked = joiners[0];
-    if (ci === CHAPTERS.length - 1) { c.champion = true; blueprint = true; }
+    if (!chapter.league && ci === CHAPTERS.length - 1) { c.champion = true; blueprint = true; }
   }
   const drop = earnDrop(c, ev, sc.pass, c.stars[evId]);
   // Scenes to play on the hub: this event's, the chapter's outro and the epilogue.
@@ -634,8 +663,14 @@ export function applyResult(c, evId, res) {
     stories.push({ key: `${chapter.id}-outro`, lines: chapter.outro, title: chapter.name });
     if (chapter.epilogue) stories.push({ key: `${chapter.id}-epilogue`, lines: chapter.epilogue, title: 'Epilogue' });
   }
+  // Legend Rank: rewards of any rank reached by these stars, given once.
+  let rank = null;
+  if (chapter.league) {
+    const to = legendRank(c), got = grantLeagueRewards(c, to);
+    rank = { from: rank0, to, cos: got.cos, paints: got.paints, up: to > rank0 };
+  }
   saveCareer(c);
-  return { ...sc, coins, lines, firstClear, newStars, prevStars, unlocked, chapterDone, drop, blueprint, stories, ev, chapter, ci };
+  return { ...sc, coins, lines, firstClear, newStars, prevStars, unlocked, chapterDone, drop, blueprint, stories, ev, chapter, ci, rank };
 }
 
 function ordinalSuffix(n) {

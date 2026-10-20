@@ -169,6 +169,15 @@ export class Audio {
         [[0, 0], [4, 0.12], [7, 0.24], [12, 0.36]].forEach(([s, at]) => T('square', mtof(72 + s), 0, at === 0.36 ? 0.5 : 0.14, 0.09, at));
         T('triangle', mtof(60), 0, 0.8, 0.12, 0.36);
         break;
+      case 'lg_gong':
+        [196, 293, 392].forEach((f) => T('sine', f, f * 0.995, 1.1, 0.1, 0, 0.005));
+        N(1.0, 0.1, 'bandpass', 1800, 700, 0, 6);
+        break;
+      case 'lg_stadium':
+        N(1.0, 0.22, 'bandpass', 900, 1500, 0, 0.8);
+        [0, 7, 12].forEach((st, i) => T('square', mtof(60 + st), 0, 0.5, 0.07, i * 0.1));
+        N(0.5, 0.12, 'highpass', 3000, 6000, 0.55, 0.7);
+        break;
       case 'dino':
         N(0.9, 0.35, 'lowpass', 900, 160, 0, 1.2);
         T('sawtooth', 190, 70, 0.9, 0.14, 0, 0.08); T('sawtooth', 240, 90, 0.8, 0.08, 0.05, 0.08);

@@ -34,7 +34,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 
 - **Track hazards:** hay bales, crabs, tumbleweeds, snowballs, penguins, gumballs, laser gates, fireballs, boulders, balloons, ghosts, rolling barrels, moon rovers, and on the adventures floating logs, crocodiles and storm clouds. There are also boost pads, jump ramps, glide ramps with a pop-out glider, gems, and road patches of black ice, oil, mud and sand. Snow and ice tracks have much less grip, and the moon has low gravity.
 - **Career:** a story mode where you start in the scrapyard with the Rust Bucket and one racer, and take on Boost Corp.
-  - **The story:** Gramps Gearbox (once the champion "Gearbox Gus") and you against **Baron Von Boost**, the owner of Boost Corp. The company sponsors the Zoomies Circuit and sells every team the same "approved" kart. Years ago the Baron took the Starbolt design Gramps built with him. Each chapter drops a clue (fine print in a sponsor deal, a statue with the wrong name on it, a rigged boost pad, a locked garage), rivals react to how you are doing, and one by one some of them change sides. A prologue, a mid-story twist (the Baron offers you a golden seat), a final cup against the Baron himself on the moon and an epilogue that opens the door to the next league ("coming soon").
+  - **The story:** Gramps Gearbox (once the champion "Gearbox Gus") and you against **Baron Von Boost**, the owner of Boost Corp. The company sponsors the Zoomies Circuit and sells every team the same "approved" kart. Years ago the Baron took the Starbolt design Gramps built with him. Each chapter drops a clue (fine print in a sponsor deal, a statue with the wrong name on it, a rigged boost pad, a locked garage), rivals react to how you are doing, and one by one some of them change sides. A prologue, a mid-story twist (the Baron offers you a golden seat), a final cup against the Baron himself on the moon and an epilogue that points to the **Legends League** (see below).
   - A prologue and 7 chapters, 36 events. Event types are races, gem hunts, time trials, one-on-one rival duels and a final 4-race cup for the Golden Wheel. The prologue is a one-lap race on Easy where just finishing pays 100 coins and the first part (see **First steps** below for its lessons).
   - Each chapter has a rival with a short story before and after. Beating them opens the next chapter and lets that racer join your team. The hub shows your story progress and the latest clue.
   - Events pay coins by finishing place and gems, plus a first-clear bonus. Each event also has 3 stars to earn.
@@ -49,6 +49,27 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt) and 4 motorbikes (Zoom Bike, Zip Scooter, Hog Wild and the Vortex), paint jobs and new racers. The Garage's Workshop tab opens Gramps's Workshop.
   - Bikes turn sharper and grip harder in drifts, lean into corners and pop a wheelie when boosting. Pick **Kart** or **Bike** on the racer screen for quick races, cups and online.
   - Progress is saved on the phone. Settings has a reset.
+  - **🏛️ Legends League:** the post-game, a second map on the Career hub that opens when you win the Golden Wheel (until then its card reads "Win the Golden Wheel to enter"). The Baron's company is falling apart, so he proposes a new circuit run by racers, and you are its first Legend. It is Career income and uses the same machinery as the chapters: stars, first-clear bonuses, drops, Gramps's tips and saves.
+    - **3 seasons of 6 events (18), ids `L1-1` to `L3-6`:**
+      - **Season 1, Comeback Season** (Zoom class, Hard racers on strong karts): the old champions return, each with a new motive. Reunion Tour, a gem hunt, a Gold-medal time attack, a reversed race, the 4-race Old Champions Cup and a duel with Ember.
+      - **Season 2, Masked Rival** (Turbo class, harder karts): a masked racer sabotages the events (bombs in every item box, a Balloon Battle in Neon Pinball, moon gravity on the volcano, the Epic Jungle Odyssey) and leaves clues. Beat the mask in a duel to see who it is and why.
+      - **Season 3, Gearbox Gus** (Turbo class, the strongest karts the computer racers get): Gramps comes out of retirement. Five lessons (a reversed race, a gem hunt, a Gold time attack, the Epic Island Hopper with a twist, a twisted 4-race cup), then the final duel against Gramps in his Starbolt, on the road where it all began.
+    - **Variety:** top-2 finishes, gem hunts, Balloon Battle events (finish in the top 2 of a battle against the League racers; 3 stars for a win with 3 balloons left), time attacks that need a **Gold medal** time (3 stars at the Zoomie time), duels, 4-race cups, reversed tracks and Daily-style twists. Twists show on the event card and the HUD.
+    - **Hard but fair:** a player who ignores the Workshop will struggle. Gramps's tips and the event cards say which parts help. `node tools/league-sim.mjs` runs the League's races with a computer-driven player to sanity check the AI strength.
+    - **Drops:** 3-star clears drop Tier III parts (Engine, Turbo Coil, Tyres, Armour); each season boss drops a special Blueprint (Wing Kit, Item Pouch, Comeback Spring) and Mud Boots drops from a gem hunt. Coins: about 16,600 for a typical player over the League plus 2,100 from its trophies, roughly 60% of the whole story's 28,100 (`node tools/economy.mjs`).
+    - **Legend Rank 1 to 10** comes from your League stars (3, 8, 14, 20, 27, 34, 41, 46 and 50 stars for ranks 2 to 10), so there is nothing extra to save. The results screen shows rank progress and any rank-up. Rewards come once, at ranks 2, 4, 6, 8 and 10 (the Career hub strip shows the next one):
+
+      | Rank | Reward |
+      |---|---|
+      | 2 | 🌿 Champion's Laurel (hat), 🔔 Victory Gong (horn) |
+      | 4 | 💫 Comeback Flare (boost trail), Comeback Teal (paint) |
+      | 6 | 🏁 Checkered Topper (hat), 🏟️ Stadium Roar (horn) |
+      | 8 | 🌠 Legend Aurora (boost trail), Legend Plum (paint) |
+      | 10 | 🌟 Legend's Crest (hat), the **Legend** profile title and a 🏆 Legend trophy |
+
+      They are worn like gumball prizes (hats, trails and horns in the gumball collection, paints in the Garage), friends see the hats online, and the machine never gives them out. They do not count towards the 35-prize collection.
+    - **4 League trophies:** League Debut (clear an event), Three-Season Run (clear all 3 seasons), Perfect League (3 stars on all 18 events) and Living Legend (Legend Rank 10).
+    - Two extra story characters, the Masked Racer and Gramps Gearbox in racing gear, only appear in the League (they are not among the 20 racers). Syncing two devices keeps the most stars of each event and every clear, and the rank rewards follow the merged stars.
 - **Modes:**
   - Career.
   - Daily Challenge: a new track, twist and goal every day.
@@ -77,13 +98,13 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Every racer has a funny **title** at levels 3, 6 and 10 (Mochi: Whisker Rookie, Nine-Lives Drifter, Grand Cat of the Circuit), shown on the racer screen and the profile. A coloured ★ with the level shows on the racer and ride cards (bronze, silver, gold, mint, pink for level 10).
   - The profile has a mastery list with progress bars. Every 5 mastery levels gained across all racers and rides give a free prize capsule. The results screen shows the mastery gained and any level-up or title.
   - Saved as `mastery` (`r` racers, `b` rides, `capLevels`); syncing keeps the higher XP of each.
-- **Trophies:** 42 achievements with progress bars, from your first win to beating every rival, finding every shortcut, winning online and earning Gold and Zoomie medals. Each pays coins and XP. Tap 🏆 on the title screen.
+- **Trophies:** 46 achievements with progress bars, from your first win to beating every rival, finding every shortcut, winning online and earning Gold and Zoomie medals. Each pays coins and XP. Tap 🏆 on the title screen.
 - **Medals:** every track has four time targets for your best Time Trial: 🥉 Bronze, 🥈 Silver, 🥇 Gold and ⚡ Zoomie. Gold matches what a Hard computer racer can do in the stock Zoom Classic. Zoomie is 6% faster than that, so it needs the shortcuts and a clean lap. The track cards show your medal and (in Time Trial) all four times, the Time Trial results show your medal and "next medal in X.XXs", and the Trophies screen shows your medal total (a Gold track counts 3). Improving your tier pays a one-off XP bonus (Bronze 50, Silver 100, Gold 200, Zoomie 400). Medals are worked out from your best time, so nothing extra is saved. Reverse laps don't have medals.
 - **Daily missions:** three small goals a day, the same for everyone (drift-boost 10 times, finish 3 races, win on a bike, collect 25 gems, pop balloons in a battle and more), shown with progress bars on the title screen. Each pays 100 XP, and finishing all three gives a free prize capsule. A 🔥 streak counts days in a row with all three done.
 - **Results screen:** the XP bar fills (through a level-up), the missions and medals you moved are listed, and a **Next up** line picks the closest goal (a mission nearly done, a medal just out of reach, the next level or the next Career event). **Race again** restarts the same race in one tap. Tap the rewards to skip the animation.
 - **Challenge a friend:** after a Time Trial, the results screen has **Challenge a friend**. It shares a link (the Share sheet on a phone, otherwise it is copied) holding the track, your time, your nickname and your ghost. The ghost is squeezed into the part of the link after the \#, which browsers never send to any server, and a typical link is 1.5 to 3.5 thousand characters. A friend who opens it sees "Beat Mia's 1:23.45 on Sprout Speedway!" and races a Time Trial against your ghost at the same speed class. Links are checked carefully: anything oversized, garbled or about an unknown track is ignored.
 - **Gumball machine (🍬 Prizes):**
-  - Spend 600 coins, or a free capsule, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary.
+  - Spend 600 coins, or a free capsule, on random prizes: 16 hats, 10 boost trails and 10 horns, from common to legendary. The Legends League adds 3 hats, 2 trails and 2 horns that only Legend Rank gives.
   - **Jackpots (8%):** real prizes instead of a cosmetic. A paint job (3%), a free random Tier I or II part for the Workshop (2.5%), 1,500 coins (1.5%), a kart or bike you don't own (0.7%) or a racer you haven't hired (0.3%). Jackpot karts, bikes and racers work everywhere, like ones bought in the Career.
   - Hats show on your racer everywhere, even to friends online. Trails colour your boost flames, and your horn honks when you overtake someone.
   - Duplicates pay coins back.
@@ -203,6 +224,7 @@ zoomies/
   index.html          UI, HUD and styles
   src/main.js         app shell, menus, Grand Prix, career and multiplayer flow, dynamic resolution
   src/career.js       career chapters, events, story, event hints, scoring and save data
+  src/league.js       the Legends League: seasons, events, Legend Rank and its rewards
   src/careerui.js     career hub, garage, Gramps's Workshop, story dialogue and career results
   src/parts.js        stat parts, special parts, sockets and the kart-stats maths
   src/workshop.js     owning, fitting, buying, selling and migrating parts
@@ -234,6 +256,8 @@ zoomies/
   src/coach.js        first steps: lessons, one-shot tips, the steering-help offer, haptics
   src/audio.js        synthesised sound effects and music
   tools/build-single.mjs  bundles everything into one HTML file
+  tools/economy.mjs   Career and League coin income, shop stock and drops
+  tools/league-sim.mjs  League races with a computer-driven player (AI strength check)
 ```
 
 Before committing, run `node tools/stamp.mjs`. It stamps each code file's URL with a hash of its contents (in the import map in `index.html`) and writes `version.json`. Browsers then never run a mix of old and new files, and a page left open reloads itself once when a newer version goes live.

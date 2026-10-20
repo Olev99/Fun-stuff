@@ -13,7 +13,8 @@ const three = pathToFileURL(resolve(root, 'vendor/three.module.min.js')).href;
 register(`data:text/javascript,export async function resolve(s,c,n){if(s==='three')return{url:${JSON.stringify(three)},shortCircuit:true};return n(s,c)}`);
 
 const src = (f) => import(pathToFileURL(resolve(root, 'src', f)).href);
-const { CHAPTERS, RACER_PRICE, scoreEvent, chapterMult } = await src('career.js');
+const { CHAPTERS, LEAGUE, RACER_PRICE, scoreEvent, chapterMult } = await src('career.js');
+const { ACHIEVEMENTS } = await src('profile.js');
 const { PART_LIST, partById, chassisPrice } = await src('parts.js');
 const { BODIES } = await src('karts.js');
 const { inStock } = await src('workshop.js');
@@ -22,11 +23,12 @@ const { inStock } = await src('workshop.js');
 const GEMS = 8; // per race that has gems
 const STAR_COINS = 40;
 const P3 = 0.35; // share of events a decent player three-stars (and so earns their drop)
-function eventCoins(ev, ci) {
+function eventCoins(ev, mult) {
   const res = { place: 2, gems: GEMS, finished: true, margin: 2, time: (ev.target || 0) * 0.95, wins: 2 };
   if (ev.type === 'duel' || ev.type === 'cup') res.place = 1;
   if (ev.type === 'race' && ev.goal <= 2) res.place = 2;
-  const sc = scoreEvent(ev, res, chapterMult(ci));
+  if (ev.type === 'battle') res.balloons = 2;
+  const sc = scoreEvent(ev, res, mult);
   return sc.placeCoins + sc.gemCoins + ev.reward + 2 * STAR_COINS;
 }
 
@@ -60,7 +62,7 @@ let cum = 0;
 const stocked = new Set();
 for (let ci = 0; ci < CHAPTERS.length; ci++) {
   const ch = CHAPTERS[ci];
-  const coins = Math.round(ch.events.reduce((a, e) => a + eventCoins(e, ci), 0));
+  const coins = Math.round(ch.events.reduce((a, e) => a + eventCoins(e, chapterMult(ci)), 0));
   cum += coins;
   // drops: the guaranteed ones (boss Blueprint, prologue) plus P3 of the 3-star ones; value = price of a wished-for copy
   const drops = [];
@@ -75,6 +77,19 @@ for (let ci = 0; ci < CHAPTERS.length; ci++) {
   rows.push({ ch: `c${ci + 1}`, coins, cum, shop: fresh.map((p) => p.id).join(' ') || '-', shopCum: [...stocked].reduce((a, id) => a + partById(id).price, 0), drops: drops.join(' ') || '-', share: wl.map((w) => Math.min(1, (cum + w.drop) / w.total)), dv: wl.map((w) => Math.round(w.drop)) });
 }
 
+// ---- the Legends League (after the Golden Wheel): same typical player, season coin multiplier ----
+const storyTotal = cum;
+const leagueRows = [];
+for (const s of LEAGUE) {
+  const coins = Math.round(s.events.reduce((a, e) => a + eventCoins(e, s.mult), 0));
+  cum += coins;
+  const drops = s.events.filter((e) => e.drop).map((e) => `${e.drop}${e.bp || e.dropAny ? '' : '*'}`);
+  leagueRows.push({ id: s.id, name: s.name, coins, cum, drops: drops.join(' ') });
+}
+const leagueTotal = cum - storyTotal;
+// achievements pay coins too: the four League ones
+const leagueAch = ACHIEVEMENTS.filter((a) => a.id.startsWith('lg')).reduce((a, x) => a + x.reward, 0);
+
 // ---- print ----
 const pad = (s, n) => String(s).padEnd(n);
 console.log(`Typical player: place 2, 2 stars, ${GEMS} gems, first clears; 3-star drops at ${P3 * 100}% of events (* = 3-star drop)\n`);
@@ -88,7 +103,11 @@ for (const w of wl) {
   for (const i of w.items) g[i.g] = (g[i.g] || 0) + i.cost;
   console.log(`\nWishlist ${w.name}: ${w.total} coins = ${Object.entries(g).map(([k, v]) => `${k} ${v}`).join(', ')}`);
 }
+console.log('\nLegends League (after the Golden Wheel), typical player as above, season coin multiplier:');
+for (const r of leagueRows) console.log(pad(r.id, 4), pad(r.coins, 6), pad(r.cum, 7), r.name.padEnd(18), `drops: ${r.drops}`);
+console.log(`League events ${leagueTotal} coins + 4 League achievements ${leagueAch} = ${leagueTotal + leagueAch}. Story ${storyTotal}.`);
+console.log(`League / story = ${Math.round((leagueTotal / storyTotal) * 100)}% (with achievements ${Math.round(((leagueTotal + leagueAch) / storyTotal) * 100)}%); League share of all Career event income = ${Math.round((leagueTotal / (leagueTotal + storyTotal)) * 100)}% (${Math.round(((leagueTotal + leagueAch) / (leagueTotal + leagueAch + storyTotal)) * 100)}% with achievements).`);
 const parts1 = PART_LIST.filter((p) => !(p.kind === 'stat' && p.tier === 3)).reduce((a, p) => a + p.price, 0);
 console.log(`\nOne copy of every Tier I/II part and special: ${parts1} coins. Tier III sells only after the Golden Wheel.`);
 const noParts = Object.values(BODIES).reduce((a, b) => a + b.price, 0) + Object.values(RACER_PRICE).reduce((a, p) => a + p, 0);
-console.log(`Every kart, bike and Career racer, no parts at all: ${noParts} coins (story income ${cum}).`);
+console.log(`Every kart, bike and Career racer, no parts at all: ${noParts} coins (story income ${storyTotal}, with the League ${cum}).`);

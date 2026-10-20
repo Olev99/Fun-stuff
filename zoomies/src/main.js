@@ -29,7 +29,7 @@ import { NetSession } from './net.js';
 import { PostFX } from './post.js';
 import { installHeightFog } from './env.js';
 import {
-  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, rivalFor, playerLoadout, aiLoadouts, applyResult,
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult,
 } from './career.js';
 
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
@@ -961,6 +961,7 @@ class App {
     clearCareer();
     this.career = newCareer();
     this.careerUI.ci = null;
+    this.careerUI.league = false;
   }
 
   startCareerEvent(evId) {
@@ -969,22 +970,30 @@ class App {
     const player = c.racer;
     const rival = rivalFor(c, chapter);
     const lo = playerLoadout(c);
-    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: chapter.cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0 };
+    // A League event may set its own speed class (Gold medal times are Zoom class) and a Daily-style twist.
+    const cls = ev.cls || chapter.cls, mods = modOf(ev);
+    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0, mods };
     this.careerRun = { evId };
     if (ev.type === 'cup') {
       this.gp = {
-        cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: chapter.cls, player, careerEv: ev, wins: 0, gems: 0,
+        cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: cls, player, careerEv: ev, wins: 0, gems: 0,
       };
       this._gpField(this.gp, [rival, ...(chapter.field || [])]);
       const others = this.gp.field.filter((id) => id !== player);
-      this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev };
+      this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev, mods };
       this.startGPRace();
     } else if (ev.type === 'time') {
       this.startRace({ ...base, mode: 'tt' });
+    } else if (ev.type === 'battle') {
+      // Balloon Battle: the rival and the returning racers first, spread round the arena.
+      const all = this.makeGrid(player, null, [rival, ...(chapter.field || [])]).filter((id) => id !== player);
+      const others = [rival, ...all.filter((id) => id !== rival)].slice(0, BATTLE_FIELD - 1);
+      const grid = [...others.slice(0, 2), player, ...others.slice(2)];
+      this.startRace({ ...base, mode: 'battle', reverse: false, grid, loadoutsById: aiLoadouts(chapter, others, rival) });
     } else if (ev.type === 'duel') {
       this.startRace({ ...base, mode: 'quick', grid: [rival, player], difficulty: chapter.bossDiff, loadoutsById: aiLoadouts(chapter, [rival], rival) });
     } else {
-      const grid = this.makeGrid(player, null, [rival]);
+      const grid = this.makeGrid(player, null, chapter.league ? [rival, ...(chapter.field || [])] : [rival]);
       this.startRace({ ...base, mode: 'quick', grid, loadoutsById: aiLoadouts(chapter, grid.filter((id) => id !== player), rival) });
     }
   }
@@ -992,16 +1001,17 @@ class App {
   onCareerComplete(race, rows) {
     const me = rows.find((r) => r.isPlayer);
     const { ev } = eventById(this.careerRun.evId);
-    const res = { place: me.place, finished: me.finished, time: me.time, gems: (race.player && race.player.gemsGot) || 0 };
+    const res = { place: me.place, finished: me.finished, time: me.time, gems: (race.player && race.player.gemsGot) || 0, balloons: me.balloons || 0 };
     // Lead over the next racer (duels and "win by" stars).
     const next = rows.find((r) => r.place === me.place + 1);
-    res.margin = me.place === 1 && next ? next.time - me.time : 0;
+    res.margin = me.place === 1 && next && !race.battle ? next.time - me.time : 0;
     const out = applyResult(this.career, ev.id, res);
     this.pendingStories.push(...out.stories);
     const rw = this.profileAward(race, me, { coins: 0, xpBonus: out.pass ? 50 : 0 });
     let extra = '';
     if (ev.type === 'time') extra = `<div class="big-msg"><em>${fmtTime(me.time)}</em></div><div class="car-goal">Target ${fmtTime(ev.target)}</div>`;
-    const rowsHtml = ev.type === 'time' ? '' : `<div class="results">${rows.map((r) => this.ui.row(r, `<span></span><span class="pts">${fmtTime(r.time)}</span>`)).join('')}</div>`;
+    const cell = (r) => (race.battle ? `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons || 0)}</span><span class="pts">💥 ${r.hits || 0}</span>` : `<span></span><span class="pts">${fmtTime(r.time)}</span>`);
+    const rowsHtml = ev.type === 'time' ? '' : `<div class="results">${rows.map((r) => this.ui.row(r, cell(r))).join('')}</div>`;
     this.careerUI.results(out, rw + rowsHtml, extra);
   }
 

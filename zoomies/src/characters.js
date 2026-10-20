@@ -32,12 +32,15 @@ export const CHARACTERS = [
 // uses them (the Baron is the final rival).
 export const STORY_CHARS = [
   { id: 'baron', name: 'Baron Von Boost', species: 'Lion', tagline: 'Owns Boost Corp, the Circuit and a very shiny moustache.', color: '#d9a520', accent: '#1d1537', story: true, stats: { speed: 4, accel: 3, handling: 3, weight: 2 } },
+  // Legends League (league.js): the masked saboteur of Season 2 (it is Bruno under the hood) and Gramps in racing gear for Season 3.
+  { id: 'mask', name: 'The Masked Racer', species: 'Mystery', tagline: 'Nobody knows who is under the mask. Everybody knows who is on the leaderboard.', color: '#2b1b4a', accent: '#ffd23f', story: true, stats: { speed: 4, accel: 2, handling: 2, weight: 5 } },
+  { id: 'gearbox', name: 'Gramps Gearbox', species: 'Badger', tagline: 'Retired champion "Gearbox Gus". Thirty years of lessons, one very fast Starbolt.', color: '#e8892b', accent: '#f4f1ea', story: true, stats: { speed: 5, accel: 3, handling: 4, weight: 3 } },
 ];
 
 // How big each racer sits in the kart: tiny bees and slimes, huge golems and yetis.
 const SIZE = {
   pip: 0.8, hopper: 0.9, fizz: 0.68, lulu: 0.86, gloop: 0.82, nimbus: 0.84, mochi: 0.95, ember: 0.97, zorp: 0.95,
-  baron: 1.04, bruno: 1.12, rexi: 1.1, bao: 1.16, gus: 1.24, pebble: 1.42, boris: 1.4,
+  baron: 1.04, mask: 1.12, gearbox: 1.06, bruno: 1.12, rexi: 1.1, bao: 1.16, gus: 1.24, pebble: 1.42, boris: 1.4,
 };
 export const charSize = (id) => SIZE[id] || 1;
 
@@ -156,6 +159,41 @@ function driver(ch, hat) {
       B.add(new THREE.CylinderGeometry(0.2, 0.22, 0.32, 14), '#15102a', [0, H.y + 0.62, H.z - 0.04], [0, 0, 0], 1, 'plastic');
       B.add(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 16), '#15102a', [0, H.y + 0.47, H.z - 0.04], [0, 0, 0], 1, 'plastic');
       B.add(new THREE.CylinderGeometry(0.205, 0.225, 0.07, 14), '#ffd23f', [0, H.y + 0.52, H.z - 0.04], [0, 0, 0], 1, 'metal');
+      break;
+    }
+    case 'mask': {
+      // a hooded stranger: cream mask with glowing gold eye slits (and a suspiciously big frame)
+      const cloth = '#2b1b4a';
+      torso(cloth, '#5a3a9a');
+      armL(cloth);
+      B.add(sphere(0.48), cloth, [H.x, H.y, H.z], [0, 0, 0], [1.08, 1.02, 1]);
+      B.add(new THREE.ConeGeometry(0.3, 0.42, 10), cloth, [0, H.y + 0.46, H.z - 0.12], [-0.35, 0, 0]);
+      B.add(sphere(0.38), '#f4f1ea', [0, H.y - 0.02, H.z + 0.14], [0, 0, 0], [0.92, 1, 0.62], 'gloss');
+      for (const sd of [-1, 1]) B.add(new THREE.BoxGeometry(0.17, 0.05, 0.03), '#ffd23f', [sd * 0.14, H.y + 0.06, H.z + 0.43], [0, 0, sd * -0.25], 1, 'glow');
+      B.add(new THREE.TorusGeometry(0.34, 0.025, 6, 24), '#ffd23f', [0, H.y - 0.02, H.z + 0.2], [0, 0, 0], [0.92, 1, 0.5], 'metal');
+      B.add(new THREE.CapsuleGeometry(0.1, 0.5, 3, 8), '#8f5cff', [0, H.y - 0.5, H.z + 0.05], [0, 0, Math.PI / 2], [1, 1, 0.8], 'fabric');
+      break;
+    }
+    case 'gearbox': {
+      // Gramps: a grizzled badger with a white-striped face, bushy brows, pushed-up goggles and a spanner behind one ear
+      const fur = '#6a6f78';
+      B.mat = 'fur';
+      torso(suit, '#e8d9b0');
+      armL(fur);
+      B.add(sphere(0.47), fur, [H.x, H.y, H.z], [0, 0, 0], [1.08, 1, 1]);
+      B.add(new THREE.CapsuleGeometry(0.07, 0.42, 3, 8), '#f4f1ea', [0, H.y + 0.2, H.z + 0.3], [Math.PI / 2 - 0.55, 0, 0], 1, 'fur');
+      B.add(sphere(0.22), '#f4f1ea', [0, H.y - 0.1, H.z + 0.34], [0, 0, 0], [1.15, 0.82, 0.8], 'fur');
+      B.add(sphere(0.07, 12, 8), '#1b1530', [0, H.y - 0.02, H.z + 0.53], [0, 0, 0], [1.3, 1, 1], 'gloss');
+      for (const sd of [-1, 1]) {
+        B.add(sphere(0.12, 10, 8), fur, [sd * 0.3, H.y + 0.36, H.z - 0.04]);
+        B.add(sphere(0.07, 8, 6), '#f4f1ea', [sd * 0.3, H.y + 0.38, H.z + 0.04]);
+        B.add(new THREE.CapsuleGeometry(0.035, 0.2, 3, 6), '#f4f1ea', [sd * 0.13, H.y - 0.18, H.z + 0.5], [0, 0, Math.PI / 2 + sd * 0.4]);
+        B.add(new THREE.BoxGeometry(0.2, 0.06, 0.05), '#f4f1ea', [sd * 0.14, H.y + 0.2, H.z + 0.44], [0, 0, sd * -0.3]);
+      }
+      eyes(B, 0, H.y + 0.09, H.z + 0.42, 0.14, 0.06);
+      B.add(new THREE.TorusGeometry(0.44, 0.05, 8, 28), '#ffb347', [0, H.y + 0.24, H.z], [Math.PI / 2 - 0.3, 0, 0], 1, 'plastic');
+      B.add(new THREE.BoxGeometry(0.06, 0.4, 0.04), '#c9ced6', [0.46, H.y + 0.16, H.z - 0.1], [0, 0, 0.5], 1, 'metal');
+      B.add(new THREE.TorusGeometry(0.07, 0.02, 6, 12), '#c9ced6', [0.55, H.y + 0.36, H.z - 0.1], [0, 0, 0], 1, 'metal');
       break;
     }
     case 'rexi': {

@@ -13,6 +13,7 @@ import { nextUp } from './nextup.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
 import { isTouch } from './platform.js';
 import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, WEEKLY_XP_BASE } from './weekly.js';
+import { profileTitle, rankInfo, MAX_RANK, LEAGUE_MAX_STARS } from './league.js';
 import { masteryOf, titleFor, STAR_COLORS, RACER_IDS, BODY_IDS } from './mastery.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
 
@@ -178,7 +179,8 @@ export class UI {
     const c = this.app.career;
     const lv = levelOf(c.xp || 0);
     const streak = dailyStreak(c);
-    $('pchip').innerHTML = `<b>Lv ${lv.level}</b><i class="pbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></i><span>🪙 ${c.coins.toLocaleString('en-US')}</span>${streak ? `<span>🔥 ${streak}</span>` : ''}`;
+    const ttl = profileTitle(c);
+    $('pchip').innerHTML = `<b>Lv ${lv.level}</b>${ttl ? `<em class="ptitle">${ttl}</em>` : ''}<i class="pbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></i><span>🪙 ${c.coins.toLocaleString('en-US')}</span>${streak ? `<span>🔥 ${streak}</span>` : ''}`;
     const d = dailyFor();
     const done = dailyDoneToday(c);
     $('menu-daily').textContent = done ? `Done today ✓ · ${streak}-day streak` : `${d.mod.icon} ${d.mod.name} · +${150 + Math.round(dailyReward(streak + 1) / 2)} XP · 🍬`;
@@ -266,7 +268,7 @@ export class UI {
     const nAch = Object.keys(c.ach || {}).length;
     $('prof-count').textContent = `${nAch} of ${ACHIEVEMENTS.length} trophies`;
     $('prof-top').innerHTML = `<div class="lvbadge"><small>Level</small>${lv.level}</div>
-      <div class="lvinfo"><div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div><small>${lv.into} / ${lv.need} XP to level ${lv.level + 1}</small>
+      <div class="lvinfo">${profileTitle(c) ? `<div class="ptitle big">🏛️ ${profileTitle(c)}</div>` : ''}<div class="xpbar"><i style="width:${Math.round((lv.into / lv.need) * 100)}%"></i></div><small>${lv.into} / ${lv.need} XP to level ${lv.level + 1}</small>
       <div class="pstats"><span>🪙 ${c.coins.toLocaleString('en-US')}</span><span>🏁 ${n('races')} races</span><span>🥇 ${n('wins')} wins</span><span>🔥 best streak ${(c.daily && c.daily.best) || 0}</span><span>🎖️ ${medalCount(app.records)}/${medalMax()} medals</span></div></div>`;
     $('prof-extra').innerHTML = this.profileExtra(c);
     $('ach-grid').innerHTML = ACHIEVEMENTS.map((a) => {
@@ -294,7 +296,9 @@ export class UI {
     const m = c.mastery || { capLevels: 0 };
     const mastery = `<div class="prof-sec"><b>Mastery</b><span>Free capsule every 5 levels · ${Math.floor(m.capLevels / 5)} earned</span></div>`
       + (rr || rb ? `<div class="mast-grid">${rr}${rb}</div>` : '<div class="wbadges"><small>Race with a racer or ride to start its mastery. Mastery never changes your stats.</small></div>');
-    return weekly + mastery;
+    const ri = rankInfo(c);
+    const league = c.champion ? `<div class="prof-sec"><b>Legends League</b><span>Legend Rank ${ri.rank} of ${MAX_RANK} · ★ ${ri.stars}/${LEAGUE_MAX_STARS}${ri.rank >= MAX_RANK ? ' · 🏆 Legend trophy' : ''}</span></div>` : '';
+    return league + weekly + mastery;
   }
 
   // Mastery gained in a race: the racer and ride, level-ups with new titles, a capsule.

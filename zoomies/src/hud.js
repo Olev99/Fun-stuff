@@ -57,7 +57,7 @@ export class HUD {
     this.speed.classList.remove('on');
     this.flash.style.opacity = 0;
     this._buildMap(race);
-    this.goalEl.hidden = !(race.careerEv && race.careerEv.type !== 'cup') && !race.dailyEv;
+    this.goalEl.hidden = !(race.careerEv && (race.careerEv.type !== 'cup' || race.careerEv.mod)) && !race.dailyEv;
     this.styleEl.innerHTML = '';
     this.app.input.lookBack = false;
     const sp = document.getElementById('hud-split');
