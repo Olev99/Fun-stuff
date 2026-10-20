@@ -1,11 +1,12 @@
 import { BODIES } from './karts.js';
-import { PARTS, PART_LIST, partById, isPart, cleanFit, baseSockets, chassisPrice, EARNED_SELL, MAX_PARTS, MAX_SOCKETS, FAMILY_LIST } from './parts.js';
+import { PARTS, PART_LIST, partById, isPart, cleanFit, baseSockets, chassisPrice, EARNED_SELL, MAX_PARTS, MAX_SOLD, MAX_SOCKETS, FAMILY_LIST } from './parts.js';
 
 // Gramps's Workshop: the rules for owning, fitting, buying and selling parts.
 // Everything works on the career save `c` so the UI, the race and the tests
 // share one set of rules. Save fields:
 //   parts     { partId: copies owned }
 //   bought    { partId: copies that were bought (sell back for the full price) }
+//   sold      { partId: copies ever sold; lets a sale survive a sync with a device that still holds the part }
 //   loadouts  { bodyId: { cur: [partIds fitted], pre: [3 saved presets] } }
 //   sockets   { bodyId: 0 | 1 }  extra sockets from Chassis Mods
 //   drops     { eventId: partId } parts already earned from events
@@ -14,7 +15,7 @@ import { PARTS, PART_LIST, partById, isPart, cleanFit, baseSockets, chassisPrice
 export const PRESET_NAMES = ['Grip', 'Speed', 'Allround'];
 
 export function ensure(c) {
-  for (const k of ['parts', 'bought', 'loadouts', 'sockets', 'drops']) if (!c[k] || typeof c[k] !== 'object' || Array.isArray(c[k])) c[k] = {};
+  for (const k of ['parts', 'bought', 'sold', 'loadouts', 'sockets', 'drops']) if (!c[k] || typeof c[k] !== 'object' || Array.isArray(c[k])) c[k] = {};
   return c;
 }
 
@@ -144,6 +145,7 @@ export function sell(c, id) {
   const v = sellValue(c, id);
   c.coins += v;
   c.parts[id]--;
+  c.sold[id] = Math.min(MAX_SOLD, (c.sold[id] || 0) + 1);
   if (c.bought[id] > 0) c.bought[id]--;
   if (c.parts[id] <= 0) { delete c.parts[id]; delete c.bought[id]; }
   return { ok: true, coins: v };
@@ -170,6 +172,7 @@ export function normalize(c) {
   ensure(c);
   for (const id of Object.keys(c.parts)) if (!isPart(id) || !(c.parts[id] > 0)) delete c.parts[id];
   for (const id of Object.keys(c.bought)) if (!isPart(id) || !(c.bought[id] > 0)) delete c.bought[id];
+  for (const id of Object.keys(c.sold)) if (!isPart(id) || !(c.sold[id] > 0)) delete c.sold[id];
   for (const id of Object.keys(c.bought)) c.bought[id] = Math.min(c.bought[id], owned(c, id));
   for (const b of Object.keys(c.sockets)) if (!BODIES[b] || !(c.sockets[b] > 0)) delete c.sockets[b];
   const used = {};

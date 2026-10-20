@@ -66,6 +66,7 @@ export const isPart = (id) => typeof id === 'string' && Object.prototype.hasOwnP
 // Earned parts (drops) sell back for a small fixed amount.
 export const EARNED_SELL = 40;
 export const MAX_PARTS = 20; // copies of one part
+export const MAX_SOLD = 1000; // copies of one part ever sold (save merging, see sync.js)
 export const MAX_SOCKETS = 6;
 
 // Sockets a vehicle has from the factory; a Chassis Mod adds one more.
