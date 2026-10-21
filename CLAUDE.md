@@ -5,14 +5,16 @@ The goal is one awesome, original kart racer for iPhone Safari and the Mac. Ever
 ## Where we are (handover for new sessions)
 
 - **Read the history first.** A new session has no memory of earlier chats. Read this file, `zoomies/README.md` (the full player-facing feature list), `git log` (detailed commit messages, newest first) and the description of PR #1.
-- **What exists:** the whole game is playable.
-  - 20 racers and 20 tracks, including 2 Epic boat and plane adventures, and 10 karts and bikes.
-  - A Career with a Garage, Grand Prix cups, Quick Race, Time Trial with ghosts, and a Daily Challenge.
-  - Balloon Battle in 5 arenas, against computer racers and online.
-  - Online multiplayer for up to 4 phones, the Mac version with phone-as-wheel, and progress sync between devices.
-  - XP, levels, trophies and the prize machine.
+- **Read the plans too:** `docs/ROADMAP.md` (phases and why), `docs/CAREER2.md` (story and Parts spec) and `docs/VISUAL_POLISH.md` (the world audit and fixes). The roadmap's phases 0-4 are built; what is left is real-device testing and tuning from the owner's play-test.
+- **What exists:** the whole game is playable and feature-complete.
+  - 20 racers and 20 tracks (2 Epic boat and plane adventures), 10 karts and bikes, 5 Balloon Battle arenas.
+  - Career: a story with Baron Von Boost, a prologue and 7 chapters, then the Legends League (3 seasons, 18 events, Legend Rank 1-10) with the Gramps duel. Gramps's Workshop replaces upgrades: limited sockets, stat parts Tier I-III, 11 special parts, Chassis Mods, drops, loadout presets.
+  - Retention loops: medals (Bronze to Zoomie) on every track, daily missions, Daily Challenge, Weekly Cup, mastery levels and titles, trophies, the prize machine, beat-my-ghost links.
+  - Onboarding: first-run intro, Driving School lessons, first-time tips, assist offer. Feel: shake, FOV kick, hit-stop (single-player only), haptics where the browser allows (not iOS).
+  - Modes: Career, Quick Race, Grand Prix, Time Trial with ghosts, Daily, Weekly, Balloon Battle (4 balloons, one comeback), online for up to 4 phones, Mac with phone-as-wheel, progress sync.
+  - Release safety: backup codes, storage protection, an iOS install card, offline play with a service worker and a safe update path, an About screen.
 - **Where it's published:**
-  - GitHub Pages serves `main` at https://olev99.github.io/Fun-stuff/. The first build, PR #1, was merged into `main`.
+  - GitHub Pages serves `main` at https://olev99.github.io/Fun-stuff/. Every pull request is merged into `main` once its tests pass (see Project conventions).
   - A playable single-file copy is published as a private artifact for the owner. Rebuild it with `build-single.mjs` and republish to the same artifact link when asked.
 
 **Decisions and preferences from the owner (keep to these):**
@@ -28,10 +30,10 @@ The goal is one awesome, original kart racer for iPhone Safari and the Mac. Ever
 - **No idle work:** no scheduled check-ins or PR watching; only act when the owner writes. Keep token use low (see the routing below).
 
 **Known open points:**
-- **Real devices:** nothing has been tested on real phones or Macs yet (frame rate, tilt feel), and PeerJS's public broker can't be reached from the cloud sandbox.
-- **Computer drivers and shortcuts:** they miss two shortcuts from one direction (Dune Surf and Snowmobile Trail).
-- **Battle length:** battles often end within 1–2 minutes once you're knocked out. The owner may want them longer (4 balloons, or coming back after being knocked out).
-- **Online ram glitch:** in an online battle, lag can very rarely give the rammer a balloon without the victim losing one.
+- **Real devices:** nothing has been tested on real phones or Macs yet (frame rate, tilt calibration, shake and hit-stop feel, online between two phones, ghost links from a messaging app, offline mode and the install card on iOS). The owner will do heavy testing next and report; fix what they find first. PeerJS's public broker can't be reached from the cloud sandbox.
+- **Balance is measured on computer racers only:** the front starter wins about 18-19% of equal-skill races, a fully tuned Starbolt wins most Normal races, and the Zoomie medal and Legends League difficulty are only checked against computer noise. Retune from human feedback with `tools/balance.mjs`, `tools/economy.mjs` and `tools/league-sim.mjs`.
+- **Shortcuts:** reversed Dune Surf is only break-even without a boost (the cut would need to be longer). `shortcuts moon` reports Crater Hop forward as not enterable and Rover Tracks as stopped partway by the scripted driver (same on older commits); check by hand whether it is the driver or the game.
+- **Known small gaps:** selling the same part on two devices that each held two or more copies counts as one sale after a sync; a mastery capsule can be doubled once by a sync; mastery titles are not shown on name tags online; League hats other than the laurel were checked structurally, not visually.
 
 ## Model and effort routing (follow this every session)
 
@@ -61,6 +63,9 @@ How to apply it:
 - **Before every commit:** run `node zoomies/tools/stamp.mjs`. It stamps file hashes so phones never mix old and new files.
 - **Branch:** `main` holds the released game. Do new work on a branch, push it and open a pull request into `main`. Once the checks pass (`run.mjs` quick suite, plus the suite for the area touched), merge the pull request yourself without asking; the owner approved automatic merging. Then the game on GitHub Pages updates. Still no PR watching or check-ins.
 - **Model names:** keep model names out of repo files, commit messages and PR text.
+- **Stamping and the service worker:** `node zoomies/tools/stamp.mjs` also writes `zoomies/precache.json` and the `VERSION` line in `zoomies/sw.js`. Always stamp before committing, and check both read the same version, or the offline worker's install fails and old phones are not updated.
+- **Testing on this 4-core cloud machine:** run suites one at a time and never two agents' test runs at once (`run.mjs` reuses whatever server is already on port 8000, which may serve a different checkout). The two-phone suites (`online`, `battle-online`) load two pages; the tests freeze the first page's demo race before loading the second. If a UI suite times out, rerun it alone before concluding anything. `run.mjs full` takes about an hour. Opt-in suites (not in quick or full): `visual-audit` (free-camera shots of every track, before/after sheets) and `balance`.
+- **Merging branches:** merge with a command that stops on conflicts (check `git status` for `UU` before committing), resolve by keeping both sides of independent additions, re-stamp, then run `full`.
 - **README:** `zoomies/README.md` is the player-facing feature list. Keep it accurate when features change.
 - **Playable single-file build:** `node zoomies/tools/build-single.mjs <out.html> --fragment`.
 - **Screen sizes:** design mobile first, at 852×393 landscape with touch. Desktop is checked at 1470×860.
