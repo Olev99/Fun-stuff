@@ -405,12 +405,17 @@ const web2 = await serve();
   check('after a relaunch version B is what runs', (await page.evaluate(() => window.__mark)) === 'B');
   const preB = JSON.parse(readFileSync(join(sB, 'precache.json'), 'utf8'));
   await page.close();
-  // the old caches go once B takes over
-  page = await ctx.newPage();
-  await page.goto(`${web2.url}index.html?sw=1`);
-  await page.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
-  await page.waitForFunction(async (v) => { const k = await caches.keys(); return k.length === 1 && k[0] === `zoomies-${v}`; }, preB.v, { timeout: 30000 }).catch(() => {});
-  const keys = await page.evaluate(() => caches.keys());
+  // the old caches go once B takes over (at a launch with no other game page open)
+  let keys = [];
+  for (let launch = 0; launch < 4 && keys.join() !== `zoomies-${preB.v}`; launch++) {
+    await new Promise((r) => setTimeout(r, 2500));
+    page = await ctx.newPage();
+    await page.goto(`${web2.url}index.html?sw=1`);
+    await page.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
+    await page.waitForTimeout(1500);
+    keys = await page.evaluate(() => caches.keys());
+    await page.close();
+  }
   check('old caches are deleted when the new worker takes over', keys.length === 1 && keys[0] === `zoomies-${preB.v}`, keys.join());
   await ctx.close();
 }
@@ -489,12 +494,13 @@ for (const [label, url] of [['over http', `${web3.url}single.html?sw=1`], ['from
   const ctx = await browser.newContext(phone);
   const page = await ctx.newPage();
   const logs = [];
+  await page.route('**/favicon.ico', (r) => r.fulfill({ status: 204 })); // the single page has no icon links
   page.on('pageerror', (e) => { pageErrors++; console.log('[pageerror]', e.message); });
   page.on('console', (m) => { if (m.type() === 'error') logs.push(m.text()); });
   await page.goto(url);
   await page.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
   await page.waitForTimeout(1500);
-  const regs = await page.evaluate(async () => ('serviceWorker' in navigator ? (await navigator.serviceWorker.getRegistrations()).length : 0));
+  const regs = await page.evaluate(async () => { try { return (await navigator.serviceWorker.getRegistrations()).length; } catch (e) { return 0; } }); // file:// has none to ask for
   check(`single-file build ${label}: loads and registers no worker`, regs === 0);
   check(`single-file build ${label}: no console errors`, logs.length === 0, logs.slice(0, 3).join(' | '));
   await ctx.close();
