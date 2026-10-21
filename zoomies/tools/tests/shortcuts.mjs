@@ -117,4 +117,19 @@ const res = await p.evaluate(async ([only, onlySc, onlyRev]) => {
   return out;
 }, [only, onlySc, onlyRev]);
 console.log(res.join('\n'));
+// Dune Surf must not hold a hairpin in either direction (the reversed cut was boost-only with a 7 m corner).
+if (!only || only === 'dunes') {
+  const bad = await p.evaluate(() => {
+    const a = window.zoomies, out = [];
+    for (const rev of [false, true]) {
+      a.startRace({ mode: 'quick', trackId: 'dunes', reverse: rev, player: 'mochi', speedClass: 'zoom' });
+      a.paused = true;
+      const sc = a.race.track.shortcuts.find((s) => s.name === 'Dune Surf');
+      let mn = 1e9; for (let i = 0; i < sc.count; i++) mn = Math.min(mn, 1 / Math.max(1e-4, Math.abs(sc.curv[i])));
+      if (mn < 12) out.push(`${rev ? 'reverse' : 'forward'} ${mn.toFixed(1)} m`);
+    }
+    return out;
+  });
+  console.log(bad.length ? `FAIL Dune Surf corner under 12 m: ${bad.join(', ')}\nerrors ${bad.length}` : 'ok   Dune Surf corners are at least 12 m in both directions');
+}
 await b.close();

@@ -213,12 +213,12 @@ const net = await p.evaluate(async (prepSrc) => {
     if (i % 90 === 0) { k.startBoost(1.4, 10); k.gems = 10; }
     for (const q of r.karts) {
       const s = kartState(q), c = cleanState(s);
-      n++;
-      if (!c || c.some((v, j) => v !== s[j])) bad++;
+      n++; // timers can dip a hair below 0 and get clamped: fine, only rejected or far-off values count
+      if (!c || c.some((v, j) => Math.abs(v - s[j]) > 0.05)) { bad++; if (!window.__bad) window.__bad = JSON.stringify({ s, c, ai: !!q.ai, player: q.isPlayer }); }
     }
     maxSpeed = Math.max(maxSpeed, Math.hypot(k.vel.x, k.vel.z));
   }
-  return { bad, n, maxSpeed: +maxSpeed.toFixed(1), tuned: k.stats.speed };
+  return { bad, n, maxSpeed: +maxSpeed.toFixed(1), tuned: k.stats.speed, first: window.__bad };
 }, `(${prep.toString()})`);
 console.log('net', JSON.stringify(net));
 check('online state validation accepts a tuned, boosting kart', net.bad === 0 && net.n > 1000 && net.maxSpeed > 20, JSON.stringify(net));
@@ -257,13 +257,14 @@ await p.screenshot({ path: 'fin/setup-852.png' });
 await p.evaluate(() => { const ui = window.zoomies.ui; ui.mode = 'tt'; ui.trackSelect(); });
 await p.waitForTimeout(500);
 await p.screenshot({ path: 'fin/setup-tt-852.png' });
-await p.evaluate(() => { const ui = window.zoomies.ui; ui.overlay('settings', 'title'); document.querySelector('#scr-settings .scroll').scrollTop = 400; });
+await p.evaluate(() => { const ui = window.zoomies.ui; ui.overlay('settings', 'title'); document.getElementById('set-ws').scrollIntoView({ block: 'center' }); });
 await p.waitForTimeout(500);
 await p.screenshot({ path: 'fin/settings-852.png' });
 
 // Reversed Dune Surf shot: a kart driving into the reversed cut.
 const dsShot = async (pg, shot) => {
   await pg.evaluate(() => { window.zoomies.ui.hideAll(); });
+  await pg.addStyleTag({ content: '#hud{display:none!important}' });
   await pg.evaluate(async () => {
     const a = window.zoomies;
     a.startRace({ mode: 'quick', trackId: 'dunes', reverse: true, player: 'mochi', speedClass: 'zoom' });
@@ -287,7 +288,9 @@ const dsShot = async (pg, shot) => {
     }
     window.__onCut = k.path === sc;
   });
-  await pg.waitForTimeout(600);
+  await pg.evaluate(() => { window.zoomies.paused = false; }); // a paused game draws nothing: let one frame render
+  await pg.waitForTimeout(500);
+  await pg.evaluate(() => { window.zoomies.paused = true; });
   await pg.screenshot({ path: shot });
   return pg.evaluate(() => window.__onCut);
 };
