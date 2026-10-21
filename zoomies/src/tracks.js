@@ -33,6 +33,7 @@ export const TRACKS = [
   },
   {
     id: 'coral', name: 'Coral Cove', size: 'Short', theme: 'beach',
+    events: ['tide'], // track events (events.js)
     blurb: 'Palm-lined beach laps with a sneaky sandbar.',
     music: { key: 4, bpm: 142, seed: 71, scale: 'major' },
     points: [
@@ -53,6 +54,7 @@ export const TRACKS = [
   },
   {
     id: 'dunes', name: 'Dune Dash Canyon', size: 'Medium', theme: 'desert', scale: 1.18,
+    events: ['sandstorm'], // track events (events.js)
     blurb: 'Blazing sand, a tight canyon and a secret cave.',
     music: { key: 2, bpm: 146, seed: 23, scale: 'dorian' },
     points: [
@@ -76,6 +78,7 @@ export const TRACKS = [
   },
   {
     id: 'frost', name: 'Frostbite Pass', size: 'Medium', theme: 'frost', scale: 1.28,
+    events: ['blizzard', 'avalanche'], // track events (events.js)
     blurb: 'Icy corners, pine forests and a frozen lake.',
     music: { key: 5, bpm: 132, seed: 37, scale: 'minor' },
     points: [
@@ -148,6 +151,7 @@ export const TRACKS = [
   },
   {
     id: 'magma', laps: 3, name: 'Magma Mountain', size: 'Long', theme: 'volcano',
+    events: ['lavaRain', 'eruption'], // track events (events.js)
     blurb: 'Climb a smoking volcano, then bomb down its lava slopes.',
     music: { key: 9, bpm: 144, seed: 63, scale: 'minor' },
     points: [
@@ -230,6 +234,7 @@ export const TRACKS = [
   },
   {
     id: 'tidal', name: 'Tidal Twist', size: 'Short', theme: 'beach', scale: 1.1,
+    events: ['tide'], // track events (events.js)
     blurb: 'A seaside figure-eight with a bridge over the start line.',
     music: { key: 9, bpm: 144, seed: 113, scale: 'major' },
     points: [
