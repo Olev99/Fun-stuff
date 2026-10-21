@@ -6,7 +6,7 @@ import { levelOf, oldLevel, DAILY_MODS } from './profile.js';
 import { LEAGUE, legendRank, grantLeagueRewards, enforceLeagueRewards } from './league.js';
 import { emptyWeekly } from './weekly.js';
 import { RACER_IDS, BODY_IDS, MAX_XP, emptyMastery } from './mastery.js';
-import { partById, isPart, MAX_PARTS, MAX_SOCKETS } from './parts.js';
+import { partById, isPart, MAX_PARTS, MAX_SOLD, MAX_SOCKETS } from './parts.js';
 import { normalize as normalizeShop, migrateUpgrades, grant as grantPart, kitOf } from './workshop.js';
 
 // Career: start in the scrapyard with the Rust Bucket and one racer, win
@@ -275,7 +275,7 @@ export function newCareer() {
     v: 1, coins: 0, racer: 'mochi', racers: ['mochi'], body: 'buggy', bodies: ['buggy'],
     paint: 'stock', paints: ['stock'],
     // Gramps's Workshop (workshop.js): owned parts, what is fitted, extra sockets, parts already earned
-    pv: 2, upgrades: {}, parts: {}, bought: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
+    pv: 2, upgrades: {}, parts: {}, bought: {}, sold: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
     xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
@@ -355,6 +355,7 @@ export function cleanCareer(saved) {
   // Parts (see workshop.js). Old saves (no pv) had 4 upgrade levels per kart: they become parts.
   c.parts = mapObj(saved.parts, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));
   c.bought = mapObj(saved.bought, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));
+  c.sold = mapObj(saved.sold, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_SOLD) : undefined)); // old saves: none
   c.sockets = mapObj(saved.sockets, (v) => (Number.isFinite(v) ? count(v, 1) : undefined));
   c.drops = mapObj(saved.drops, (v) => (isStr(v) && isPart(v) ? v : undefined));
   c.loadouts = mapObj(saved.loadouts, (l) => (isObj(l) ? {

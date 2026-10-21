@@ -238,7 +238,7 @@ export class UI {
     $('daily-facts').innerHTML = `<div><small>Track</small>${dailyTrackName(d)}</div><div><small>Goal</small>${dailyGoalText(d)}</div><div><small>Speed</small>${cls} · ${d.diff === 'hard' ? 'Hard' : 'Normal'} racers</div>`;
     const flames = Array.from({ length: 7 }, (_, i) => `<i class="${i < streak ? 'on' : ''}">🔥</i>`).join('');
     $('daily-streak').innerHTML = `<div class="flames">${flames}</div><span>${streak ? `${streak}-day streak` : 'Start a streak today'}${done ? ' · done today ✓' : ''}</span>`;
-    $('daily-reward').innerHTML = done ? 'Completed! A new challenge arrives tomorrow. You can still race it for fun.' : `Reward: <b>+${150 + Math.round(dailyReward(streak + 1) / 2)} XP</b> and a <b>free prize capsule</b>. Longer streaks pay more XP.`;
+    $('daily-reward').innerHTML = done ? 'Completed! A new challenge arrives tomorrow. You can still race it for fun. Stock stats: Workshop parts are off here.' : `Reward: <b>+${150 + Math.round(dailyReward(streak + 1) / 2)} XP</b> and a <b>free prize capsule</b>. Longer streaks pay more XP. Stock stats: Workshop parts are off here.`;
     this.app.previewTrack(d.track, d.rev);
     this.show('daily');
   }
@@ -258,7 +258,7 @@ export class UI {
     $('weekly-facts').innerHTML = `<div class="wide"><small>Tracks</small>${w.tracks.map((t) => trackById(t).name).join(' · ')}</div><div><small>Speed</small>${cls} · ${w.diff === 'hard' ? 'Hard' : 'Normal'}</div><div><small>Best this week</small>${best ? pl(best) : 'Not raced'}</div>`;
     const wt = (c.weekly && c.weekly.trophies.length) || 0;
     $('weekly-streak').innerHTML = `<span>${streak ? `🔥 ${streak} podium week${streak === 1 ? '' : 's'} in a row` : 'Finish on the podium to start a streak'}${wt ? ` · 🏅 ${wt} Weekly trophies` : ''}</span>`;
-    $('weekly-reward').innerHTML = `Cup points like the Grand Prix. Retry all week: your <b>best</b> counts. XP: <b>${WEEKLY_XP.join(' / ')}</b> for 1st / 2nd / 3rd, ${WEEKLY_XP_BASE} for finishing (only for beating your best). First podium: a <b>Week ${weekNum(w.week)} trophy</b> and a free capsule 🍬.`;
+    $('weekly-reward').innerHTML = `Cup points like the Grand Prix. Retry all week: your <b>best</b> counts. XP: <b>${WEEKLY_XP.join(' / ')}</b> for 1st / 2nd / 3rd, ${WEEKLY_XP_BASE} for finishing (only for beating your best). First podium: a <b>Week ${weekNum(w.week)} trophy</b> and a free capsule 🍬. Stock stats: Workshop parts are off here.`;
     this.app.previewTrack(w.tracks[0], false);
     this.show('weekly');
   }
@@ -579,6 +579,7 @@ export class UI {
     $('class-seg').hidden = this.mode === 'tt';
     $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
+    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
     this._syncClass();
     this._renderTrackCards();
     this.show('track');
@@ -757,6 +758,7 @@ export class UI {
     $('set-musicvol').addEventListener('input', (e) => { s().musicVol = +e.target.value; app.audio.setMusicVolume(s().musicVol); saveSettings(s()); });
     $('set-sfx').addEventListener('change', (e) => { s().sfx = e.target.checked; app.audio.setSfx(s().sfx); saveSettings(s()); });
     $('set-sfxvol').addEventListener('input', (e) => { s().sfxVol = +e.target.value; app.audio.setSfxVolume(s().sfxVol); saveSettings(s()); });
+    $('set-ws').addEventListener('change', (e) => { s().workshopParts = e.target.checked; saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
     $('set-reset-career').addEventListener('click', () => {
       if (!confirm('Start over? Your level, coins, trophies, karts, racers and career progress will be lost.')) return;
@@ -783,6 +785,7 @@ export class UI {
     $('set-sfxvol').value = s.sfxVol ?? 1;
     $('set-persist').textContent = this.app.pwa ? this.app.pwa.persistLabel : 'unknown';
     $('set-fps').checked = s.showFps;
+    $('set-ws').checked = s.workshopParts !== false;
     $('set-reset-career').textContent = 'Reset';
     $('set-about').textContent = this.app.versionInfo;
   }
@@ -877,6 +880,7 @@ export class UI {
     });
     for (let i = ses.players.length; i < 4; i++) rows.push(`<div class="pl empty"><span></span><span>Waiting for a friend…</span><span></span></div>`);
     $('lobby-players').innerHTML = rows.join('');
+    $('lobby-ws').textContent = app.workshopOn() ? 'Workshop parts: on (your kart only)' : 'Workshop parts: off (Settings)';
     const cfg = ses.lobby;
     const def = trackById(cfg.track);
     // The host's picker runs through the tracks, then the battle arenas.
@@ -962,6 +966,13 @@ export class UI {
       T(() => set(to, 700), 900);
       T(() => lbl.classList.remove('pop'), 1700);
     }
+  }
+
+  // Balloon Battle result cells: balloons left, OUT, or DOWN for a racer still waiting for
+  // the one comeback when time ran out (alive with no balloons; no extra network field needed).
+  battleCell(r) {
+    const left = r.out ? 'OUT' : r.balloons > 0 ? '🎈'.repeat(r.balloons) : 'DOWN';
+    return `<span class="plus${left === 'DOWN' ? ' down' : ''}">${left}</span><span class="pts">💥 ${r.hits || 0}</span>`;
   }
 
   row(r, extra = '') {
