@@ -7,9 +7,10 @@
 // It rewrites the import map, main script tag and the CSP's inline-script
 // hashes in index.html, and writes
 // version.json, which the game checks on startup to reload itself once when
-// a newer version is live.
+// a newer version is live, and precache.json plus the VERSION line of sw.js
+// (the offline cache, see sw.js).
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,4 +40,10 @@ const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/scrip
 html = html.replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?script-src )[^;"]*/, `$1'self' ${inline.join(' ')}`);
 writeFileSync(`${root}/index.html`, html);
 writeFileSync(`${root}/version.json`, `${JSON.stringify({ v: version })}\n`);
+// The offline cache (sw.js): the exact URLs the page loads, and the version the worker is stamped with.
+const urls = ['index.html', 'manifest.webmanifest', 'version.json', 'vendor/peerjs.min.js', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
+  ...readdirSync(`${root}/vendor/fonts`).filter((f) => f.endsWith('.woff2')).sort().map((f) => `vendor/fonts/${f}`),
+  ...Object.values(imports).map((u) => u.replace(/^\.\//, ''))];
+writeFileSync(`${root}/precache.json`, `${JSON.stringify({ v: version, urls }, null, 1)}\n`);
+if (existsSync(`${root}/sw.js`)) writeFileSync(`${root}/sw.js`, readFileSync(`${root}/sw.js`, 'utf8').replace(/^const VERSION = '[^']*';/m, `const VERSION = '${version}';`));
 console.log(`version ${version}, ${files.length} files stamped`);

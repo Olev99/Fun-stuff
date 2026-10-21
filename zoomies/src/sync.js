@@ -15,6 +15,7 @@ import { saveCareer, loadCareer, newCareer, cleanCareer, MAX_COUNT } from './car
 import { parseGhost, ghostJSON } from './ghost.js';
 import { saveRecords } from './settings.js';
 import { levelOf, oldLevel } from './profile.js';
+import { MAX_PARTS } from './parts.js';
 import { ownedCount } from './cosmetics.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,10 +28,10 @@ const union = (a, b) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.i
 // The other device's data is checked before it is merged or stored.
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
-const GHOST_KEY = /^[a-z0-9-]{1,48}$/i; // track id, '-r' for reverse
+export const GHOST_KEY = /^[a-z0-9-]{1,48}$/i; // track id, '-r' for reverse
 
 // Records: { trackKey: { tt, lap }, 'cup:id': '1st', battle: { arena: wins }, found: { track: [names] } }.
-function cleanRecords(r) {
+export function cleanRecords(r) {
   const out = {};
   if (!isObj(r)) return out;
   const field = (x) => x === null || Number.isFinite(x) || (Array.isArray(x) && x.length <= 100 && x.every((y) => (typeof y === 'string' && y.length <= 64) || Number.isFinite(y)));
@@ -75,12 +76,18 @@ export function mergeCareer(A, B) {
   // saved presets) come from the more played save, with the other save's
   // vehicles and empty presets filled in; cleanCareer then drops anything that
   // no longer fits (more fitted than owned, more parts than sockets).
-  const maxOf = (x, y) => {
+  const plus = (x, y) => maxOf(x, y, (p, q) => p + q);
+  const maxOf = (x, y, f = Math.max) => {
     const out = {};
-    for (const k of union(Object.keys(x || {}), Object.keys(y || {}))) out[k] = Math.max(num((x || {})[k]), num((y || {})[k]));
+    for (const k of union(Object.keys(x || {}), Object.keys(y || {}))) out[k] = f(num((x || {})[k]), num((y || {})[k]));
     return out;
   };
-  m.parts = maxOf(a.parts, b.parts);
+  // A part sold on one device must not come back from the other: per side,
+  // acquired = owned + sold; take the higher acquired and sold, owned = the difference.
+  m.sold = maxOf(a.sold, b.sold);
+  const acq = maxOf(plus(a.parts, a.sold), plus(b.parts, b.sold));
+  m.parts = {};
+  for (const [k, v] of Object.entries(acq)) { const n = Math.min(MAX_PARTS, v - (m.sold[k] || 0)); if (n > 0) m.parts[k] = n; }
   m.bought = maxOf(a.bought, b.bought);
   m.sockets = maxOf(a.sockets, b.sockets);
   m.drops = { ...(b.drops || {}), ...(a.drops || {}) };
@@ -198,7 +205,7 @@ function readGhost(key) {
   try { return localStorage.getItem(GHOST + key); } catch (e) { return null; }
 }
 
-function writeGhost(key, raw) {
+export function writeGhost(key, raw) {
   if (typeof key !== 'string' || !GHOST_KEY.test(key)) return;
   const g = parseGhost(raw);
   if (!g) return;

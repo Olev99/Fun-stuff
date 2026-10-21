@@ -82,7 +82,9 @@ export class HUD {
     const name = (r) => (r.isPlayer ? 'You' : r.nick || r.ch.name);
     const medals = ['🥇', '🥈', '🥉'];
     $('pod-title').textContent = top[0].isPlayer ? '🏆 You win!' : `🏆 ${name(top[0])} wins!`;
-    $('pod-names').innerHTML = top.map((r, i) => `<span class="${r.isPlayer ? 'me' : ''}">${medals[i]} ${name(r).replace(/[<>&]/g, '')}</span>`).join('');
+    const bat = this.app.race && this.app.race.battle; // Balloon Battle: balloons left, or DOWN, next to each name
+    const tag = (r) => (bat ? ` <small>${r.out ? 'OUT' : r.balloons > 0 ? `🎈${r.balloons}` : 'DOWN'}</small>` : '');
+    $('pod-names').innerHTML = top.map((r, i) => `<span class="${r.isPlayer ? 'me' : ''}">${medals[i]} ${name(r).replace(/[<>&]/g, '')}${tag(r)}</span>`).join('');
     $('pod-me').textContent = me && me.place > 3 ? `You finished ${me.place}${ordinal(me.place).toLowerCase()}` : '';
     el.hidden = false;
   }

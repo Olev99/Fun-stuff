@@ -3,6 +3,7 @@
 //   cd zoomies/tools/tests && npm install      (once: playwright-core)
 //   node run.mjs              quick suites (about 5 minutes)
 //   node run.mjs full         every suite (about 25 minutes)
+//   node run.mjs release      backup codes, offline play, updates, About (own temp servers)
 //   node run.mjs battle-sim crater   one suite, with its own arguments
 //   node run.mjs balance      opt-in: seeded AI races, balance bands (report: node ../balance.mjs)
 //
@@ -34,9 +35,11 @@ const SUITES = {
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
   shortcuts: ['shortcuts.mjs', [], 25],
+  finish: ['finish.mjs', [], 12],
   phase2: ['phase2.mjs', [], 20],
   phase2b: ['phase2b.mjs', [], 20],
   onboarding: ['onboarding.mjs', [], 12],
+  release: ['release.mjs', [], 20],
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
   balance: ['balance-check.mjs', [], 12], // opt-in: seeded AI races, checks the balance bands
 };
@@ -83,7 +86,7 @@ let plan;
 if (argv[0] && SUITES[argv[0]]) plan = [[argv[0], argv.length > 1 ? argv.slice(1) : null]];
 else plan = (argv[0] === 'full' ? Object.keys(SUITES).filter((n) => n !== 'visual-audit' && n !== 'balance') : QUICK).map((n) => [n, null]);
 
-for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv']) await mkdir(join(out, d), { recursive: true });
+for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv', 'fin']) await mkdir(join(out, d), { recursive: true });
 const srv = await serve();
 const results = [];
 for (const [name, args] of plan) {

@@ -25,13 +25,13 @@ const QP = 10, QY = 40; // link precision: 10 cm, 1/40 rad
 const wrap = (a) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
 
 // ---- bytes <-> base64url ----
-function b64uEncode(u8) {
+export function b64uEncode(u8) {
   let s = '';
   for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function b64uDecode(t) {
+export function b64uDecode(t) {
   if (!/^[A-Za-z0-9_-]+$/.test(t)) return null;
   const s = atob(t.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((t.length + 3) % 4));
   const u8 = new Uint8Array(s.length);
@@ -40,13 +40,13 @@ function b64uDecode(t) {
 }
 
 // ---- gzip ----
-async function gzip(u8) {
+export async function gzip(u8) {
   const cs = new Blob([u8]).stream().pipeThrough(new CompressionStream('gzip'));
   return new Uint8Array(await new Response(cs).arrayBuffer());
 }
 
 // Decompress, giving up (null) as soon as the output passes `max` bytes.
-async function gunzip(u8, max) {
+export async function gunzip(u8, max) {
   const reader = new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
   const parts = [];
   let n = 0;

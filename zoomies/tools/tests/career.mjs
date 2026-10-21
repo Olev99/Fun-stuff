@@ -214,11 +214,12 @@ const sold = await p.evaluate(async () => {
   const after = c.coins;
   W.setFit(c, 'buggy', []); // buying fitted it; take it off to sell
   const r3 = W.sell(c, 'engine1'); // that copy was bought
-  return { coins0, r1, r2, buy, after, r3, end: c.coins };
+  return { coins0, r1, r2, buy, after, r3, end: c.coins, soldCount: { ...c.sold } };
 });
 check('sell: bought part pays 100%', sold.r1.ok && sold.r1.coins === 150);
 check('sell: earned part pays a small fixed sum', sold.r2.ok && sold.r2.coins === 40);
 check('sell: no coin exploit (buy then sell is free)', sold.buy.ok && sold.r3.coins === 180 && sold.end === sold.after + 180 && sold.after === sold.coins0 + 150 + 40 - 180, JSON.stringify(sold));
+check('sell: every sale is counted in the save (sold), so a sync cannot bring the part back', sold.soldCount.tyres1 === 1 && sold.soldCount.engine1 === 2, JSON.stringify(sold.soldCount));
 // Loadout presets: save, change, load
 const pre = await p.evaluate(async () => {
   const W = await import('./src/workshop.js');

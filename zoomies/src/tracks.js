@@ -70,8 +70,8 @@ export const TRACKS = [
     shortcuts: [
       { name: 'Mesa Cave', lead: 25, from: 0.39, to: 0.57, side: 1, surface: 'road', width: 10, deco: 'cave',
         wpts: [[200, 28, 9], [180, -5, 9.5], [160, -38, 9.5], [140, -70, 9]], gems: [{ at: 0.35, n: 5 }] },
-      { name: 'Dune Surf', lead: 45, from: 0.66, to: 0.91, side: 1, surface: 'offroad', width: 11, deco: 'cacti', crates: true, aiNoBoost: 'fwd',
-        wpts: [[50, -207, 1.1], [22, -221, 1], [-5, -234, 0.9], [-33, -248, 0.8]], gems: [{ at: 0.5, n: 5 }] },
+      { name: 'Dune Surf', lead: 45, from: 0.66, to: 0.92, side: 1, surface: 'offroad', width: 11, deco: 'cacti', crates: true, aiNoBoost: 'both',
+        wpts: [[50, -207, 1.1], [22, -221, 1], [-4, -262, 0.9], [-40, -300, 0.8]], gems: [{ at: 0.5, n: 5 }] },
     ],
   },
   {

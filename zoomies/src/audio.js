@@ -9,6 +9,7 @@ export class Audio {
     this.musicOn = true;
     this.musicVol = 0.7; // 0..1 from Settings
     this.sfxOn = true;
+    this.sfxVol = 1; // 0..1 from Settings
     this.engine = null;
     this.song = null;
   }
@@ -33,7 +34,7 @@ export class Audio {
       this.comp.ratio.value = 4;
       this.master.connect(this.comp).connect(c.destination);
       this.sfx = c.createGain();
-      this.sfx.gain.value = this.sfxOn ? 0.7 : 0;
+      this.sfx.gain.value = this.sfxOn ? this.sfxLevel : 0;
       this.sfx.connect(this.master);
       this.music = c.createGain();
       this.music.gain.value = this.musicOn ? this.musicLevel : 0;
@@ -75,6 +76,10 @@ export class Audio {
     return 0.42 * this.musicVol * this.musicVol;
   }
 
+  get sfxLevel() {
+    return 0.7 * this.sfxVol * this.sfxVol;
+  }
+
   setMusic(on) {
     this.musicOn = on;
     if (this.music) this.music.gain.setTargetAtTime(on ? this.musicLevel : 0, this.ctx.currentTime, 0.1);
@@ -87,7 +92,12 @@ export class Audio {
 
   setSfx(on) {
     this.sfxOn = on;
-    if (this.sfx) this.sfx.gain.setTargetAtTime(on ? 0.7 : 0, this.ctx.currentTime, 0.05);
+    if (this.sfx) this.sfx.gain.setTargetAtTime(on ? this.sfxLevel : 0, this.ctx.currentTime, 0.05);
+  }
+
+  setSfxVolume(v) {
+    this.sfxVol = Math.max(0, Math.min(1, v));
+    if (this.sfx) this.sfx.gain.setTargetAtTime(this.sfxOn ? this.sfxLevel : 0, this.ctx.currentTime, 0.05);
   }
 
   suspend() {

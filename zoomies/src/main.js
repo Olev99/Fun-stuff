@@ -8,6 +8,8 @@ import { CareerUI } from './careerui.js';
 import { GumballUI } from './gumballui.js';
 import { WheelHost, WheelPad } from './wheel.js';
 import { Sync } from './sync.js';
+import { Pwa } from './pwa.js';
+import { SafeUI } from './safeui.js';
 import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { BODIES, bodyLocked } from './karts.js';
@@ -31,6 +33,7 @@ import { installHeightFog } from './env.js';
 import {
   loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult,
 } from './career.js';
+import { kitOf } from './workshop.js';
 
 const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
 
@@ -102,6 +105,7 @@ class App {
     this.audio.musicOn = this.settings.music;
     this.audio.musicVol = this.settings.musicVol ?? 0.7;
     this.audio.sfxOn = this.settings.sfx;
+    this.audio.sfxVol = this.settings.sfxVol ?? 1;
     this.input = new Input(this.settings);
     this.input.bindTouch($('controls'));
     this.hud = new HUD(this);
@@ -114,6 +118,8 @@ class App {
     this.wheelPad = new WheelPad(this);
     this.input.wheel = this.wheelHost;
     this.sync = new Sync(this);
+    this.safeUI = new SafeUI(this, VERSION);
+    this.pwa = new Pwa(this, VERSION);
     this.showroom = new Showroom(this);
     this.portraits = this.showroom.portraits(r, 112);
     $('fps').hidden = !this.settings.showFps;
@@ -354,7 +360,7 @@ class App {
     const s = this.settings;
     if (mode === 'gp') {
       const cup = CUPS.find((c) => c.id === s.cup) || CUPS[0];
-      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: this.menuChar(), extra: { playerLoadout: this.menuLoadout() } };
+      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: this.menuChar(), extra: { playerLoadout: this.menuLoadout(true) } };
       this._gpField(this.gp);
       this.startGPRace();
     } else if (mode === 'battle') {
@@ -364,10 +370,10 @@ class App {
       const others = this.makeGrid(player).filter((id) => id !== player).slice(0, BATTLE_FIELD - 1);
       const grid = [...others.slice(0, 2), player, ...others.slice(2)];
       const arena = arenaById(s.arena) ? s.arena : ARENAS[0].id;
-      this.startRace({ mode, trackId: arena, reverse: false, player, grid, speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
+      this.startRace({ mode, trackId: arena, reverse: false, player, grid, speedClass: s.speedClass, playerLoadout: this.menuLoadout(true) });
     } else {
       this.gp = null;
-      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: this.menuChar(), speedClass: s.speedClass, playerLoadout: this.menuLoadout() });
+      this.startRace({ mode, trackId: s.track, reverse: s.reverse, player: this.menuChar(), speedClass: s.speedClass, playerLoadout: this.menuLoadout(mode !== 'tt') });
     }
   }
 
@@ -379,10 +385,18 @@ class App {
 
   // The ride picked on the racer screen (quick races, Grand Prix, time trials,
   // online), if it is unlocked; otherwise the Zoom Classic.
-  menuLoadout() {
+  // With `parts`, the ride also carries its Workshop loadout (quick races, cups, battles, online).
+  // Time trials, the Daily Challenge, the Weekly Cup and Driving School stay on stock stats.
+  menuLoadout(parts = false) {
     const id = this.settings.vehicle;
     const lvl = levelOf((this.career && this.career.xp) || 0).level;
-    return { body: BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic' };
+    const body = BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic';
+    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body) } : { body };
+  }
+
+  // The Settings toggle 'Use Workshop parts in quick modes' (default on).
+  workshopOn() {
+    return this.settings.workshopParts !== false && !!this.career;
   }
 
   startGPRace() {
@@ -560,7 +574,7 @@ class App {
       if (race.battle && me && me.place === 1) addStat(this.career, 'battleWins');
       const rw = this.profileAward(race, me, race.battle ? { trackId: null } : {});
       const cell = (r) => (race.battle
-        ? `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons || 0)}</span><span class="pts">💥 ${r.hits || 0}</span>`
+        ? this.ui.battleCell(r)
         : `<span></span><span class="pts">${r.finished ? fmtTime(r.time) : '--'}</span>`);
       ui.results({
         title: me ? (race.battle && me.place === 1 ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`) : 'Results',
@@ -583,7 +597,7 @@ class App {
       ui.results({
         title: won ? 'You win!' : `${me.place}${ordinal(me.place).toLowerCase()} place`,
         sub: `Balloon Battle · ${race.trackDef.name}`,
-        html: `${rw}<div class="results">${rows.map((r) => ui.row(r, `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons)}</span><span class="pts">💥 ${r.hits}</span>`)).join('')}</div>`,
+        html: `${rw}<div class="results">${rows.map((r) => ui.row(r, ui.battleCell(r))).join('')}</div>`,
         buttons: [['menu', 'Menu', 'ghost small'], ['tracks', 'Arenas', 'alt'], ['retry', 'Battle again', 'hot big']],
       });
       return;
@@ -1010,7 +1024,7 @@ class App {
     const rw = this.profileAward(race, me, { coins: 0, xpBonus: out.pass ? 50 : 0 });
     let extra = '';
     if (ev.type === 'time') extra = `<div class="big-msg"><em>${fmtTime(me.time)}</em></div><div class="car-goal">Target ${fmtTime(ev.target)}</div>`;
-    const cell = (r) => (race.battle ? `<span class="plus">${r.out ? 'OUT' : '🎈'.repeat(r.balloons || 0)}</span><span class="pts">💥 ${r.hits || 0}</span>` : `<span></span><span class="pts">${fmtTime(r.time)}</span>`);
+    const cell = (r) => (race.battle ? this.ui.battleCell(r) : `<span></span><span class="pts">${fmtTime(r.time)}</span>`);
     const rowsHtml = ev.type === 'time' ? '' : `<div class="results">${rows.map((r) => this.ui.row(r, cell(r))).join('')}</div>`;
     this.careerUI.results(out, rw + rowsHtml, extra);
   }
@@ -1214,6 +1228,7 @@ class App {
     const def = trackById(cfg.trackId);
     this.race = new Race(this, {
       mode: 'mp', trackDef: def, reverse: cfg.reverse, grid: cfg.grid, speedClass: cfg.speedClass, difficulty: cfg.difficulty,
+      playerLoadout: this.menuLoadout(true), // your own kart only: each phone simulates its own
       laps: def.laps || 3, net: ses, playerSlot: mine.slot, humans: ses.isHost ? cfg.humans.filter((h) => h.id !== 'host') : [],
       humanSlots: cfg.humans.map((h) => h.slot),
       nicks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanNick(h.nick)])),

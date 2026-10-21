@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <!-- Content-Security-Policy: tools/stamp.mjs fills in the hashes of the inline scripts (script-src). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-kbE7Bz2TpyuBCWMAyrBwvVi170AmG0K8jKwU155Ocho='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-OpiQrIKjbFHzIPsT9g7ptxy4wHPRO2urZz3wBHRyokk='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="1fb9c8c">
+<meta name="zoomies-version" content="08c50b1">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -126,11 +126,6 @@ html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 .btn.battle-btn { background: var(--berry); color: #fff; }
 .menu-row.tight .btn { min-width: 0; white-space: nowrap; padding-left: 4px; padding-right: 4px; font-size: clamp(12px, calc(3.5 * var(--vh)), 16px); }
 .menu-row.tight .btn.ico { flex: 0 0 auto; width: 40px; }
-.install-tip {
-  position: absolute; left: max(18px, var(--sal)); bottom: max(10px, var(--sab)); font-size: 12px; font-weight: 700;
-  color: var(--muted); max-width: 46ch;
-}
-.install-tip b { color: var(--cream); }
 
 /* Character select */
 #scr-char { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
@@ -171,6 +166,7 @@ html.desktop .menu { width: min(340px, calc(42 * var(--vw))); }
 }
 .card.sel { border-color: var(--sun); transform: translateY(-3px) scale(1.04); box-shadow: 0 0 0 3px var(--ink), 0 7px 0 var(--ink); }
 .card:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.ws-line { margin-right: auto; font-weight: 800; font-size: 12px; color: var(--muted); }
 .bottom-bar { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
 
 /* Track select */
@@ -292,6 +288,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .res .pts { font-family: var(--font-display); font-size: 13px; min-width: 44px; text-align: right; }
 .res .plus { font-size: 12px; color: var(--mint); min-width: 30px; text-align: right; }
 .res.me .plus { color: var(--ink); }
+.res .plus.down { color: var(--berry); font-weight: 800; letter-spacing: .04em; }
+.pod-names small { font-family: var(--font-body); font-size: 11px; opacity: .85; }
 .trophy { font-size: 46px; line-height: 1; text-align: center; }
 .big-msg { font-family: var(--font-display); font-size: clamp(22px, calc(7 * var(--vh)), 36px); color: var(--cream); text-align: center; line-height: 1.05; text-shadow: 0 4px 0 var(--ink); }
 .big-msg em { font-style: normal; color: var(--sun); }
@@ -953,6 +951,38 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
 }
 #controls.tilt .steer-hint { display: none; }
 
+#ab-version { text-transform: none; }
+.ver-label { position: absolute; left: max(18px, var(--sal)); bottom: max(6px, var(--sab)); padding: 4px 6px; background: none; border: 0; color: var(--muted); font-weight: 700; font-size: 11px; cursor: pointer; }
+.ver-label:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+/* Backup, About and the notes on the title screen */
+.bk-sec, .ab-sec { display: grid; gap: 6px; padding: 8px 10px; background: rgba(0,0,0,.18); border-radius: 12px; }
+.bk-sec > b, .ab-sec > b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--sun); }
+.ab-sec p, .bk-note { margin: 0; font-weight: 600; font-size: 12.5px; line-height: 1.3; color: var(--cream); }
+.bk-note { color: var(--muted); }
+.ab-sec ul { margin: 0; padding-left: 18px; font-weight: 600; font-size: 12.5px; line-height: 1.5; }
+.ab-sec a { color: var(--sky); }
+.bk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.bk-size { font-weight: 700; font-size: 12px; color: var(--muted); }
+.bk-msg { margin: 0; min-height: 1.2em; font-weight: 800; font-size: 13px; color: var(--berry); }
+.bk-msg.ok { color: var(--mint); }
+.bk-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-facts span { font-family: var(--font-display); font-size: 12.5px; padding: 5px 9px 4px; border-radius: 10px; background: var(--ink-3); color: var(--cream); }
+.bk-facts b { font-weight: 400; color: var(--sun); }
+#bk-code, #bk-paste {
+  width: 100%; resize: none; font: 600 12px/1.3 ui-monospace, Menlo, monospace; padding: 7px 9px; border-radius: 10px; border: 3px solid var(--ink);
+  background: var(--cream); color: var(--ink); -webkit-user-select: text; user-select: text; touch-action: manipulation; word-break: break-all;
+}
+#bk-code:focus-visible, #bk-paste:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.pwa-note {
+  position: fixed; left: max(14px, var(--sal)); bottom: max(26px, calc(var(--sab) + 18px)); z-index: 40; width: min(380px, calc(100% - 28px - var(--sal) - var(--sar)));
+  display: grid; gap: 4px; padding: 10px 12px; border-radius: 16px; background: var(--ink-2); border: 3px solid var(--sun); box-shadow: 0 6px 0 rgba(0,0,0,.4); animation: rwin .35s ease-out;
+}
+.pwa-note > b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--sun); }
+.pwa-note p { margin: 0; font-weight: 600; font-size: 12.5px; line-height: 1.25; }
+.pwa-note ol { margin: 0; padding-left: 18px; font-weight: 700; font-size: 12.5px; line-height: 1.4; }
+.pwa-note ol:empty { display: none; }
+.pn-actions { display: flex; gap: 8px; margin-top: 4px; }
+
 /* Rotate + loading */
 #rotate { position: fixed; inset: 0; z-index: 100; background: var(--ink); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 24px; }
 #rotate .phone { width: 46px; height: 78px; border: 4px solid var(--cream); border-radius: 10px; animation: rot 1.8s ease-in-out infinite; }
@@ -1079,7 +1109,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <button class="btn alt small" data-go="profile" id="menu-trophies">🏆</button>
     </div>
   </nav>
-  <p class="install-tip" id="install-tip" hidden>For full screen: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
+  <button class="ver-label" id="ver-label" data-go="about" aria-label="About Zoomies"></button>
 </section>
 
 <section id="scr-char" class="screen" hidden>
@@ -1123,6 +1153,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
   </div>
   <div class="track-row" id="track-row"></div>
   <div class="bottom-bar">
+    <span class="ws-line" id="ws-line"></span>
     <button class="btn ghost small" data-go="back">Back</button>
     <button class="btn hot" data-go="race">Race!</button>
   </div>
@@ -1369,6 +1400,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
         <div class="players" id="lobby-players"></div>
         <div class="lobby-settings" id="lobby-settings"></div>
       </div>
+      <p class="ws-line" id="lobby-ws"></p>
     </div>
     <div class="bottom-bar" id="lobby-buttons"></div>
   </div>
@@ -1420,18 +1452,82 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <div class="row"><div><div class="lbl">Music volume</div><div class="hint">Every track has its own song.</div></div>
         <input type="range" id="set-musicvol" min="0" max="1" step="0.05" aria-label="Music volume"></div>
       <div class="row"><div><div class="lbl">Sound effects</div><div class="hint">Plays even when the phone is on silent.</div></div><label class="toggle"><input type="checkbox" id="set-sfx" aria-label="Sound effects"></label></div>
+      <div class="row"><div><div class="lbl">Sound effects volume</div><div class="hint">Engines, bumps and menus.</div></div>
+        <input type="range" id="set-sfxvol" min="0" max="1" step="0.05" aria-label="Sound effects volume"></div>
       <div class="row"><div class="lbl">Show FPS</div><label class="toggle"><input type="checkbox" id="set-fps" aria-label="Show FPS"></label></div>
       <div class="row"><div><div class="lbl">Screen shake</div><div class="hint">Camera shake, the boost zoom, the short freeze on big hits and phone buzzes.</div></div>
         <div class="seg" id="set-shake"><button data-v="off">Off</button><button data-v="low">Low</button><button data-v="normal">Normal</button></div></div>
-      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes.</div></div>
+      <div class="row"><div><div class="lbl">Use Workshop parts in quick modes</div><div class="hint">Your fitted parts count in Quick Race, Grand Prix, Balloon Battle and online. Time Trial, the Daily Challenge, the Weekly Cup and Driving School always use stock stats.</div></div><label class="toggle"><input type="checkbox" id="set-ws" aria-label="Use Workshop parts in quick modes"></label></div>
+      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes, stock stats.</div></div>
         <button class="btn mint small" data-go="school">Practice</button></div>
       <div class="row no-pause"><div><div class="lbl">Replay intro</div><div class="hint">The first-run controls check again.</div></div>
         <button class="btn alt small" data-go="intro">Replay</button></div>
       <div class="row"><div><div class="lbl">Sync progress</div><div class="hint">Same progress on your phone and your Mac. No account needed.</div></div>
         <button class="btn sky small" data-go="sync">Sync</button></div>
+      <div class="row"><div><div class="lbl">Progress protected: <span id="set-persist">unknown</span></div><div class="hint">Asks the browser not to erase your saved game. On iPhone, Add to Home Screen keeps it for good.</div></div>
+        <button class="btn mint small" data-go="backup">Back up</button></div>
+      <div class="row"><div><div class="lbl">Restore from backup</div><div class="hint">Paste a backup code to get your progress back on this device.</div></div>
+        <button class="btn alt small" data-go="restore">Restore</button></div>
+      <div class="row"><div><div class="lbl">Repair</div><div class="hint">Clears downloaded game files and reloads. Your progress stays.</div></div>
+        <button class="btn alt small" data-go="repair">Repair</button></div>
+      <div class="row"><div><div class="lbl">About Zoomies</div><div class="hint">Version, credits and privacy.</div></div>
+        <button class="btn alt small" data-go="about">About</button></div>
       <div class="row"><div><div class="lbl">Start over</div><div class="hint">Wipes your level, coins, trophies, karts and career progress.</div></div>
         <button class="btn ghost small" id="set-reset-career">Reset</button></div>
       <p class="set-about" id="set-about"></p>
+    </div>
+    <div class="bottom-bar"><button class="btn" data-go="close">Done</button></div>
+  </div>
+</section>
+
+<section id="scr-backup" class="screen center shade-full" hidden>
+  <div class="dialog panel">
+    <div class="top-bar"><h2 class="title">Backup</h2><span class="eyebrow">Keep your progress safe</span></div>
+    <div class="scroll">
+      <div class="bk-sec">
+        <b>Back up my progress</b>
+        <p class="bk-note">One code with your Career, coins, karts, trophies, records and settings. Save it in Notes or send it to yourself.</p>
+        <div class="bk-row"><button class="btn mint small" id="bk-build">Make my code</button>
+          <label class="toggle"><input type="checkbox" id="bk-ghosts" aria-label="Include best-lap ghosts"> Include best-lap ghosts (longer code)</label></div>
+        <div id="bk-out" hidden>
+          <textarea id="bk-code" readonly rows="3" spellcheck="false" aria-label="Your backup code"></textarea>
+          <div class="bk-row"><button class="btn small" id="bk-copy">Copy</button><button class="btn sky small" id="bk-share" hidden>Share</button><span class="bk-size" id="bk-size"></span></div>
+        </div>
+      </div>
+      <div class="bk-sec" id="bk-restore">
+        <b>Restore from backup</b>
+        <textarea id="bk-paste" rows="3" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste your backup code here" aria-label="Paste your backup code"></textarea>
+        <div class="bk-row"><button class="btn alt small" id="bk-check">Check code</button></div>
+        <p class="bk-msg" id="bk-msg"></p>
+        <div id="bk-preview" hidden>
+          <div class="bk-facts" id="bk-facts"></div>
+          <div class="bk-row"><button class="btn mint small" id="bk-merge">Merge with this device</button><button class="btn hot small" id="bk-replace">Replace this device</button></div>
+          <p class="bk-note">Merge keeps the best of both. Replace makes this device match the backup exactly.</p>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-bar"><button class="btn" data-go="close">Done</button></div>
+  </div>
+</section>
+
+<section id="scr-about" class="screen center shade-full" hidden>
+  <div class="dialog panel">
+    <div class="top-bar"><h2 class="title">About</h2><span class="eyebrow" id="ab-version"></span></div>
+    <div class="scroll">
+      <div class="ab-sec"><b>Zoomies! Kart Chaos</b>
+        <p>An original kart racer for your phone and your Mac. All the art, models, names, characters, music and sounds are original and made in code.</p></div>
+      <div class="ab-sec"><b>Credits and licences</b>
+        <ul>
+          <li><a href="vendor/THREE_LICENSE" target="_blank" rel="noopener">three.js</a>: MIT licence</li>
+          <li><a href="vendor/PEERJS_LICENSE" target="_blank" rel="noopener">PeerJS</a>: MIT licence</li>
+          <li><a href="vendor/QRCODE_LICENSE" target="_blank" rel="noopener">qrcode-generator</a> by Kazuhiko Arase: MIT licence</li>
+          <li><a href="vendor/fonts/OFL.txt" target="_blank" rel="noopener">Baloo 2 and Bungee</a> fonts: SIL Open Font License</li>
+        </ul></div>
+      <div class="ab-sec"><b>Privacy</b>
+        <p>No accounts, no tracking and no ads. Your progress stays on your device. Online play shares only a room code and gameplay data between the players' phones, through a public matchmaking server.</p></div>
+      <div class="ab-sec"><b>Your data</b>
+        <div class="bk-row"><button class="btn mint small" data-go="backup">Back up</button><button class="btn alt small" data-go="restore">Restore</button><button class="btn alt small" data-go="repair">Repair</button></div>
+        <p class="bk-note">Repair clears downloaded game files and reloads; your progress stays.</p></div>
     </div>
     <div class="bottom-bar"><button class="btn" data-go="close">Done</button></div>
   </div>
@@ -1508,6 +1604,10 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
   </div>
 </section>
 
+<div id="pwa-note" class="pwa-note" role="status" hidden>
+  <b id="pn-title"></b><p id="pn-text"></p><ol id="pn-steps"></ol>
+  <div class="pn-actions"><button class="btn small hot" id="pn-go"></button><button class="btn small ghost" id="pn-no"></button></div>
+</div>
 </div>
 
 <div id="rotate"><div class="phone"></div><p>Turn your phone sideways</p><span>Zoomies is played in landscape, like a steering wheel.</span></div>
@@ -1522,7 +1622,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=251ba426", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=cc1acf28", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=4a3b902f", "./src/careerui.js": "./src/careerui.js?v=0552952d", "./src/characters.js": "./src/characters.js?v=86619e10", "./src/coach.js": "./src/coach.js?v=d2a23bd0", "./src/cosmetics.js": "./src/cosmetics.js?v=242b95b1", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=ac13c7a6", "./src/ghostlink.js": "./src/ghostlink.js?v=dec0fdf6", "./src/gumballui.js": "./src/gumballui.js?v=a36ce4ca", "./src/hud.js": "./src/hud.js?v=330f9f2f", "./src/input.js": "./src/input.js?v=e177d516", "./src/items.js": "./src/items.js?v=b633418c", "./src/kart.js": "./src/kart.js?v=2ef21281", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/league.js": "./src/league.js?v=82591c37", "./src/main.js": "./src/main.js?v=05ce2bad", "./src/mastery.js": "./src/mastery.js?v=eff00973", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=903fd996", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=718499b7", "./src/nextup.js": "./src/nextup.js?v=b88378c8", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=000e9a64", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=a645f892", "./src/race.js": "./src/race.js?v=e2a909ca", "./src/settings.js": "./src/settings.js?v=067b2be2", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=17e1d8f3", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=d3de4371", "./src/ui.js": "./src/ui.js?v=3757d8bc", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/weekly.js": "./src/weekly.js?v=bf8edef8", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=3666a770", "./src/world.js": "./src/world.js?v=d59799e7", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
-<script type="module" src="./src/main.js?v=05ce2bad"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=251ba426", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=e248fec3", "./src/backup.js": "./src/backup.js?v=8c4c7717", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=27251046", "./src/careerui.js": "./src/careerui.js?v=0552952d", "./src/characters.js": "./src/characters.js?v=86619e10", "./src/coach.js": "./src/coach.js?v=d2a23bd0", "./src/cosmetics.js": "./src/cosmetics.js?v=242b95b1", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=ac13c7a6", "./src/ghostlink.js": "./src/ghostlink.js?v=7957bf0f", "./src/gumballui.js": "./src/gumballui.js?v=a36ce4ca", "./src/hud.js": "./src/hud.js?v=2704b015", "./src/input.js": "./src/input.js?v=e177d516", "./src/items.js": "./src/items.js?v=b633418c", "./src/kart.js": "./src/kart.js?v=2ef21281", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/league.js": "./src/league.js?v=82591c37", "./src/main.js": "./src/main.js?v=c11f62a3", "./src/mastery.js": "./src/mastery.js?v=eff00973", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=903fd996", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=718499b7", "./src/nextup.js": "./src/nextup.js?v=b88378c8", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=a74ec9ae", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=a645f892", "./src/pwa.js": "./src/pwa.js?v=9f2ff847", "./src/race.js": "./src/race.js?v=64332032", "./src/safeui.js": "./src/safeui.js?v=9bbad7bd", "./src/settings.js": "./src/settings.js?v=e1affb3b", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=31acb476", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=3b02d7f1", "./src/ui.js": "./src/ui.js?v=df8800dd", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/weekly.js": "./src/weekly.js?v=bf8edef8", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=95e28ab3", "./src/world.js": "./src/world.js?v=d59799e7", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=c11f62a3"></script>
 </body>
 </html>
