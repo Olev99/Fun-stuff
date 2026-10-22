@@ -29,7 +29,7 @@ async function serve() {
 export const DEFAULT_TRACKS = ['sprout', 'coral', 'dunes', 'frost', 'candy', 'neon', 'tidal', 'hollow', 'gear', 'cloud'];
 
 // Runs the races and returns one record per race.
-export async function runRaces({ tracks = DEFAULT_TRACKS, diffs = ['normal', 'hard'], n = 3, seed = 1, kit = null, log = () => {} } = {}) {
+export async function runRaces({ tracks = DEFAULT_TRACKS, diffs = ['normal', 'hard'], n = 3, seed = 1, kit = null, events = 'off', log = () => {} } = {}) {
   const srv = await serve();
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
@@ -40,7 +40,7 @@ export async function runRaces({ tracks = DEFAULT_TRACKS, diffs = ['normal', 'ha
   for (const diff of diffs) for (const tid of tracks) for (let i = 0; i < n; i++) {
     const rs = seed * 1000 + i * 7 + tracks.indexOf(tid) * 131 + (diff === 'hard' ? 17 : 0);
     const t0 = Date.now();
-    const r = await p.evaluate(simRace, { tid, diff, seed: rs, kit });
+    const r = await p.evaluate(simRace, { tid, diff, seed: rs, kit, events });
     r.track = tid; r.diff = diff; r.seed = rs;
     recs.push(r);
     log(`${diff} ${tid} #${i} winner place-start ${r.winnerStart + 1}, gap ${r.gapLast.toFixed(1)}s, ${r.overtakes} overtakes, ${r.hits} hits (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
@@ -56,7 +56,7 @@ export async function runRaces({ tracks = DEFAULT_TRACKS, diffs = ['normal', 'ha
 }
 
 // ---- runs inside the page ----
-async function simRace({ tid, diff, seed, kit }) {
+async function simRace({ tid, diff, seed, kit, events }) {
   let st = seed >>> 0;
   Math.random = () => { st = (st + 0x6d2b79f5) >>> 0; let t = st; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const app = window.zoomies;
@@ -67,6 +67,7 @@ async function simRace({ tid, diff, seed, kit }) {
   const grid = ids.slice(0, 8);
   const pi = Math.floor(Math.random() * 8);
   app.paused = true;
+  app.settings.trackEvents = events; // track events: off (the baseline), normal or wild
   app.startRace({ mode: 'quick', trackId: tid, reverse: false, player: grid[pi], grid, speedClass: 'zoom', difficulty: diff, playerLoadout: kit ? { body: kit.body, upgrades: { parts: kit.parts } } : undefined }); // kit: the player's ride and Workshop parts
   app.paused = true;
   const race = app.race;

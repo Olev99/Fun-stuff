@@ -115,8 +115,8 @@ const blobTex = () => canvasTex(128, 128, (g, w) => {
 const waterTex = () => {
   const t = canvasTex(256, 4, (g, w, h) => {
     const f = g.createLinearGradient(0, 0, w, 0);
-    f.addColorStop(0, 'rgba(40,150,210,0.7)');
-    f.addColorStop(0.4, 'rgba(90,200,235,0.6)');
+    f.addColorStop(0, 'rgba(20,110,200,0.9)');
+    f.addColorStop(0.4, 'rgba(50,170,230,0.85)');
     f.addColorStop(0.455, 'rgba(255,255,255,0.95)');
     f.addColorStop(0.5, 'rgba(255,255,255,0.9)');
     f.addColorStop(0.505, 'rgba(255,255,255,0)');
@@ -399,7 +399,7 @@ export const EVENTS = {
   tide: {
     name: 'Rising Tide', icon: '🌊', line: 'RISING TIDE! Waves wash in, keep to the dry side or ride the crest!', warn: 5, dur: 16, weight: 3, cue: 'wave',
     telegraph(sys, e) {
-      e.zones = sys.spots(e, Math.round(clamp(sys.tr.length / 180, 4, 7)), 0).map((p) => ({ ...p, len: 26, sea: e.rand() < 0.5 ? -1 : 1 }));
+      e.zones = sys.spots(e, Math.round(clamp(sys.tr.length / 180, 4, 7)), 0).map((p) => ({ ...p, len: 34, sea: e.rand() < 0.5 ? -1 : 1 }));
       const tr = sys.tr, fr = sys.fr;
       e.zones.forEach((z, i) => {
         tr.frame(z.s + z.len / 2, fr);

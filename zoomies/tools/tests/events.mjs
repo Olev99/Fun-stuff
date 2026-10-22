@@ -281,12 +281,13 @@ for (const [tid, id] of SHOTS) {
       const { r, e } = window.evFind(tid, id);
       const { EVENTS } = window.evMod;
       const def = EVENTS[id];
-      const t = phase === 'warn' ? e.at + at : phase === 'peak' ? e.at + def.dur * at : e.end + at;
+      const t = phase === 'warn' ? e.at + at : phase === 'peak' ? e.at + (id === 'tide' ? 3.2 : def.dur * at) : e.end + at;
       // Drive to a little before the moment, then put the player just before the action.
       window.evRun(r, t - 1.2);
       const c = r.evs.cur;
       const spot = c && (c.spots || c.lanes || c.zones || c.ice || (c.rocks && c.rocks.filter((q) => q.st === 1 || q.st === 2)));
       if (spot && spot.length) r.player.placeAt((spot[0].s - 52 + r.track.length) % r.track.length, 0);
+      r.camSeg = -1; // the camera's track hint is stale after a teleport
       const k = r.player, sp = 24;
       k.vel.set(Math.sin(k.yaw) * sp, 0, Math.cos(k.yaw) * sp);
       r.placeCam(true);
