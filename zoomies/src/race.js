@@ -169,6 +169,7 @@ export class Race {
     this.stylePts = 0;
     this.styleCounts = {};
     this.lapWalls = 0;
+    this.evWalls = {}; // player wall hits per track event id while that event is active (the Eye of the Storm trophy)
     this._lastPlace = 0;
     this._overtakeT = 0;
     this.lookBack = false;
@@ -578,6 +579,7 @@ export class Race {
           break;
         case 'wall':
           if (k.isPlayer) this.lapWalls++;
+          if (k.isPlayer && this.evs && this.evs.cur && this.evs.cur.began) this.evWalls[this.evs.cur.id] = (this.evWalls[this.evs.cur.id] || 0) + 1;
           if (k.isPlayer) { a.play('wall', data); this.shake = Math.max(this.shake, Math.min(0.4, data * 0.02)); }
           this.fx.burst(k.pos.x + Math.sin(k.yaw) * 1.2, k.pos.y + 0.5, k.pos.z + Math.cos(k.yaw) * 1.2, ['#ffd23f', '#ffffff'], 6, 7, 0.3, 0.3, 14);
           break;

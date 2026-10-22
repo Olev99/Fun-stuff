@@ -7,6 +7,7 @@ import { medalTimes } from './medals.js';
 // has no imports from career.js (career.js imports it).
 //
 // Extra event fields over the story chapters:
+//   ev    track events (events.js): 'off' | 'signature' | 'wild', like the story chapters in career.js
 //   mod   a twist from DAILY_MODS (profile.js) applied to the race
 //   cls   speed class for this event only (Gold medal times are Zoom class)
 //   tm    star multipliers for a time event [2 stars, 3 stars]
@@ -19,7 +20,7 @@ const gold = (track) => +medalTimes(track)[2].toFixed(2);
 
 export const LEAGUE = [
   {
-    id: 'L1', name: 'Comeback Season', rival: 'ember', alt: 'pip', field: ['hopper', 'zorp', 'pip', 'volt'], joins: [], league: true,
+    id: 'L1', name: 'Comeback Season', ev: 'signature', rival: 'ember', alt: 'pip', field: ['hopper', 'zorp', 'pip', 'volt'], joins: [], league: true,
     cls: 'zoom', diff: 'hard', bossDiff: 'hard', mult: 1.2,
     blurb: 'The old champions are back, and every one of them has something to prove.',
     ai: { bodies: ['comet', 'classic', 'stomper'], up: 2 }, boss: { body: 'bolt', up: 3 },
@@ -80,7 +81,7 @@ export const LEAGUE = [
     ],
   },
   {
-    id: 'L2', name: 'Masked Rival', rival: 'mask', alt: 'ember', field: ['ember', 'volt', 'rexi'], joins: [], league: true,
+    id: 'L2', name: 'Masked Rival', ev: 'signature', rival: 'mask', alt: 'ember', field: ['ember', 'volt', 'rexi'], joins: [], league: true,
     cls: 'turbo', diff: 'hard', bossDiff: 'hard', mult: 1.35,
     blurb: 'Someone in a mask keeps wrecking the events. Who, and why?',
     ai: { bodies: ['comet', 'stomper', 'classic'], up: 3 }, boss: { body: 'stomper', up: 4 },
@@ -123,10 +124,11 @@ export const LEAGUE = [
         ],
       },
       {
-        id: 'L2-4', type: 'race', track: 'magma', goal: 2, mod: 'moon', title: 'Lava Lunar Leap', reward: 550, drop: 'turbo3',
+        id: 'L2-4', type: 'race', track: 'magma', ev: 'wild', goal: 2, mod: 'moon', title: 'Lava Lunar Leap', reward: 550, drop: 'turbo3',
         after: [
           ['rexi', 'STOMP! The gravity left! Somebody turned it down! I flew past the volcano!'],
           ['mask', 'Heh. Smooth landing, rookie.'],
+          ['mic', 'Low gravity AND lava rain! The meteors take twice as long to land. Somehow that makes it scarier.'],
         ],
       },
       {
@@ -136,11 +138,11 @@ export const LEAGUE = [
           ['gramps', 'Who in this whole League loves honey that much...? Hm. Keep racing. I will think.'],
         ],
       },
-      { id: 'L2-6', type: 'duel', track: 'jungle', title: 'Under the Mask', reward: 1200, boss: true, drop: 'itemPouch', bp: true },
+      { id: 'L2-6', type: 'duel', track: 'jungle', ev: 'wild', title: 'Under the Mask', reward: 1200, boss: true, drop: 'itemPouch', bp: true },
     ],
   },
   {
-    id: 'L3', name: 'Gearbox Gus', rival: 'gearbox', alt: 'bruno', field: ['bruno', 'ember', 'hopper', 'pip'], joins: [], league: true,
+    id: 'L3', name: 'Gearbox Gus', ev: 'wild', rival: 'gearbox', alt: 'bruno', field: ['bruno', 'ember', 'hopper', 'pip'], joins: [], league: true,
     cls: 'turbo', diff: 'hard', bossDiff: 'hard', mult: 1.5,
     blurb: 'Gramps comes out of retirement. One race, properly, at last.',
     ai: { bodies: ['comet', 'stomper', 'bolt'], up: 4 }, boss: { body: 'bolt', up: 5 },
@@ -149,6 +151,7 @@ export const LEAGUE = [
       ['mic', 'Season Three! Folks, there is a sign on Gramps\'s Workshop door: "Closed for racing." Nobody knows what it means. ...No relation to Gus the walrus, by the way. Different Gus. Fewer tusks.'],
       ['gramps', 'I taught you everything I know, kid. Lift before the bend. Drift long. Never trust a fence. But I never raced you. Not once. That is about to change.'],
       ['gramps', 'Finish the League. Show me every lesson. And at the end of it, I will be waiting. With the Starbolt.'],
+      ['mic', 'Weather desk says Season Three storms are "extra". I asked what extra means. They laughed, and then they stopped laughing.'],
     ],
     bossIntro: [
       ['gearbox', 'Out of retirement, out of the shed and out of excuses. Thirty years since I raced the Wheel, and I wouldn\'t pick anyone else to race now.'],
