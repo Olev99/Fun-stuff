@@ -354,6 +354,18 @@ export class Audio {
         this._noise(1.6, 0.35, 'lowpass', 400, 2600, 0, this.sfx, 0.8);
         this._noise(1.2, 0.2, 'bandpass', 3000, 900, 0.5, this.sfx, 1.5);
         break;
+      case 'chime': // lanterns, sparks and fireworks
+        [0, 4, 7, 12].forEach((st, i) => this._tone('sine', mtof(84 + st), 0, 0.45, 0.08, i * 0.08));
+        break;
+      case 'crack': // ice or glass splitting
+        this._noise(0.12, 0.5, 'highpass', 3000, 6000);
+        this._noise(0.5, 0.3, 'bandpass', 2400, 700, 0.05, this.sfx, 4);
+        this._tone('triangle', 1400, 300, 0.25, 0.08);
+        break;
+      case 'thud': // a press stamping, a boulder landing
+        this._tone('sine', 110, 38, 0.3, 0.45);
+        this._noise(0.25, 0.4, 'lowpass', 500, 90);
+        break;
       case 'lap':
         [0, 7, 12].forEach((s, i) => this._tone('triangle', mtof(79 + s), 0, 0.14, 0.16, i * 0.09));
         break;

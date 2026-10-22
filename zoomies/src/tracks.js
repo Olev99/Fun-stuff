@@ -10,6 +10,7 @@ import { arenaById } from './arenas.js';
 export const TRACKS = [
   {
     id: 'sprout', name: 'Sprout Speedway', size: 'Short', theme: 'meadow',
+    events: ['harvestGust'], // track events (events.js)
     blurb: 'Rolling meadows, a windmill and one big hill jump.',
     music: { key: 0, bpm: 138, seed: 11, scale: 'major' },
     points: [
@@ -105,6 +106,7 @@ export const TRACKS = [
   },
   {
     id: 'candy', name: 'Sweet Tooth Valley', size: 'Medium', theme: 'candy', scale: 1.22,
+    events: ['syrupShower'], // track events (events.js)
     blurb: 'Chocolate roads, gumdrop hills and ribbon-candy bends.',
     music: { key: 7, bpm: 150, seed: 91, scale: 'major' },
     points: [
@@ -128,6 +130,7 @@ export const TRACKS = [
   },
   {
     id: 'neon', laps: 3, name: 'Neon Nebula', size: 'Long', theme: 'neon', scale: 1.3,
+    events: ['powerSurge'], // track events (events.js)
     blurb: 'A glowing figure-eight skyway with a flyover.',
     music: { key: 7, bpm: 152, seed: 51, scale: 'minor' },
     points: [
@@ -183,6 +186,7 @@ export const TRACKS = [
   },
   {
     id: 'cloud', laps: 3, name: 'Cloud Carnival', size: 'Long', theme: 'cloud', scale: 1.22,
+    events: ['fireworks'], // track events (events.js)
     blurb: 'A floating fairground in the sky. Glide ramps included.',
     music: { key: 5, bpm: 148, seed: 83, scale: 'major' },
     points: [
@@ -206,6 +210,7 @@ export const TRACKS = [
   },
   {
     id: 'downs', name: 'Windmill Downs', size: 'Medium', theme: 'meadow',
+    events: ['twisterCrossing'], // track events (events.js)
     blurb: 'Sweeping farmland esses past the old windmill.',
     music: { key: 2, bpm: 140, seed: 101, scale: 'major' },
     points: [
@@ -264,6 +269,7 @@ export const TRACKS = [
   },
   {
     id: 'glacier', laps: 3, name: 'Glacier Gorge', size: 'Long', theme: 'frost',
+    events: ['iceQuake'], // track events (events.js)
     blurb: 'Sheer ice from start to finish. Brake early, drift long.',
     music: { key: 1, bpm: 130, seed: 127, scale: 'minor' },
     points: [
@@ -304,6 +310,7 @@ export const TRACKS = [
   },
   {
     id: 'obsidian', laps: 3, name: 'Obsidian Rush', size: 'Long', theme: 'volcano',
+    events: ['glassCrack'], // track events (events.js)
     blurb: 'Black-glass highways over rivers of lava.',
     music: { key: 4, bpm: 150, seed: 131, scale: 'minor' },
     points: [
@@ -342,6 +349,7 @@ export const TRACKS = [
   },
   {
     id: 'hollow', name: 'Spooky Hollow', size: 'Medium', theme: 'haunted', scale: 1.1,
+    events: ['ghostParade'], // track events (events.js)
     blurb: 'Moonlit lanes, a haunted manor and ghosts that bump back.',
     music: { key: 3, bpm: 136, seed: 149, scale: 'minor' },
     points: [
@@ -371,6 +379,7 @@ export const TRACKS = [
   },
   {
     id: 'jungle', name: 'Jungle Ruins', size: 'Medium', theme: 'jungle',
+    events: ['templeTremor'], // track events (events.js)
     blurb: 'Vines, rolling boulders and a lost temple.',
     music: { key: 6, bpm: 146, seed: 157, scale: 'dorian' },
     points: [
@@ -402,6 +411,7 @@ export const TRACKS = [
   },
   {
     id: 'gear', name: 'Gearworks', size: 'Medium', theme: 'factory',
+    events: ['factoryAlarm'], // track events (events.js)
     blurb: 'A factory figure-eight: oil slicks, rolling barrels, a crossover.',
     music: { key: 10, bpm: 152, seed: 163, scale: 'minor' },
     points: [
@@ -429,6 +439,7 @@ export const TRACKS = [
   },
   {
     id: 'moon', laps: 3, name: 'Moonbase Loop', size: 'Long', theme: 'moon', scale: 1.1,
+    events: ['meteorShower'], // track events (events.js)
     blurb: 'Low gravity! Floaty crater jumps with Earth overhead.',
     music: { key: 8, bpm: 128, seed: 173, scale: 'dorian' },
     points: [
@@ -464,6 +475,7 @@ export const TRACKS = [
   },
   {
     id: 'maple', name: 'Maple Ridge', size: 'Medium', theme: 'autumn',
+    events: ['leafStorm'], // track events (events.js)
     blurb: 'Climb a red-gold ridge, then plunge down through the leaves.',
     music: { key: 0, bpm: 142, seed: 181, scale: 'dorian' },
     points: [
@@ -495,6 +507,7 @@ export const TRACKS = [
   },
   {
     id: 'blossom', name: 'Blossom Gardens', size: 'Short', theme: 'garden', scale: 1.2,
+    events: ['lanternFest'], // track events (events.js)
     blurb: 'Twisty paths through cherry trees, koi ponds and torii gates.',
     music: { key: 5, bpm: 138, seed: 191, scale: 'major' },
     points: [
@@ -521,6 +534,7 @@ export const TRACKS = [
   // ---- Adventures: one long lap in three legs, driving, boating and flying ----
   {
     id: 'odyssey', laps: 1, name: 'Jungle Odyssey', size: 'Epic', theme: 'jungle', width: 17, terrain: true,
+    events: ['riverSurge', 'jetStream'], // track events (events.js)
     blurb: 'Temple road, river rapids and a waterfall, then take off and fly home over the sea.',
     music: { key: 6, bpm: 150, seed: 211, scale: 'dorian' },
     points: [
@@ -578,6 +592,7 @@ export const TRACKS = [
   },
   {
     id: 'hopper', laps: 1, name: 'Island Hopper', size: 'Epic', theme: 'beach', scale: 1.48, width: 17, terrain: true,
+    events: ['harborSwell', 'ashCloud'], // track events (events.js)
     blurb: 'Race boats through the harbour canals, climb the volcano and fly home across the bay.',
     music: { key: 2, bpm: 152, seed: 223, scale: 'major' },
     points: [

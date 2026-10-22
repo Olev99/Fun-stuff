@@ -38,7 +38,9 @@ export function estRaceTime(len, laps, top) {
 
 // The events of one race: [{ id, warnAt, at, end, seed }] in race-clock
 // seconds (warnAt: the warning starts, at: the effect starts, end: all over).
-export function schedule(seed, mode, ids, raceT) {
+// `wins` (optional): an event id -> [from, to] as fractions of the race, for events that belong to
+// one leg of an adventure track (a river surge only makes sense while the leader is in the river).
+export function schedule(seed, mode, ids, raceT, wins = {}) {
   const out = [];
   const pool = (ids || []).filter((id) => EVENTS[id]);
   if (mode !== 'normal' && mode !== 'wild') return out;
@@ -48,9 +50,12 @@ export function schedule(seed, mode, ids, raceT) {
   const stop = raceT * EV_LAST;
   let t = EV_FIRST + r() * (wild ? 5 : 20);
   let last = null;
-  for (let n = 0; n < 12; n++) {
+  for (let n = 0; n < 12 && t < stop;) {
     // Weighted pick, never the same event twice in a row when there is a choice.
-    const opts = pool.length > 1 ? pool.filter((id) => id !== last) : pool;
+    const inWin = (id) => !wins[id] || (t + EVENTS[id].warn >= wins[id][0] * raceT && t + EVENTS[id].warn + EVENTS[id].dur * 0.6 <= wins[id][1] * raceT);
+    const opts = (pool.length > 1 ? pool.filter((id) => id !== last) : pool).filter(inWin);
+    if (!opts.length) { t += 2; continue; } // nothing fits this part of the race yet
+    n++;
     let w = r() * opts.reduce((a, id) => a + EVENTS[id].weight, 0);
     let id = opts[opts.length - 1];
     for (const o of opts) if ((w -= EVENTS[o].weight) <= 0) { id = o; break; }
@@ -100,14 +105,14 @@ const bandTex = () => canvasTex(64, 64, (g, w) => {
     g.fill();
   }
 }, { wrap: true });
-// A soft round blob (lava puddles).
-const blobTex = () => canvasTex(128, 128, (g, w) => {
+// A soft round blob (lava puddles; syrup and craters take other colours).
+const blobTex = (c0 = 'rgba(255,255,255,1)', c1 = 'rgba(255,210,150,0.95)', c2 = 'rgba(180,60,20,0.85)', c3 = 'rgba(60,10,0,0)') => canvasTex(128, 128, (g, w) => {
   const c = w / 2;
   const f = g.createRadialGradient(c, c, 0, c, c, c);
-  f.addColorStop(0, 'rgba(255,255,255,1)');
-  f.addColorStop(0.55, 'rgba(255,210,150,0.95)');
-  f.addColorStop(0.8, 'rgba(180,60,20,0.85)');
-  f.addColorStop(1, 'rgba(60,10,0,0)');
+  f.addColorStop(0, c0);
+  f.addColorStop(0.55, c1);
+  f.addColorStop(0.8, c2);
+  f.addColorStop(1, c3);
   g.fillStyle = f;
   g.fillRect(0, 0, w, w);
 });
@@ -207,6 +212,13 @@ const glowBasic = (map, color, k, extra = {}) => new THREE.MeshBasicMaterial({
 });
 
 // ---------------------------------------------------------------- the events
+// Instanced props the events draw: [obstacle model, material, how rot turns it].
+const INST = {
+  meteor: ['fireball', 'glow', 'tumble'], lump: ['snowball', 'mat', 'tumble'], ghost: ['ghost', 'mat', 'spin'], lantern: ['lantern', 'mat', 'spin'],
+  hay: ['hay', 'mat', 'roll'], boulder: ['boulder', 'mat', 'tumble'], gumball: ['gumball', 'mat', 'tumble'], twister: ['twister', 'twister', 'spin'], press: ['crate', 'mat', 'spin'],
+};
+const POOL = 96;
+
 // Gusts: a smooth swell every `period` seconds; returns 0..1 and the gust's index.
 function gust(t, period, len) {
   const n = Math.floor(t / period), ph = t - n * period;
@@ -460,6 +472,656 @@ export function bury(sys, k) {
   if (k === sys.race.player) { sys.toast('BURIED! Dig out!'); sys.shake(0.5); sys.sound('bump'); }
 }
 
+// ---------------------------------------------------------------- the other signature events
+// A drift boost let go in a gust surfs it for extra speed (like Blizzard), with its own popup.
+const surf = (label) => (sys, e, k, type, data) => {
+  if (type !== 'driftBoost' || !(data >= 1) || !(e.gust > 0.45)) return;
+  k.startBoost(0.6, 5);
+  if (k === sys.race.player) sys.style(label, 20, 'gold');
+};
+
+// Boost-lane events: striped marks while warning, lanes afterwards; the first drive down each lane pays a popup.
+function lanesMark(sys, e, n, len, { col = '#ffd23f', within = null, margin = 3.5, best = false } = {}) {
+  e.lanes = sys.spots(e, n, margin, within, len + 4).map((p) => ({ ...p, len }));
+  if (best) for (const p of e.lanes) p.d = sys.bestD(p.s + len / 2);
+  e.lanes.forEach((p, i) => sys.layer('band').set(i, sys.tr.patch(p.s, p.s + len, p.d - 2.5, p.d + 2.5, { lift: 0.05, segs: 6 })));
+  sys.layerColor('band', col, 1.8);
+}
+const lanesOpen = (sys, e) => { sys.layer('band').clear(); e.live = e.lanes.map((p) => sys.addLane(p.s, p.d, p.len)); };
+const lanesClose = (sys, e) => { for (const ln of e.live || []) sys.removeLane(ln); sys.layer('band').clear(); };
+function lanesPay(sys, e, label, pts = 10) {
+  const pl = sys.race.player;
+  if (!pl || pl.remote || !e.live) return;
+  for (const ln of e.live) {
+    const u = sys.ahead(ln.s, pl.trk.s);
+    if (!ln.used && pl.path === sys.tr && pl.grounded && u >= 0 && u <= ln.len && Math.abs(pl.trk.d - ln.d) < ln.w / 2 + 0.4) { ln.used = true; sys.style(label, pts, 'gold'); }
+  }
+}
+// Sparkles falling on every live lane (a few glow particles, no extra draw call).
+function lanesGlow(sys, e, cols, k = 1, up = 3) {
+  for (const ln of e.live || []) {
+    if (Math.random() > k * 0.7) continue;
+    const q = sys.at(ln.s + Math.random() * ln.len, ln.d + (Math.random() - 0.5) * ln.w, up);
+    sys.fx.glow.emit(q.x, q.y, q.z, 0, -2.5, 0, cols[(Math.random() * cols.length) | 0], 0.5, 0.1, 0.8, 0, 0.5);
+  }
+}
+
+// Things crossing the road at marked spots, line after line (ghosts, hay carts): a hit is a bump, the gaps are the way through.
+// Each spot sends `n` items in a diagonal row every `period` seconds; c: { put, n, step, stagger, cross, period, y, r, kind, scale, label, dur, roll, glow }.
+function cross(sys, e, t, c) {
+  const pl = sys.race.player;
+  e.spots.forEach((p) => {
+    for (let w = 0; w * c.period < c.dur - c.cross; w++) {
+      for (let i = 0; i < c.n; i++) {
+        const u = (t - w * c.period - i * c.stagger) / c.cross;
+        if (u < 0 || u > 1) continue;
+        const d = p.side * (p.hw + 3) * (1 - 2 * u);
+        const q = sys.at(p.s + (i - (c.n - 1) / 2) * c.step, d, c.y + (c.roll ? 0 : Math.sin(sys.time * 3 + i + w) * 0.25));
+        const fr = sys._f2, x = q.x, y = q.y, z = q.z, yaw = Math.atan2(-p.side * fr.rx, -p.side * fr.rz);
+        if (c.roll) sys.put(c.put, x, y, z, c.scale, sys.time * 7 * p.side, yaw);
+        else sys.put(c.put, x, y, z, c.scale, yaw);
+        sys.hazard(x, z, c.r);
+        if (c.glow && Math.random() < 0.4) sys.fx.glow.emit(x, y - 0.5, z, 0, 0.6, 0, c.glow, 0.7, 0.1, 0.6, 0, 1, 0.6);
+        for (const k of sys.local()) {
+          if ((k.pos.x - x) ** 2 + (k.pos.z - z) ** 2 < (c.r + 0.9) ** 2 && Math.abs(k.pos.y + 0.8 - y) < 3 && sys.hurt(k, c.kind) && k === pl) sys.sound('bump');
+        }
+      }
+    }
+    // A popup for slipping through a live crossing without being hit.
+    if (pl && !pl.remote && t < c.dur - 1) {
+      const ds = Math.abs(sys.ahead(pl.mainPos ?? pl.trk.s, p.s));
+      if (ds < 6) p.near = true;
+      else if (p.near) {
+        p.near = false;
+        if ((pl._evHit || -9) < sys.time - 3) sys.style(c.label, 15, 'mint');
+      }
+    }
+  });
+}
+const crossMarks = (sys, e, c, col) => {
+  e.spots.forEach((p, i) => sys.layer('band').set(i, sys.tr.patch(p.s - (c.n * c.step) / 2 - 2, p.s + (c.n * c.step) / 2 + 2, -p.hw, p.hw, { lift: 0.05, segs: 5 })));
+  sys.layerColor('band', col, 1.6);
+};
+
+// Marked circles, then something lands: the shape of Syrup Shower, Temple Tremor and the meteor showers.
+// cfg: waves, gap, every (metres of road per circle), r, life (s on the ground), ring (colour), fall (flying model), fs, dust, dodge, sound, thump,
+// land(sys, e, c, i), gone(sys, e, c, i), hit(sys, k, c) -> true if it got the kart, live(sys, e, c, t), each(sys, e, t, dt), tele(sys, e), start(sys, e), finish(sys, e), soft (the AI ignores it).
+function rain(cfg) {
+  return {
+    telegraph(sys, e) {
+      const per = Math.round(clamp(sys.tr.length / cfg.every, 5, 12) * sys.amp);
+      e.rocks = [];
+      for (let w = 0; w < cfg.waves + (sys.wild ? 1 : 0); w++) {
+        for (const p of sys.spots(e, per, 3)) e.rocks.push({ ...p, r: cfg.r, mark: w * cfg.gap, hit: w * cfg.gap + 2, gone: w * cfg.gap + 2 + cfg.life, st: 0 });
+      }
+      sys.layerColor('ring', cfg.ring, 2);
+      if (cfg.tele) cfg.tele(sys, e);
+    },
+    begin(sys, e) { sys.sound(cfg.sound); if (cfg.start) cfg.start(sys, e); },
+    update(sys, e, t, dt) {
+      const tr = sys.tr, pl = sys.race.player;
+      for (let i = 0; i < e.rocks.length; i++) {
+        const c = e.rocks[i];
+        if (t < c.mark || c.st === 3) continue;
+        if (c.st === 0) { c.st = 1; sys.layer('ring').set(i, tr.patch(c.s - c.r, c.s + c.r, c.d - c.r, c.d + c.r, { lift: 0.07, segs: 3 })); }
+        if (c.st === 1) {
+          const f = (c.hit - t) / 0.8;
+          if (f < 1) {
+            const y = c.y + 0.6 + f * 38;
+            sys.put(cfg.fall, c.x + f * 8, y, c.z + f * 5, cfg.fs, sys.time * 6);
+            sys.fx.glow.emit(c.x + f * 8, y + 1, c.z + f * 5, 0, 2, 0, cfg.dust[(Math.random() * cfg.dust.length) | 0], 1.2, 0.2, 0.5, 0, 1);
+          }
+          if (t < c.hit) {
+            sys.hazard(c.x, c.z, t > c.hit - 1 ? c.r : 0.1);
+            if (pl && !pl.remote && (pl.pos.x - c.x) ** 2 + (pl.pos.z - c.z) ** 2 < (c.r + 0.6) ** 2) c.near = true;
+            continue;
+          }
+          c.st = 2;
+          sys.layer('ring').del(i);
+          cfg.land(sys, e, c, i);
+          sys.fx.burst(c.x, c.y + 0.6, c.z, cfg.dust, 12, 8, 0.6, 0.6, 10);
+          if (sys.near(c.x, c.z, 45)) { sys.sound(cfg.thump); sys.shake(Math.max(0.12, 0.4 - Math.sqrt((pl.pos.x - c.x) ** 2 + (pl.pos.z - c.z) ** 2) / 100)); }
+          let struck = false;
+          for (const k of sys.local()) if ((k.pos.x - c.x) ** 2 + (k.pos.z - c.z) ** 2 < (c.r + 0.4) ** 2 && Math.abs(k.pos.y - c.y) < 3 && cfg.hit(sys, k, c) && k === pl) struck = true;
+          if (c.near && !struck && pl && pl.spinTime <= 0) sys.style(cfg.dodge, 15, 'mint');
+        }
+        if (c.st === 2) {
+          if (t >= c.gone) { c.st = 3; if (cfg.gone) cfg.gone(sys, e, c, i); continue; }
+          if (!cfg.soft) sys.hazard(c.x, c.z, c.r);
+          if (cfg.live) cfg.live(sys, e, c, t);
+        }
+      }
+      if (cfg.each) cfg.each(sys, e, t, dt);
+    },
+    end(sys, e) {
+      (e.rocks || []).forEach((c, i) => { if (c.st === 2 && cfg.gone) cfg.gone(sys, e, c, i); });
+      sys.layer('ring').clear();
+      if (cfg.finish) cfg.finish(sys, e);
+    },
+  };
+}
+
+// A crater is a small bump: a grounded kart rolling over one hops a little and loses a touch of speed.
+function craterBump(sys, c) {
+  for (const k of sys.local()) {
+    if (!k.grounded || (k._evBump || -9) > sys.time - 1 || (k.pos.x - c.x) ** 2 + (k.pos.z - c.z) ** 2 > (c.r * 0.85) ** 2 || Math.abs(k.pos.y - c.y) > 2) continue;
+    k._evBump = sys.time;
+    k.vel.x *= 0.95;
+    k.vel.z *= 0.95;
+    k.vy = 3.4;
+    k.grounded = false;
+    if (k === sys.race.player) sys.sound('bump');
+  }
+}
+const impactMeteors = (o) => rain({
+  waves: 4, gap: 2.5, every: 140, r: 2.4, life: 1e6, ring: '#ff8a3a', fall: 'meteor', fs: 0.9, dust: ['#c9ccd6', '#8a8fa0', '#ffd23f'], dodge: 'DODGED!', sound: 'rumble', thump: 'boom', soft: true,
+  land(sys, e, c, i) { sys.layer('crater').set(i, sys.tr.patch(c.s - c.r, c.s + c.r, c.d - c.r, c.d + c.r, { lift: 0.06, segs: 3 })); },
+  hit: (sys, k) => sys.hurt(k, 'spin'),
+  live: (sys, e, c) => craterBump(sys, c),
+  finish(sys) { sys.layer('crater').clear(); },
+  each(sys, e, t) {
+    const k = env(t, o.dur, 1.5, 2.5);
+    sys.setVis(0.2 * k, '#ff9a4a', '#ffb347'); // solar flare
+    if (!o.gravity) return;
+    // A gravity pulse every 5.5 s: everything floats for a moment.
+    const g = gust(t, 5.5, 1.8);
+    sys.mods.gravity = 1 - 0.38 * g.g * k;
+    const pl = sys.race.player;
+    if (pl && g.g > 0.5 && pl.airTime > 0.4 && e.gp !== g.n) { e.gp = g.n; sys.style('MOON HOP', 10, 'gold'); }
+  },
+});
+
+const METEORS = impactMeteors({ dur: 17, gravity: true });
+const CRATER_METEORS = impactMeteors({ dur: 16, gravity: false });
+const SYRUP = rain({
+  waves: 4, gap: 2.4, every: 150, r: 2.6, life: 8, ring: '#ff5fa8', fall: 'gumball', fs: 0.7, dust: ['#ff7ab8', '#ffffff', '#7fe8ff'], dodge: 'SWEET DODGE!', sound: 'honey', thump: 'honey',
+  land(sys, e, c, i) {
+    sys.layer('syrup').set(i, sys.tr.patch(c.s - c.r, c.s + c.r, c.d - c.r, c.d + c.r, { lift: 0.06, segs: 3 }));
+    c.patch = sys.addPatch('mud', c.s - c.r, c.r * 2, c.d, c.r * 2);
+  },
+  gone(sys, e, c, i) { sys.layer('syrup').del(i); if (c.patch) sys.removePatch(c.patch); c.patch = null; },
+  hit(sys, k) { k.vel.x *= 0.7; k.vel.z *= 0.7; if (k === sys.race.player) sys.toast('STICKY!'); return true; },
+  finish(sys) { sys.layer('syrup').clear(); },
+});
+const TREMOR = rain({
+  waves: 3, gap: 2.6, every: 170, r: 2.6, life: 0.3, ring: '#ffb347', fall: 'boulder', fs: 0.8, dust: ['#8a7a66', '#5a4d50', '#c9b48a'], dodge: 'DODGED!', sound: 'rumble', thump: 'thud',
+  tele(sys, e) { lanesMark(sys, e, sys.wild ? 3 : 2, 26, { col: '#ffd23f' }); }, // the temple gate
+  land() {},
+  hit: (sys, k) => sys.hurt(k, 'spin'),
+  start(sys) { sys.shake(0.6); },
+  each(sys, e, t) {
+    const n = Math.floor(t / 1.8);
+    if (n !== e.sh) { e.sh = n; sys.shake(0.2); }
+    // Once the boulders have fallen the gate swings open: a boost lane through it.
+    if (t > 7 && !e.live) { lanesOpen(sys, e); sys.sound('chime'); }
+    lanesPay(sys, e, 'TEMPLE RUSH', 15);
+  },
+  finish: lanesClose,
+});
+
+// The river, sky and volcano events share one shape: lanes along a stretch of the leg, a vehicle-sized reward.
+const streamEvent = (o) => ({
+  telegraph(sys, e) {
+    const lg = sys.tr.legs;
+    lanesMark(sys, e, sys.wild ? 5 : 4, o.len, { col: o.col, margin: o.margin, within: o.zone ? { zone: o.zone } : { s0: lg[1].s + 20, s1: (lg[2] ? lg[2].s : sys.tr.length) - 10 } });
+    if (o.move) e.lanes.forEach((p) => { p.s0 = p.s; });
+  },
+  begin(sys, e) { lanesOpen(sys, e); sys.sound(o.sound); },
+  update(sys, e, t) {
+    const k = env(t, this.dur, 2, 3);
+    lanesPay(sys, e, o.label, 20);
+    lanesGlow(sys, e, o.glow, k, 1.2);
+    if (o.vis) { sys.setVis(o.vis * k, o.fog, o.edge); sys.storm(0, k, o.ash, 3); }
+    if (o.move) {
+      // Swells roll down the canal: the lane moves with the wave (rebuilt a few times a second).
+      const z = sys.tr.zones.find((q) => q.kind === o.zone), end = z.s0 + z.len - o.len - 4;
+      e.live.forEach((ln, i) => { ln.s = Math.min(end, e.lanes[i].s0 + t * o.move); });
+      if (t - (e.rb ?? -9) > 0.2) {
+        e.rb = t;
+        e.live.forEach((ln) => sys.layer('lane').set(ln, sys.tr.patch(ln.s, ln.s + ln.len, ln.d - ln.w / 2, ln.d + ln.w / 2, { lift: 0.06, segs: 8 })));
+      }
+    }
+    if (o.foam) for (const ln of e.live) {
+      if (Math.random() > k * 0.8) continue;
+      const q = sys.at(ln.s + Math.random() * ln.len, ln.d + (Math.random() < 0.5 ? -1 : 1) * ln.w * 0.5, 0.3);
+      sys.fx.soft.emit(q.x, q.y, q.z, (Math.random() - 0.5) * 3, 2 + Math.random() * 2, (Math.random() - 0.5) * 3, '#ffffff', 0.5, 0.2, 0.7, 4, 1, 0.8);
+    }
+  },
+  end: lanesClose,
+});
+
+Object.assign(EVENTS, {
+  // Sprout Speedway
+  harvestGust: {
+    name: 'Harvest Gust', icon: '🌾', line: 'HARVEST GUST! Petals and hay fly sideways, drift into it for a boost!', warn: 4, dur: 14, weight: 3, cue: 'wind',
+    telegraph(sys, e) { e.side = e.rand() < 0.5 ? -1 : 1; },
+    begin(sys) { sys.sound('wind'); },
+    update(sys, e, t) {
+      const k = env(t, this.dur, 1.5, 2.5), gs = gust(t, 3.4, 1.7);
+      e.gust = gs.g;
+      sys.mods.wind = e.side * sys.amp * (2 + gs.g * 4.4) * k;
+      sys.mods.traction = 1 - 0.04 * k;
+      sys.storm(e.side, k, '#ffb3d1', 3);
+      sys.storm(e.side, k, '#e8c65a', 3);
+      if (gs.g > 0.6 && !e.gusted?.[gs.n]) { (e.gusted ||= {})[gs.n] = 1; sys.sound('wind'); }
+    },
+    end() {},
+    kartEvent: surf('GUST SURFER'),
+  },
+  // Blossom Gardens
+  lanternFest: {
+    name: 'Lantern Festival', icon: '🏮', line: 'LANTERN FESTIVAL! Follow the floating lanterns for a boost!', warn: 4, dur: 14, weight: 3, cue: 'chime',
+    telegraph(sys, e) { lanesMark(sys, e, sys.wild ? 5 : 4, 26, { col: '#ff9a3c', best: true }); },
+    begin(sys, e) { lanesOpen(sys, e); },
+    update(sys, e, t) {
+      const k = env(t, this.dur, 1.5, 2);
+      lanesPay(sys, e, 'LANTERN LIGHT', 12);
+      lanesGlow(sys, e, ['#ffd27a', '#ff9a3c'], k, 3);
+      // Lanterns float along both sides of every lane.
+      for (const ln of e.live) for (let u = 0; u <= ln.len; u += 8) for (const sd of [-1, 1]) {
+        const q = sys.at(ln.s + u, ln.d + sd * 3.4, 3 + Math.sin(sys.time * 1.6 + u + sd) * 0.4);
+        sys.put('lantern', q.x, q.y, q.z, 0.8 * k, sys.time * 0.5 + u);
+      }
+    },
+    end: lanesClose,
+  },
+  // Sweet Tooth Valley
+  syrupShower: {
+    name: 'Syrup Shower', icon: '🍯', line: 'SYRUP SHOWER! Sticky splats at the pink circles, grab a candy spark to clean up!', warn: 4, dur: 18, weight: 3, cue: 'honey',
+    telegraph(sys, e) {
+      SYRUP.telegraph(sys, e);
+      // Candy sparks appear along the way; driving through one wipes the puddles round it.
+      const n = e.rocks.length;
+      e.sparks = [0.2, 0.5, 0.8].map((f, i) => { const c = e.rocks[Math.floor(f * n)]; return { s: c.s + 7, d: c.d, from: 4 + i * 3.5 }; });
+    },
+    begin: SYRUP.begin,
+    update(sys, e, t, dt) {
+      SYRUP.update(sys, e, t, dt);
+      for (const sp of e.sparks) {
+        if (sp.got || t < sp.from || t > this.dur - 1.5) continue;
+        const q = sys.at(sp.s, sp.d, 1.3);
+        const x = q.x, y = q.y, z = q.z;
+        sys.fx.glow.emit(x + (Math.random() - 0.5) * 0.8, y + (Math.random() - 0.5) * 0.8, z + (Math.random() - 0.5) * 0.8, 0, 1, 0, ['#ffffff', '#ff7ab8', '#7fe8ff'][(Math.random() * 3) | 0], 1.1, 0.2, 0.45, 0, 1);
+        for (const k of sys.local()) {
+          if ((k.pos.x - x) ** 2 + (k.pos.z - z) ** 2 > 2.8 * 2.8 || Math.abs(k.pos.y - y) > 3) continue;
+          sp.got = true;
+          e.rocks.forEach((c, i) => {
+            if (c.st !== 2 || (c.x - x) ** 2 + (c.z - z) ** 2 > 24 * 24) return;
+            c.st = 3;
+            sys.layer('syrup').del(i);
+            if (c.patch) sys.removePatch(c.patch);
+            c.patch = null;
+          });
+          sys.fx.burst(x, y, z, ['#ffffff', '#ff7ab8', '#7fe8ff'], 22, 8, 0.7, 0.7, 6);
+          sys.sound('chime');
+          if (k === sys.race.player) sys.style('SWEET RELIEF', 20, 'gold');
+          break;
+        }
+      }
+    },
+    end: SYRUP.end,
+  },
+  // Windmill Downs
+  twisterCrossing: {
+    name: 'Twister Crossing', icon: '🌪️', line: 'TWISTER CROSSING! It wanders over the striped path, wait for it to pass!', warn: 5, dur: 14, weight: 3, cue: 'twister',
+    telegraph(sys, e) {
+      e.spots = sys.spots(e, sys.wild ? 2 : 1, 0).map((p) => ({ ...p, side: e.rand() < 0.5 ? -1 : 1, ph: e.rand() * 6 }));
+      e.spots.forEach((p, i) => sys.layer('band').set(i, sys.tr.patch(p.s - 8, p.s + 8, -p.hw, p.hw, { lift: 0.05, segs: 5 })));
+      sys.layerColor('band', '#ffb347', 1.6);
+    },
+    begin(sys) { sys.sound('wind'); },
+    update(sys, e, t) {
+      const pl = sys.race.player;
+      for (const p of e.spots) {
+        const u = (t - 0.5) / 12;
+        if (u < 0 || u > 1) continue;
+        // Across the field and the road in about 12 s, wandering up and down the road as it goes.
+        const q = sys.at(p.s + Math.sin(t * 0.9 + p.ph) * 7, p.side * (p.hw + 22) * (1 - 2 * u), 0.1);
+        const x = q.x, y = q.y, z = q.z;
+        sys.put('twister', x, y, z, 2.4, sys.time * 5);
+        sys.hazard(x, z, 3.8);
+        if (Math.random() < 0.8) sys.fx.soft.emit(x + (Math.random() - 0.5) * 4, y + Math.random() * 5, z + (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6, 3, (Math.random() - 0.5) * 6, Math.random() < 0.5 ? '#9a8a6a' : '#7fae5a', 0.5, 0.2, 0.8, 0, 1, 0.8);
+        for (const k of sys.local()) if ((k.pos.x - x) ** 2 + (k.pos.z - z) ** 2 < 3.4 * 3.4 && Math.abs(k.pos.y - y) < 4 && sys.hurt(k, 'bump') && k === pl) sys.toast('WHIRL!');
+        if (pl && !pl.remote) {
+          const d2 = (pl.pos.x - x) ** 2 + (pl.pos.z - z) ** 2;
+          if (d2 < 9 * 9) p.near = true;
+          else if (p.near && d2 > 13 * 13) {
+            p.near = false;
+            if ((pl._evHit || -9) < sys.time - 3) sys.style('TWISTER DANCE', 15, 'mint');
+          }
+        }
+      }
+    },
+    end() {},
+  },
+  // Spooky Hollow
+  ghostParade: {
+    name: 'Ghost Parade', icon: '👻', line: 'GHOST PARADE! Friendly ghosts float across, slip through the gaps!', warn: 5, dur: 20, weight: 3, cue: 'ghost', vis: true,
+    cross: { put: 'ghost', n: 4, step: 5, stagger: 0.55, cross: 3.4, period: 5.5, y: 1.6, r: 1.4, kind: 'bump', scale: 1.1, label: 'BOO-GIE', dur: 20, glow: '#9dff8a' },
+    telegraph(sys, e) {
+      e.spots = sys.spots(e, 3, 0).map((p) => ({ ...p, side: e.rand() < 0.5 ? -1 : 1 }));
+      crossMarks(sys, e, this.cross, '#9dff8a');
+    },
+    begin(sys) { sys.sound('ghost'); },
+    update(sys, e, t) {
+      // Fog rolls in; lantern light marks the road edges.
+      sys.setVis(0.5 * env(t, this.dur, 3, 3), '#2a2a52', '#8affc4');
+      cross(sys, e, t, this.cross);
+    },
+    end() {},
+  },
+  // Jungle Ruins
+  templeTremor: {
+    name: 'Temple Tremor', icon: '🗿', line: 'TEMPLE TREMOR! Boulders drop on the circles, then the temple gate opens!', warn: 4, dur: 17, weight: 3, cue: 'rumble',
+    ...TREMOR,
+  },
+  // Gearworks
+  factoryAlarm: {
+    name: 'Factory Alarm', icon: '🚨', line: 'FACTORY ALARM! Belts flip on every siren, presses slam on the beat!', warn: 4, dur: 18, weight: 3, cue: 'siren',
+    telegraph(sys, e) {
+      e.belts = sys.spots(e, 3, 0).map((p) => ({ ...p, len: 24 }));
+      e.presses = sys.spots(e, 2, 4).map((p) => ({ ...p, r: 2.7 }));
+      e.belts.forEach((p, i) => sys.layer('band').set(i, sys.tr.patch(p.s, p.s + p.len, -p.hw, p.hw, { lift: 0.05, segs: 6 })));
+      sys.layerColor('band', '#ffcf2a', 1.5);
+    },
+    begin(sys, e) {
+      sys.layer('band').clear();
+      e.belts.forEach((p, i) => sys.layer('lane').set(i, sys.tr.patch(p.s, p.s + p.len, -p.hw, p.hw, { lift: 0.06, segs: 8 })));
+      sys.layerColor('lane', '#ffb347', 1.6);
+      sys.sound('siren');
+      sys.shake(0.3);
+    },
+    update(sys, e, t, dt) {
+      const pl = sys.race.player, fr = sys.fr;
+      // Conveyors: forward for 5.5 s, then the siren and they run backwards, and so on.
+      const phase = Math.floor(t / 5.5);
+      sys.laneDir = phase % 2 ? -1 : 1;
+      if (phase !== e.phase) { e.phase = phase; e.paid = {}; if (phase) sys.sound('siren'); }
+      for (const k of sys.local()) {
+        if (!k.grounded || k.path !== sys.tr) continue;
+        for (const b of e.belts) {
+          const u = sys.ahead(b.s, k.trk.s);
+          if (u < 0 || u > b.len) continue;
+          sys.tr.frame(k.trk.s, fr);
+          if (sys.laneDir > 0 && k.vel.x * fr.tx + k.vel.z * fr.tz > k.baseTop * 1.15) continue;
+          k.vel.x += fr.tx * sys.laneDir * 7 * dt;
+          k.vel.z += fr.tz * sys.laneDir * 7 * dt;
+          if (k === pl && sys.laneDir > 0 && !e.paid[b.s]) { e.paid[b.s] = 1; sys.style('CONVEYOR RIDE', 12, 'gold'); }
+        }
+      }
+      // Presses: a 2.4 s beat. Hover, a quick slam, a moment down, then back up.
+      if (t < 5) return;
+      for (const c of e.presses) {
+        const idx = Math.floor((t - 5) / 2.4), ph = (t - 5) - idx * 2.4;
+        const h = ph < 1.1 ? 5.5 : ph < 1.25 ? lerp(5.5, 0, (ph - 1.1) / 0.15) : ph < 1.8 ? 0 : lerp(0, 5.5, (ph - 1.8) / 0.6);
+        sys.put('press', c.x, c.y + h + 2.3, c.z, 2.6, 0);
+        if (ph > 0.6 && ph < 1.9) sys.hazard(c.x, c.z, c.r);
+        if (ph >= 1.25 && c.cyc !== idx) {
+          c.cyc = idx;
+          if (sys.near(c.x, c.z, 50)) { sys.sound('thud'); sys.shake(0.25); }
+          sys.fx.burst(c.x, c.y + 0.4, c.z, ['#ffcf2a', '#ffffff', '#8a8f9c'], 10, 7, 0.5, 0.5, 10);
+          for (const k of sys.local()) if ((k.pos.x - c.x) ** 2 + (k.pos.z - c.z) ** 2 < c.r * c.r && Math.abs(k.pos.y - c.y) < 3) sys.hurt(k, 'spin');
+        }
+        // A popup for driving under a raised press and out the other side.
+        if (pl && !pl.remote) {
+          const d2 = (pl.pos.x - c.x) ** 2 + (pl.pos.z - c.z) ** 2;
+          if (d2 < c.r * c.r && h > 4) c.thru = true;
+          else if (c.thru && d2 > (c.r + 2.5) ** 2) { c.thru = false; if ((pl._evHit || -9) < sys.time - 1) sys.style('UNDER THE PRESS', 20, 'gold'); }
+        }
+      }
+    },
+    end(sys) { sys.layer('lane').clear(); },
+  },
+  // Maple Ridge
+  leafStorm: {
+    name: 'Leaf Storm', icon: '🍂', line: 'LEAF STORM! Leaves hide the line, find the calm eye for a boost!', warn: 5, dur: 17, weight: 3, cue: 'wind', vis: true,
+    telegraph(sys, e) { e.side = e.rand() < 0.5 ? -1 : 1; lanesMark(sys, e, 1, 26, { col: '#ffb347' }); },
+    begin(sys) { sys.sound('wind'); },
+    update(sys, e, t) {
+      const k = env(t, this.dur, 2, 3), gs = gust(t, 2.8, 2.2), pl = sys.race.player;
+      if (t > 5 && !e.live) lanesOpen(sys, e);
+      // The wind swirls (it changes side with every gust) and drops to almost nothing in the eye.
+      let calm = 1;
+      if (pl && !pl.remote) calm = 0.1 + 0.9 * smoothstep(10, 40, Math.abs(sys.ahead(e.lanes[0].s + 13, pl.trk.s)));
+      e.gust = gs.g * calm;
+      const dir = (gs.n % 2 ? -1 : 1) * e.side;
+      sys.mods.wind = dir * sys.amp * (2.4 + gs.g * 4.6) * k * calm;
+      sys.mods.traction = 1 - 0.04 * k;
+      sys.setVis(0.5 * k, '#b46a2c', '#ffd27a');
+      sys.storm(dir, k, '#e8742c', 4);
+      sys.storm(dir, k, '#ffb347', 3);
+      lanesPay(sys, e, 'EYE OF THE STORM', 25);
+    },
+    end: lanesClose,
+    kartEvent: surf('LEAF SURFER'),
+  },
+  // Neon Nebula
+  powerSurge: {
+    name: 'Power Surge', icon: '🔌', line: 'POWER SURGE! Lights out, follow the neon arrows, then the big show!', warn: 5, dur: 16, weight: 3, cue: 'siren', vis: true,
+    telegraph(sys, e) { lanesMark(sys, e, 3, 26, { col: '#39f5ff' }); },
+    begin(sys, e) { lanesOpen(sys, e); sys.sound('thunder'); },
+    update(sys, e, t) {
+      const pl = sys.race.player;
+      lanesPay(sys, e, 'LIGHTS OUT', 20);
+      lanesGlow(sys, e, ['#39f5ff', '#ff3dc8'], 1, 2);
+      // Blackout from 1.5 s to 8 s: the fog turns near-black but the road edge glows and the lane arrows stay lit.
+      const dark = smoothstep(0.3, 1.5, t) * (1 - smoothstep(7.2, 8.4, t));
+      if (dark > 0) sys.setVis(0.7 * dark, '#0b0620', '#39f5ff');
+      // Then the light show: four beats of colour.
+      if (t > 8.4) {
+        const beat = Math.floor((t - 8.4) / 1.3);
+        const col = ['#ff3dc8', '#39f5ff', '#ffd23f', '#9dff8a'][beat % 4];
+        if (beat !== e.beat && t < this.dur - 1) {
+          e.beat = beat;
+          sys.flash(0.16);
+          const base = pl ? pl.trk.s : e.lanes[0].s;
+          for (let i = 0; i < 3; i++) {
+            const q = sys.at(base + 25 + Math.random() * 60, (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 8), 8 + Math.random() * 8);
+            sys.fx.burst(q.x, q.y, q.z, [col, '#ffffff'], 24, 12, 0.9, 1, 4);
+          }
+          sys.sound('firework');
+        }
+        sys.setVis(0.2 * env(t - 8.4, this.dur - 8.4, 0.5, 1.5), col, col);
+      }
+    },
+    end: lanesClose,
+  },
+  // Cloud Carnival
+  fireworks: {
+    name: 'Fireworks Finale', icon: '🎆', line: 'FIREWORKS FINALE! Sparkle lanes light up, rainbow gusts push you along!', warn: 4, dur: 16, weight: 3, cue: 'chime',
+    telegraph(sys, e) { lanesMark(sys, e, sys.wild ? 5 : 4, 24, { col: '#ff9ae6' }); },
+    begin(sys, e) { lanesOpen(sys, e); sys.sound('firework'); },
+    update(sys, e, t) {
+      const k = env(t, this.dur, 1.5, 2.5), gs = gust(t, 3, 1.8), pl = sys.race.player;
+      e.gust = gs.g;
+      const dir = gs.n % 2 ? -1 : 1;
+      sys.mods.wind = dir * sys.amp * (1.2 + gs.g * 2.6) * k;
+      sys.storm(dir, k, ['#ff7ab8', '#ffd23f', '#7fe8ff', '#9dff8a'][Math.floor(sys.time * 3) % 4], 3);
+      lanesPay(sys, e, 'SPARKLE RUSH', 15);
+      lanesGlow(sys, e, ['#ffffff', '#ff9ae6', '#ffd23f', '#7fe8ff'], k, 6);
+      // A show in the sky ahead of the leading player.
+      const n = Math.floor(t / 0.75);
+      if (n !== e.nb && t < this.dur - 1.5) {
+        e.nb = n;
+        const q = sys.at((pl ? pl.trk.s : e.lanes[0].s) + 35 + Math.random() * 70, (Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 10), 14 + Math.random() * 10);
+        sys.fx.burst(q.x, q.y, q.z, [['#ff7ab8', '#ffd23f'], ['#7fe8ff', '#ffffff'], ['#9dff8a', '#ffd23f']][n % 3], 26, 13, 1, 1.2, 5);
+        if (n % 3 === 0) sys.sound('firework');
+      }
+    },
+    end: lanesClose,
+    kartEvent: surf('RAINBOW SURFER'),
+  },
+  // Glacier Gorge
+  iceQuake: {
+    name: 'Ice Quake', icon: '🧊', line: 'ICE QUAKE! Cracks run over the striped spots and the road turns to black ice!', warn: 4, dur: 15, weight: 3, cue: 'rumble',
+    telegraph(sys, e) {
+      e.cracks = sys.spots(e, sys.wild ? 4 : 3, 0).map((p) => ({ ...p, len: 22 + e.rand() * 8 }));
+      e.cracks.forEach((p, i) => sys.layer('band').set(i, sys.tr.patch(p.s, p.s + p.len, -p.hw, p.hw, { lift: 0.05, segs: 6 })));
+      sys.layerColor('band', '#9fe8ff', 1.6);
+      sys.shake(0.2);
+    },
+    begin(sys) { sys.sound('rumble'); sys.layer('ice').mat.color.set('#3b5068'); sys.layer('ice').mat.opacity = 0.9; },
+    update(sys, e, t) {
+      const pl = sys.race.player;
+      sys.mods.grip = 0.96;
+      e.cracks.forEach((c, i) => {
+        // One section at a time freezes, 2.6 s apart.
+        if (!c.on && t >= i * 2.6) {
+          c.on = true;
+          c.patch = sys.addPatch('ice', c.s, c.len, 0, c.hw * 2);
+          sys.layer('band').del(i);
+          sys.layer('ice').set(i, sys.tr.patch(c.s, c.s + c.len, -c.hw, c.hw, { lift: 0.05, segs: 6 }));
+          if (sys.near(c.x, c.z, 70)) { sys.sound('crack'); sys.shake(0.35); }
+          sys.fx.burst(c.x, c.y + 0.5, c.z, ['#ffffff', '#9fe8ff'], 18, 9, 0.6, 0.6, 10, false);
+        }
+        // A popup for gliding over a black-ice section without leaving the road.
+        if (c.on && pl && !pl.remote) {
+          const u = sys.ahead(c.s, pl.trk.s);
+          if (u >= 0 && u <= c.len) { c.in = true; if (pl.offroad) c.bad = true; }
+          else if (c.in) { c.in = false; if (!c.bad) sys.style('BLACK ICE SLIDE', 15, 'gold'); c.bad = false; }
+        }
+      });
+    },
+    end(sys, e) { for (const c of e.cracks || []) if (c.patch) sys.removePatch(c.patch); sys.layer('ice').clear(); },
+  },
+  // Obsidian Rush
+  glassCrack: {
+    name: 'Glass Crack', icon: '💎', line: 'GLASS CRACK! Panels flash, then crack, drive the safe side!', warn: 4, dur: 18, weight: 3, cue: 'crack',
+    telegraph(sys, e) {
+      e.panels = sys.spots(e, sys.wild ? 4 : 3, 0).map((p, i) => ({ ...p, len: 20, side: e.rand() < 0.5 ? -1 : 1, off: i * 1.3 }));
+      sys.layerColor('band', '#c9a8ff', 1.7);
+    },
+    begin(sys) { sys.sound('crack'); sys.layer('ice').mat.color.set('#4a2f8a'); sys.layer('ice').mat.opacity = 0.9; },
+    update(sys, e, t) {
+      const pl = sys.race.player;
+      e.panels.forEach((c, i) => {
+        // A learnable 4 s beat: the cracking half flashes for 1.3 s, cracks (low grip) for 1.8 s, then rests.
+        const ph = (((t - c.off) % 4) + 4) % 4, st = t < c.off ? 'rest' : ph < 1.3 ? 'flash' : ph < 3.1 ? 'crack' : 'rest';
+        if (st !== c.st) {
+          const half = () => sys.tr.patch(c.s, c.s + c.len, c.side > 0 ? 0 : -c.hw, c.side > 0 ? c.hw : 0, { lift: 0.05, segs: 5 });
+          if (c.st === 'crack') { sys.removePatch(c.patch); c.patch = null; sys.layer('ice').del(i); }
+          if (c.st === 'flash') sys.layer('band').del(i);
+          c.st = st;
+          if (st === 'flash') sys.layer('band').set(i, half());
+          if (st === 'crack') {
+            sys.layer('ice').set(i, half());
+            c.patch = sys.addPatch('ice', c.s, c.len, (c.side * c.hw) / 2, c.hw);
+            if (sys.near(c.x, c.z, 60)) sys.sound('crack');
+            sys.fx.burst(c.x + c.side * c.hw / 2, c.y + 0.5, c.z, ['#c9a8ff', '#ffffff'], 14, 8, 0.5, 0.6, 10, false);
+          }
+        }
+        // A popup for crossing a cracked panel on the safe half.
+        if (pl && !pl.remote && c.st === 'crack') {
+          const u = sys.ahead(c.s, pl.trk.s);
+          if (u >= 0 && u <= c.len) { c.in = true; if (Math.sign(pl.trk.d) === c.side) c.bad = true; }
+        } else if (pl && c.in && c.st !== 'crack') { c.in = false; if (!c.bad) sys.style('GLASS WALKER', 15, 'gold'); c.bad = false; }
+      });
+    },
+    end(sys, e) { for (const c of e.panels || []) if (c.patch) sys.removePatch(c.patch); sys.layer('ice').clear(); },
+  },
+  // Moonbase Loop
+  meteorShower: {
+    name: 'Meteor Shower', icon: '☄️', line: 'METEOR SHOWER! Craters pop up where the circles glow, gravity wobbles!', warn: 4, dur: 17, weight: 3, cue: 'siren', vis: true,
+    ...METEORS,
+  },
+  // Jungle Odyssey: the river leg (a boat) and the sky leg (a plane)
+  riverSurge: {
+    name: 'River Surge', icon: '🌊', line: 'RIVER SURGE! The current speeds up in the glowing channels, ride it!', warn: 4, dur: 14, weight: 3, cue: 'wave', leg: { zone: 1 },
+    ...streamEvent({ zone: 1, len: 30, col: '#7fe8ff', sound: 'wave', label: 'RIDE THE SURGE', glow: ['#ffffff', '#7fe8ff'], foam: true }),
+  },
+  jetStream: {
+    name: 'Jet Stream', icon: '💨', line: 'JET STREAM! Fly through the glowing lanes for a boost!', warn: 4, dur: 14, weight: 3, cue: 'wind', leg: { zone: 2 },
+    ...streamEvent({ zone: 2, len: 36, col: '#c9efff', margin: 5, sound: 'wind', label: 'JET STREAM', glow: ['#ffffff', '#c9efff'] }),
+  },
+  // Island Hopper: the canal leg (a boat) and the volcano leg (the road)
+  harborSwell: {
+    name: 'Harbor Swell', icon: '🌊', line: 'HARBOR SWELL! Big swells roll down the canal, catch one!', warn: 4, dur: 14, weight: 3, cue: 'wave', leg: { zone: 1 },
+    ...streamEvent({ zone: 1, len: 26, col: '#7fe8ff', sound: 'wave', label: 'SWELL RIDER', glow: ['#ffffff', '#7fe8ff'], foam: true, move: 9 }),
+  },
+  ashCloud: {
+    name: 'Ash Cloud', icon: '🌋', line: 'ASH CLOUD! Smoke rolls over the climb, ride the lit lanes through it!', warn: 4, dur: 15, weight: 3, cue: 'rumble', vis: true, leg: { leg: 1 },
+    ...streamEvent({ len: 18, col: '#ffd23f', margin: 3, sound: 'rumble', label: 'ASH DASH', glow: ['#ffb347', '#ffd23f'], vis: 0.55, fog: '#5a4a48', edge: '#ff8a3a', ash: '#9a8a86' }),
+  },
+  // Balloon Battle arenas (events here only shove, slow and hop karts; the battle rules decide every balloon)
+  stampede: {
+    name: 'Hay Stampede', icon: '🐄', line: 'STAMPEDE! Hay carts roll over the striped lines, find the gaps!', warn: 4, dur: 16, weight: 3, cue: 'rumble',
+    cross: { put: 'hay', n: 3, step: 7, stagger: 0.45, cross: 4.2, period: 5, y: 1.3, r: 1.7, kind: 'bump', scale: 1.1, label: 'HAY HOPPER', dur: 16, roll: true },
+    telegraph(sys, e) {
+      e.spots = sys.spots(e, 4, 0).map((p) => ({ ...p, side: e.rand() < 0.5 ? -1 : 1 }));
+      crossMarks(sys, e, this.cross, '#ffcf2a');
+    },
+    begin(sys) { sys.sound('rumble'); },
+    update(sys, e, t) { cross(sys, e, t, this.cross); sys.shake(0.08); },
+    end() {},
+  },
+  whiteout: {
+    name: 'Whiteout', icon: '❄️', line: 'WHITEOUT! Gusts shove you about, follow the glowing rim!', warn: 4, dur: 16, weight: 3, cue: 'wind', vis: true,
+    telegraph(sys, e) { e.side = e.rand() < 0.5 ? -1 : 1; },
+    begin(sys) { sys.sound('wind'); },
+    update(sys, e, t) {
+      const k = env(t, this.dur, 2, 3), gs = gust(t, 3.6, 1.8);
+      const dir = (gs.n % 2 ? -1 : 1) * e.side;
+      e.gust = gs.g;
+      sys.mods.wind = dir * sys.amp * (2.2 + gs.g * 4.4) * k;
+      sys.mods.traction = 1 - 0.05 * k;
+      sys.setVis(0.62 * k, '#eef4ff');
+      sys.storm(dir, k, '#ffffff', 6);
+      if (gs.g > 0.6 && !e.gusted?.[gs.n]) { (e.gusted ||= {})[gs.n] = 1; sys.sound('wind'); }
+    },
+    end() {},
+    kartEvent: surf('GUST SURFER'),
+  },
+  overload: {
+    name: 'Overload', icon: '⚡', line: 'OVERLOAD! Lasers spin faster, boost strips flash on!', warn: 4, dur: 14, weight: 3, cue: 'siren',
+    telegraph(sys, e) { lanesMark(sys, e, sys.wild ? 5 : 4, 24, { col: '#ff3dc8', margin: 6 }); },
+    begin(sys, e) {
+      lanesOpen(sys, e);
+      sys.sound('thunder');
+      e.lasers = sys.race.items.obstacles.filter((o) => o.type === 'laser').map((o) => ({ o, base: o.speed }));
+    },
+    update(sys, e, t) {
+      // Faster lasers, with the phase kept so they never jump.
+      const T = sys.race.session ? sys.race.netClock : sys.race.time;
+      const m = 1 + 0.7 * env(t, this.dur, 1.5, 2);
+      for (const l of e.lasers) { const v = l.base * m; l.o.ph += T * (l.o.speed - v); l.o.speed = v; }
+      lanesPay(sys, e, 'OVERCHARGE', 15);
+      lanesGlow(sys, e, ['#ff3dc8', '#39f5ff'], 1, 2);
+    },
+    end(sys, e) {
+      const T = sys.race.session ? sys.race.netClock : sys.race.time;
+      for (const l of e.lasers || []) { l.o.ph += T * (l.o.speed - l.base); l.o.speed = l.base; }
+      lanesClose(sys, e);
+    },
+  },
+  craterMeteors: {
+    name: 'Meteor Strike', icon: '☄️', line: 'METEOR STRIKE! Craters pop up where the circles glow, hop the bumps!', warn: 4, dur: 16, weight: 3, cue: 'siren', vis: true,
+    ...CRATER_METEORS,
+  },
+});
+// Sandcastle Cove: the tide of Coral Cove, flooding the outer rim of the bowl in long arcs.
+EVENTS.tideRush = {
+  ...EVENTS.tide,
+  name: 'Tide Rush', line: 'TIDE RUSH! The sea floods the outer rim, stay inland or ride the crest!', warn: 5, dur: 18,
+  telegraph(sys, e) {
+    const tr = sys.tr, fr = sys.fr;
+    e.zones = sys.spots(e, 3, 0).map((p) => ({ ...p, len: 70 }));
+    e.zones.forEach((z, i) => {
+      tr.frame(z.s + z.len / 2, fr);
+      z.hw = fr.hw;
+      z.sea = Math.sign(fr.x * fr.rx + fr.z * fr.rz) || 1; // the outer side of the ring
+      sys.layer('water').set(i, tr.patch(z.s, z.s + z.len, z.sea * fr.hw, -z.sea * fr.hw, { lift: 0.05, segs: 10 }));
+    });
+  },
+};
+
+// Where in the race (fractions of its time) an adventure leg is: { zone: 1 | 2 } or { leg: index }.
+// Time follows distance roughly; `skew` stretches it where karts are slower or faster than average.
+export function legWindow(tr, lg) {
+  const L = tr.length, z = lg.zone && tr.zones.find((q) => q.kind === lg.zone);
+  const a = z ? z.s0 : tr.legs[lg.leg] ? tr.legs[lg.leg].s : 0, b = z ? z.s0 + z.len : tr.legs[lg.leg + 1] ? tr.legs[lg.leg + 1].s : L;
+  return [clamp(a / L * (lg.skew || 1), 0, 1), clamp(b / L * (lg.skew || 1), 0, 1)];
+}
+
 // ---------------------------------------------------------------- the runner
 export class TrackEvents {
   // Returns null when this race has no events (time trials, the menu demo, Off, a track with none).
@@ -469,7 +1131,9 @@ export class TrackEvents {
     if (mode !== 'normal' && mode !== 'wild') return null;
     if (race.mode === 'tt' || race.mode === 'demo' || !ids || !ids.length) return null;
     const raceT = race.battle ? race.battle.timeLeft || BATTLE_TIME : estRaceTime(race.track.length, race.laps, race.speedClass.top);
-    const sched = schedule(opts.evSeed >>> 0, mode, ids, raceT);
+    const wins = {};
+    for (const id of ids) if (EVENTS[id].leg) wins[id] = legWindow(race.track, EVENTS[id].leg);
+    const sched = schedule(opts.evSeed >>> 0, mode, ids, raceT, wins);
     return sched.length ? new TrackEvents(race, sched, mode) : null;
   }
 
@@ -482,7 +1146,11 @@ export class TrackEvents {
     this.wild = mode === 'wild';
     this.amp = this.wild ? 1.2 : 1;
     this.fr = {};
+    this._f2 = {};
+    this._v = new THREE.Vector3();
     this.time = 0;
+    this.laneDir = 1;
+    this.edgeCol = '#ffcf6a';
     this.cur = null;
     this.hazards = [];
     this.mods = { grip: 1, traction: 1, gravity: 1, wind: 0 };
@@ -523,12 +1191,20 @@ export class TrackEvents {
 
   // n spots spread round the main lap from the event's own random numbers,
   // `margin` metres in from the edges (0: the middle), off ramps, gaps, water and sky.
-  spots(e, n, margin) {
+  // `within` limits them to a stretch: { zone: 1 | 2 } (a river or sky lane) or { s0, s1 }; `room` keeps that much road after each spot.
+  spots(e, n, margin, within = null, room = 0) {
     const tr = this.tr, fr = this.fr, L = tr.length, out = [];
+    let a = 0, b = L;
+    if (within) {
+      const z = within.zone && tr.zones.find((q) => q.kind === within.zone);
+      if (within.zone && !z) return out;
+      a = z ? z.s0 + 8 : within.s0;
+      b = z ? z.s0 + z.len : within.s1;
+    }
     for (let i = 0; i < n; i++) {
-      let s = ((i + 0.15 + e.rand() * 0.7) / n) * L;
+      let s = within ? a + ((i + 0.15 + e.rand() * 0.7) / n) * Math.max(1, b - a - room) : ((i + 0.15 + e.rand() * 0.7) / n) * L;
       const u = e.rand() * 2 - 1;
-      for (let k = 0; k < 20 && ((tr.zones.length && tr.zoneAt(s)) || (tr.voids.length && tr.isVoid(s)) || tr.rampHeight(s, 0) > 0 || s < 30 || s > L - 15); k++) s = (s + 9) % L;
+      for (let k = 0; !within && k < 20 && ((tr.zones.length && tr.zoneAt(s)) || (tr.voids.length && tr.isVoid(s)) || tr.rampHeight(s, 0) > 0 || s < 30 || s > L - 15); k++) s = (s + 9) % L;
       tr.frame(s, fr);
       const d = margin ? u * Math.max(0, fr.hw - margin) : 0;
       out.push({ s, d, hw: fr.hw, x: fr.x + fr.rx * d, z: fr.z + fr.rz * d, y: tr.heightAtFrame(fr, d) });
@@ -542,6 +1218,8 @@ export class TrackEvents {
     if (name === 'ring') mat = glowBasic(ringTex(), '#ff7a1a', 2, { blending: THREE.AdditiveBlending });
     else if (name === 'band') mat = glowBasic(bandTex(), '#ff5a5f', 1.4);
     else if (name === 'lava') mat = glowBasic(blobTex(), '#ff8a2a', 2.2);
+    else if (name === 'syrup') mat = glowBasic(blobTex('rgba(255,236,246,1)', 'rgba(255,120,190,0.95)', 'rgba(200,40,120,0.85)', 'rgba(120,10,70,0)'), '#ffffff', 1.5);
+    else if (name === 'crater') mat = glowBasic(blobTex('rgba(25,25,35,0.9)', 'rgba(55,55,70,0.85)', 'rgba(225,228,240,0.95)', 'rgba(225,228,240,0)'), '#ffffff', 1.1);
     else if (name === 'water') { mat = glowBasic(waterTex(), '#ffffff', 1); this.waterTex = mat.map; order = 1; }
     else if (name === 'lane') { mat = glowBasic(TX.boostTexture(), '#ffffff', 1.8); mat.map.repeat.set(1, 2); this.laneTex = mat.map; }
     else if (name === 'edge') { mat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffcf6a').multiplyScalar(2.2), transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }); order = 3; }
@@ -551,23 +1229,52 @@ export class TrackEvents {
   layerColor(name, col, k) { const l = this.layers[name]; if (l) l.mat.color.set(col).multiplyScalar(k); }
   waterline(cov) { this.layer('water'); this.waterTex.offset.x = 0.5 - cov; }
 
-  // Instanced props drawn this frame (meteors, snow lumps): one draw call each.
-  put(name, x, y, z, s = 1, rot = 0) {
+  // Instanced props drawn this frame (meteors, snow lumps, ghosts...): one draw call per kind.
+  // Kinds: [obstacle model, material, how `rot` turns it: spin (yaw), tumble, roll].
+  put(name, x, y, z, s = 1, rot = 0, yaw = 0) {
     let it = this.inst[name];
     if (!it) {
-      const items = this.race.items;
-      const geo = name === 'meteor' ? items.geo.obs.fireball : items.geo.obs.snowball;
-      const mesh = new THREE.InstancedMesh(geo, name === 'meteor' ? items.glowMat : items.mat, 48);
+      const items = this.race.items, def = INST[name];
+      const geo = def[0] === 'twister' ? items.geo.twister : def[0] === 'crate' ? items.geo.crate : items.geo.obs[def[0]];
+      const mesh = new THREE.InstancedMesh(geo, def[1] === 'glow' ? items.glowMat : def[1] === 'twister' ? items.twisterMat : items.mat, POOL);
       mesh.frustumCulled = false;
       mesh.count = 0;
       this.group.add(mesh);
-      it = this.inst[name] = { mesh, n: 0 };
+      it = this.inst[name] = { mesh, n: 0, how: def[2] };
     }
-    if (it.n >= 48) return;
-    this._e.set(rot, rot * 0.7, 0);
+    if (it.n >= POOL) return;
+    if (it.how === 'spin') this._e.set(0, rot, 0);
+    else if (it.how === 'roll') this._e.set(rot, yaw, 0, 'YXZ');
+    else this._e.set(rot, rot * 0.7, 0);
     this._q.setFromEuler(this._e);
     this._m.compose(this._p.set(x, y, z), this._q, this._s.setScalar(s));
     it.mesh.setMatrixAt(it.n++, this._m);
+  }
+  // World position of a spot on the road (s along, d across, `up` above the surface).
+  at(s, d, up = 0) {
+    const fr = this._f2;
+    this.tr.frame(s, fr);
+    return this._v.set(fr.x + fr.rx * d, this.tr.heightAtFrame(fr, clamp(d, -fr.hw, fr.hw)) + up, fr.z + fr.rz * d);
+  }
+  // The inside of the next bend: where a good driver would aim.
+  bestD(s, margin = 3) {
+    const a = this._f2, b = {};
+    this.tr.frame(s, a);
+    this.tr.frame(s + 14, b);
+    return clamp(((b.tx - a.tx) * a.rx + (b.tz - a.tz) * a.rz) * 60, -(a.hw - margin), a.hw - margin);
+  }
+  // A shove from an event. Races: the kart's own hit (a spin or a bump).
+  // Balloon Battle: balloons are decided by the battle rules, so an event only knocks the kart aside, slows it and hops it.
+  hurt(k, kind = 'bump') {
+    k._evHit = this.time;
+    if (!this.race.battle) return k.hit(kind);
+    if (k.starTime > 0 || k.rocketTime > 0 || k.ghostTime > 0 || k.finishedLock || (k._evHurt || -9) > this.time - 1.5) return false;
+    k._evHurt = this.time;
+    k.vel.x *= 0.55;
+    k.vel.z *= 0.55;
+    k.slip(0.9);
+    if (k.grounded) { k.vy = 3; k.grounded = false; }
+    return true;
   }
 
   // A timed road patch (ice, mud, sand, oil): karts read it like the track's own.
@@ -592,7 +1299,7 @@ export class TrackEvents {
 
   // Visibility: fog closes in and the sky takes the storm's colour. The fog
   // never closes nearer than 55 m, and glowing strips mark the road edges.
-  setVis(v, col) { if (v > this.vis) { this.vis = v; this.visCol.set(col); } }
+  setVis(v, col, edge = '#ffcf6a') { if (v > this.vis) { this.vis = v; this.visCol.set(col); this.edgeCol = edge; } }
   _applyVis(v) {
     const b = this.base, w = this.race.world;
     v = clamp(v, 0, 0.85);
@@ -610,6 +1317,7 @@ export class TrackEvents {
       const L = this.layers.edge;
       L.flush();
       L.mat.opacity = smoothstep(0.1, 0.5, v) * 0.85;
+      L.mat.color.set(this.edgeCol).multiplyScalar(2.2);
       L.mesh.visible = L.mat.opacity > 0;
     }
   }
@@ -698,8 +1406,8 @@ export class TrackEvents {
     // Warning marks pulse.
     for (const n of ['ring', 'band']) if (this.layers[n]) this.layers[n].mat.opacity = 0.72 + 0.28 * Math.sin(this.time * 9);
     for (const l of Object.values(this.layers)) l.flush();
-    for (const it of Object.values(this.inst)) { it.mesh.count = it.n; it.mesh.instanceMatrix.needsUpdate = true; }
-    if (this.laneTex) this.laneTex.offset.y = (this.laneTex.offset.y - dt * 1.6) % 1;
+    for (const it of Object.values(this.inst)) { it.mesh.count = it.n; it.mesh.visible = it.n > 0; it.mesh.instanceMatrix.needsUpdate = true; }
+    if (this.laneTex) this.laneTex.offset.y = (this.laneTex.offset.y - dt * 1.6 * this.laneDir) % 1;
   }
 
   _end(e) {
@@ -710,6 +1418,12 @@ export class TrackEvents {
     if (this.wallMesh) this.wallMesh.visible = false;
     if (this.base.wvel && this.race.world.weather) this.race.world.weather.mat.uniforms.vel.value.copy(this.base.wvel);
     this.race.evMods = null;
+    this.laneDir = 1;
+    // Whatever an event forgot: no timed patches, boost lanes or marks left behind.
+    const tr = this.tr;
+    tr.patches = tr.patches.filter((p) => !p.ev);
+    tr.boosts = tr.boosts.filter((b) => !b.ev);
+    for (const [n, l] of Object.entries(this.layers)) if (n !== 'edge') l.clear();
   }
 
   // A kart event from the race loop (drift boosts for gust surfing).
