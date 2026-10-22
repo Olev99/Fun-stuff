@@ -1,7 +1,7 @@
 // Balance report for races: runs AI-only 8-kart races headlessly and prints
 // how close, how swingy and how item-driven they are.
 //
-//   node zoomies/tools/balance.mjs [--tracks a,b,c] [--diffs normal,hard] [--n 3] [--seed 1]
+//   node zoomies/tools/balance.mjs [--tracks a,b,c] [--diffs normal,hard] [--n 3] [--seed 1] [--events off|normal|wild]
 //   node zoomies/tools/balance.mjs > zoomies/tools/balance-baseline.txt
 //
 // Needs `npm install` in tools/tests once. Starts its own static server unless
@@ -17,9 +17,10 @@ const n = +arg('n', 3), seed = +arg('seed', 1);
 // --tuned: the computer-driven player runs a fully fitted ride (classic: 3 sockets; bolt: 5) instead of stock stats.
 const KITS = { boltstock: { body: 'bolt', parts: [] }, classic: { body: 'classic', parts: ['engine3', 'turbo3', 'tyres3'] }, bolt: { body: 'bolt', parts: ['engine3', 'turbo3', 'tyres3', 'armor3', 'driftSpring'] } };
 const kit = KITS[arg('tuned', '')] || null;
-const recs = await runRaces({ tracks, diffs, n, seed, kit, log: (s) => console.error(s) });
+const events = arg('events', 'off'); // track events (the baseline is measured with them off)
+const recs = await runRaces({ tracks, diffs, n, seed, kit, events, log: (s) => console.error(s) });
 const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : 'n/a');
-console.log(`Balance report: ${tracks.length} tracks x ${diffs.join('+')} x ${n} races, seed ${seed}, 8 karts, mixed racers, the player kart is computer-driven too.`);
+console.log(`Balance report: ${tracks.length} tracks x ${diffs.join('+')} x ${n} races, seed ${seed}, 8 karts, mixed racers, the player kart is computer-driven too, track events ${events}.`);
 console.log(`tracks: ${tracks.join(', ')}\n`);
 for (const diff of [...diffs, 'all']) {
   const rs = diff === 'all' ? recs : recs.filter((r) => r.diff === diff);

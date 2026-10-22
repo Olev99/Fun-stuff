@@ -740,6 +740,16 @@ export class UI {
       saveSettings(s());
       this._syncSettings();
     });
+    for (const [id, key] of [['set-events', 'trackEvents'], ['set-evwarn', 'evWarn']]) {
+      $(id).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v]');
+        if (!b) return;
+        app.audio.play('select');
+        s()[key] = b.dataset.v;
+        saveSettings(s());
+        this._syncSettings();
+      });
+    }
     $('set-tags').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;
@@ -777,6 +787,8 @@ export class UI {
     document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
     document.querySelectorAll('#set-assist [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.assist || 'off')));
     document.querySelectorAll('#set-shake [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.shake || 'normal')));
+    document.querySelectorAll('#set-events [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.trackEvents || 'normal')));
+    document.querySelectorAll('#set-evwarn [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.evWarn || 'full')));
     $('set-sens').value = s.tiltSens;
     $('set-invert').checked = s.invertTilt;
     $('set-music').checked = s.music;

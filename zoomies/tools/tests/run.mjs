@@ -34,6 +34,7 @@ const SUITES = {
   racers: ['racers.mjs', [], 6],
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
+  events: ['events.mjs', [], 25],
   shortcuts: ['shortcuts.mjs', [], 25],
   finish: ['finish.mjs', [], 12],
   phase2: ['phase2.mjs', [], 20],
@@ -86,7 +87,7 @@ let plan;
 if (argv[0] && SUITES[argv[0]]) plan = [[argv[0], argv.length > 1 ? argv.slice(1) : null]];
 else plan = (argv[0] === 'full' ? Object.keys(SUITES).filter((n) => n !== 'visual-audit' && n !== 'balance') : QUICK).map((n) => [n, null]);
 
-for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv', 'fin']) await mkdir(join(out, d), { recursive: true });
+for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv', 'fin', 'ev']) await mkdir(join(out, d), { recursive: true });
 const srv = await serve();
 const results = [];
 for (const [name, args] of plan) {

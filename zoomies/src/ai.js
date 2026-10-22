@@ -70,6 +70,7 @@ export class AIDriver {
       };
       for (const h of this.race.items.hazards) check(h.pos.x, h.pos.z, h.r || 1.6);
       for (const o of this.race.items.obstacles) check(o.pos.x, o.pos.z, o.def.r);
+      if (this.race.evs) for (const h of this.race.evs.hazards) check(h.pos.x, h.pos.z, h.r); // track events
     }
     this.dodge += (avoid - this.dodge) * Math.min(1, dt * 3);
 
