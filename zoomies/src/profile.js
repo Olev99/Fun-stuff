@@ -1,4 +1,5 @@
 import { TRACKS, trackById } from './tracks.js';
+import { ARENAS } from './arenas.js';
 import { BODY_LIST } from './karts.js';
 import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
@@ -124,7 +125,8 @@ export function grant(c, coins, xp) {
 export const MAX_EV_SEEN = 60;
 export function addEvSeen(c, ids) {
   c.evSeen = Array.isArray(c.evSeen) ? c.evSeen : [];
-  for (const id of ids || []) if (typeof id === 'string' && id.length <= 24 && !c.evSeen.includes(id) && c.evSeen.length < MAX_EV_SEEN) c.evSeen.push(id);
+  const known = new Set([...TRACKS, ...ARENAS].flatMap((t) => t.events || []));
+  for (const id of ids || []) if (known.has(id) && !c.evSeen.includes(id) && c.evSeen.length < MAX_EV_SEEN) c.evSeen.push(id);
 }
 // Each track's signature event is the first in its list.
 export const SIGNATURE_EVENTS = [...new Set(TRACKS.filter((t) => t.events && t.events.length).map((t) => t.events[0]))];

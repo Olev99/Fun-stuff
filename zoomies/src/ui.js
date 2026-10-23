@@ -580,7 +580,7 @@ export class UI {
     $('class-seg').hidden = this.mode === 'tt';
     $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
-    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
+    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats and no track events in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
     this._syncClass();
     this._renderTrackCards();
     this.show('track');
