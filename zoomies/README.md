@@ -133,8 +133,24 @@ Things happen during a race, always announced first: a banner with an icon, a li
 - **Magma Mountain: Eruption.** The ground shakes, ash darkens the sky and short boost lanes open up through the smoke (**ASH DASH**).
 - **Dune Dash Canyon: Sandstorm.** A wall of dust rolls in, the wind pushes you towards one side and the view closes in, but the road edges glow. Gusts can be surfed like in the blizzard.
 - **Coral Cove and Tidal Twist: Rising Tide.** Waves wash over parts of the boardwalk with a clear foam line. Water slows you; keep to the dry side, or cross the crest as it rolls in for a boost (**STORM SURFER**).
+- **Sprout Speedway: Harvest Gust.** A crosswind sweeps petals and hay over the road; let a drift boost go in a gust for **GUST SURFER**.
+- **Blossom Gardens: Lantern Festival.** Lantern-lit boost lanes appear along the best line for a few seconds (**LANTERN LIGHT**).
+- **Sweet Tooth Valley: Syrup Shower.** Syrup lands on the pink circles and leaves sticky, slow puddles for 8 seconds. Drive through a candy spark to wipe the puddles round it (**SWEET RELIEF**).
+- **Windmill Downs: Twister Crossing.** A twister wanders across the field and the road over a striped path. A hit is a hop-spin, never a stall; wait it out for **TWISTER DANCE**.
+- **Spooky Hollow: Ghost Parade.** Friendly ghosts float across the road in diagonal rows while fog rolls in and lantern light marks the edges. Slip through for **BOO-GIE**.
+- **Jungle Ruins: Temple Tremor.** The ground shakes and boulders drop on marked circles; then the temple gate opens a boost lane (**TEMPLE RUSH**).
+- **Gearworks: Factory Alarm.** Conveyor strips push you forward, then reverse on every siren (**CONVEYOR RIDE**), and presses slam down on a 2.4-second beat (**UNDER THE PRESS**).
+- **Maple Ridge: Leaf Storm.** Swirling gusts of leaves push you sideways and hide the line; the wind drops in the eye, where a boost lane forms (**EYE OF THE STORM**).
+- **Neon Nebula: Power Surge.** The city blacks out for a few seconds, only the road edges, lane lights and boost arrows glow (**LIGHTS OUT**), then a big light show.
+- **Cloud Carnival: Fireworks Finale.** Fireworks light the sky and sparkle lanes open (**SPARKLE RUSH**); rainbow gusts push you along (**RAINBOW SURFER**).
+- **Glacier Gorge: Ice Quake.** Cracks run over striped sections one after another and each turns to black ice (**BLACK ICE SLIDE** for staying on the road).
+- **Obsidian Rush: Glass Crack.** Panels flash, then crack on a 4-second beat; the cracked half has low grip, so drive the safe side (**GLASS WALKER**).
+- **Moonbase Loop: Meteor Shower.** Meteors land on marked circles and leave craters that are small bumps; gravity pulses lower (**MOON HOP**) and a solar flare tints the sky.
+- **Jungle Odyssey: River Surge** (the boat leg) and **Jet Stream** (the sky leg). Glowing lanes give a boost if you ride them (**RIDE THE SURGE**, **JET STREAM**).
+- **Island Hopper: Harbor Swell** (the canal leg: swells roll down the canal, **SWELL RIDER**) and **Ash Cloud** (the volcano leg: smoke and lit lanes, **ASH DASH**).
+- **Balloon Battle arenas:** **Hay Stampede** (Barnyard Bowl: hay carts roll over marked lines), **Whiteout** (Snowglobe Rink: gusts and snow), **Overload** (Neon Pinball: faster lasers, boost strips flash on), **Tide Rush** (Sandcastle Cove: the sea floods the outer rim) and **Meteor Strike** (Moon Crater: marked impacts leave bumps). Arena events only shove, slow and hop karts; they never pop a balloon.
 
-Fair play: no event in the countdown, before 25 seconds, in the last 8% of a race or within 20 seconds of the last one, and only one at a time. **Settings → Track events** (Off, Normal or Wild; Normal by default) works in Quick Race, Grand Prix and Balloon Battle (no arena has an event yet); online, the host's setting counts and every phone sees the same events at the same moments. Wild brings more events and stronger ones. **Settings → Event warnings** (Full or Short): Short shows just the name and a 3-second countdown. Time Trial (and its medals) and Driving School never have events; the Career, the Daily Challenge and the Weekly Cup stay calm for now.
+Fair play: no event in the countdown, before 25 seconds, in the last 8% of a race or within 20 seconds of the last one, and only one at a time. **Settings → Track events** (Off, Normal or Wild; Normal by default) works in Quick Race, Grand Prix and Balloon Battle; online, the host's setting counts and every phone sees the same events at the same moments. Wild brings more events and stronger ones. **Settings → Event warnings** (Full or Short): Short shows just the name and a 3-second countdown. Time Trial (and its medals) and Driving School never have events; the Career, the Daily Challenge and the Weekly Cup stay calm for now.
 
 ## First steps
 

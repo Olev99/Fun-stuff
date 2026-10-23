@@ -568,8 +568,9 @@ function rain(cfg) {
           const f = (c.hit - t) / 0.8;
           if (f < 1) {
             const y = c.y + 0.6 + f * 38;
-            sys.put(cfg.fall, c.x + f * 8, y, c.z + f * 5, cfg.fs, sys.time * 6);
-            sys.fx.glow.emit(c.x + f * 8, y + 1, c.z + f * 5, 0, 2, 0, cfg.dust[(Math.random() * cfg.dust.length) | 0], 1.2, 0.2, 0.5, 0, 1);
+            if (cfg.fall) sys.put(cfg.fall, c.x + f * 8, y, c.z + f * 5, cfg.fs, sys.time * 6);
+            // (a glowing blob when there is no model: no triangles and no extra draw call)
+            sys.fx.glow.emit(c.x + f * 8, y + 1, c.z + f * 5, 0, 2, 0, cfg.dust[(Math.random() * cfg.dust.length) | 0], cfg.fall ? 1.2 : 3.2, 0.2, 0.5, 0, 1);
           }
           if (t < c.hit) {
             sys.hazard(c.x, c.z, t > c.hit - 1 ? c.r : 0.1);
@@ -614,7 +615,7 @@ function craterBump(sys, c) {
   }
 }
 const impactMeteors = (o) => rain({
-  waves: 4, gap: 2.5, every: 140, r: 2.4, life: 1e6, ring: '#ff8a3a', fall: 'meteor', fs: 0.9, dust: ['#c9ccd6', '#8a8fa0', '#ffd23f'], dodge: 'DODGED!', sound: 'rumble', thump: 'boom', soft: true,
+  waves: 4, gap: 2.5, every: 140, r: 2.4, life: 1e6, ring: '#ff8a3a', fall: null, dust: ['#c9ccd6', '#8a8fa0', '#ffd23f'], dodge: 'DODGED!', sound: 'rumble', thump: 'boom', soft: true,
   land(sys, e, c, i) { sys.layer('crater').set(i, sys.tr.patch(c.s - c.r, c.s + c.r, c.d - c.r, c.d + c.r, { lift: 0.06, segs: 3 })); },
   hit: (sys, k) => sys.hurt(k, 'spin'),
   live: (sys, e, c) => craterBump(sys, c),
@@ -634,7 +635,7 @@ const impactMeteors = (o) => rain({
 const METEORS = impactMeteors({ dur: 17, gravity: true });
 const CRATER_METEORS = impactMeteors({ dur: 16, gravity: false });
 const SYRUP = rain({
-  waves: 4, gap: 2.4, every: 150, r: 2.6, life: 8, ring: '#ff5fa8', fall: 'gumball', fs: 0.7, dust: ['#ff7ab8', '#ffffff', '#7fe8ff'], dodge: 'SWEET DODGE!', sound: 'honey', thump: 'honey',
+  waves: 4, gap: 2.4, every: 150, r: 2.6, life: 8, ring: '#ff5fa8', fall: null, dust: ['#ff7ab8', '#ffffff', '#7fe8ff'], dodge: 'SWEET DODGE!', sound: 'honey', thump: 'honey',
   land(sys, e, c, i) {
     sys.layer('syrup').set(i, sys.tr.patch(c.s - c.r, c.s + c.r, c.d - c.r, c.d + c.r, { lift: 0.06, segs: 3 }));
     c.patch = sys.addPatch('mud', c.s - c.r, c.r * 2, c.d, c.r * 2);
@@ -802,7 +803,7 @@ Object.assign(EVENTS, {
       e.spots = sys.spots(e, 3, 0).map((p) => ({ ...p, side: e.rand() < 0.5 ? -1 : 1 }));
       crossMarks(sys, e, this.cross, '#9dff8a');
     },
-    begin(sys) { sys.sound('ghost'); },
+    begin(sys) { sys.layer('band').clear(); sys.sound('ghost'); }, // the ghosts show the pattern now
     update(sys, e, t) {
       // Fog rolls in; lantern light marks the road edges.
       sys.setVis(0.5 * env(t, this.dur, 3, 3), '#2a2a52', '#8affc4');
