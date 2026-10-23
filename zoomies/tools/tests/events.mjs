@@ -109,7 +109,8 @@ ok(hostile.good, 'a valid seed and mode pass through');
 const prep = () => {
   window.evStart = (tid, seed, mode = 'normal', extra = {}) => {
     const a = window.zoomies;
-    a.startRace({ mode: 'quick', trackId: tid, reverse: false, player: 'mochi', speedClass: 'zoom', evMode: mode, evSeed: seed, ...extra });
+    const arena = ['barnyard', 'snowglobe', 'pinball', 'sandcastle', 'crater'].includes(tid);
+    a.startRace({ mode: arena ? 'battle' : 'quick', trackId: tid, reverse: false, player: 'mochi', speedClass: 'zoom', evMode: mode, evSeed: seed, ...extra });
     a.paused = true;
     const r = a.race;
     r.skipIntro = true;
@@ -273,19 +274,26 @@ await B.close();
 
 // ---- 7. screenshots (warning, peak, end) and draw calls ----
 await A.evaluate(async () => { window.evMod = await import('./src/events.js'); });
-const SHOTS = [['frost', 'blizzard'], ['frost', 'avalanche'], ['magma', 'lavaRain'], ['magma', 'eruption'], ['dunes', 'sandstorm'], ['coral', 'tide'], ['tidal', 'tide']];
-for (const [tid, id] of SHOTS) {
+const SHOTS = [['frost', 'blizzard'], ['frost', 'avalanche'], ['magma', 'lavaRain'], ['magma', 'eruption'], ['dunes', 'sandstorm'], ['coral', 'tide'], ['tidal', 'tide'],
+  ['sprout', 'harvestGust'], ['blossom', 'lanternFest'], ['candy', 'syrupShower'], ['downs', 'twisterCrossing'], ['hollow', 'ghostParade'], ['jungle', 'templeTremor'],
+  ['gear', 'factoryAlarm'], ['maple', 'leafStorm'], ['neon', 'powerSurge'], ['cloud', 'fireworks'], ['glacier', 'iceQuake'], ['obsidian', 'glassCrack'], ['moon', 'meteorShower'],
+  ['odyssey', 'riverSurge'], ['odyssey', 'jetStream'], ['hopper', 'harborSwell'], ['hopper', 'ashCloud'],
+  ['barnyard', 'stampede'], ['snowglobe', 'whiteout'], ['pinball', 'overload'], ['sandcastle', 'tideRush'], ['crater', 'craterMeteors']];
+// Seconds into the effect that show an event at its best (default: 45% of it).
+const PEAK = { tide: 3.2, tideRush: 3.5, powerSurge: 4.5, glassCrack: 2.2, factoryAlarm: 7.4, templeTremor: 10, twisterCrossing: 6.3, ghostParade: 6.2, syrupShower: 9, iceQuake: 6, harborSwell: 3, stampede: 3.2 };
+const ONLY = process.env.EV_ONLY ? process.env.EV_ONLY.split(',') : null;
+for (const [tid, id] of SHOTS.filter(([, i]) => !ONLY || ONLY.includes(i))) {
   for (const [phase, at] of [['warn', -2], ['peak', 0.45], ['end', 1]]) {
-    const info = await A.evaluate(({ tid, id, phase, at }) => {
+    const info = await A.evaluate(({ tid, id, phase, at, peak }) => {
       const a = window.zoomies;
       const { r, e } = window.evFind(tid, id);
       const { EVENTS } = window.evMod;
       const def = EVENTS[id];
-      const t = phase === 'warn' ? e.at + at : phase === 'peak' ? e.at + (id === 'tide' ? 3.2 : def.dur * at) : e.end + at;
+      const t = phase === 'warn' ? e.at + at : phase === 'peak' ? e.at + (peak ?? def.dur * at) : e.end + at;
       // Drive to a little before the moment, then put the player just before the action.
       window.evRun(r, t - 1.2);
       const c = r.evs.cur;
-      const spot = c && (c.spots || c.lanes || c.zones || c.ice || (c.rocks && c.rocks.filter((q) => q.st === 1 || q.st === 2)));
+      const spot = c && (c.spots || c.lanes || c.zones || c.ice || c.cracks || c.panels || c.belts || (c.rocks && c.rocks.filter((q) => q.st === 1 || q.st === 2)));
       if (spot && spot.length) r.player.placeAt((spot[0].s - 52 + r.track.length) % r.track.length, 0);
       r.camSeg = -1; // the camera's track hint is stale after a teleport
       const k = r.player, sp = 24;
@@ -301,7 +309,7 @@ for (const [tid, id] of SHOTS) {
       const without = draw();
       r.evs.group.visible = true;
       return { t: +t.toFixed(1), withEv, without, fogFar: r.world.fog.far.toFixed(0), hud: r.evs.hud && `${r.evs.hud.phase} ${r.evs.hud.name} ${r.evs.hud.secs}`, mods: r.evMods && JSON.stringify(r.evMods) };
-    }, { tid, id, phase, at });
+    }, { tid, id, phase, at, peak: PEAK[id] });
     await A.waitForTimeout(2600); // let the HUD's own animations (GO!, toasts) settle
     await A.evaluate(() => window.evShot());
     await A.screenshot({ path: `ev/${tid}-${id}-${phase}.png` });

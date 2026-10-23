@@ -717,10 +717,10 @@ Object.assign(EVENTS, {
       const k = env(t, this.dur, 1.5, 2);
       lanesPay(sys, e, 'LANTERN LIGHT', 12);
       lanesGlow(sys, e, ['#ffd27a', '#ff9a3c'], k, 3);
-      // Lanterns float along both sides of every lane.
-      for (const ln of e.live) for (let u = 0; u <= ln.len; u += 8) for (const sd of [-1, 1]) {
+      // Lantern lights float along both sides of every lane (glow sprites: no triangles, no draw call).
+      for (const ln of e.live) for (let u = 0; u <= ln.len; u += 7) for (const sd of [-1, 1]) {
         const q = sys.at(ln.s + u, ln.d + sd * 3.4, 3 + Math.sin(sys.time * 1.6 + u + sd) * 0.4);
-        sys.put('lantern', q.x, q.y, q.z, 0.8 * k, sys.time * 0.5 + u);
+        sys.fx.glow.emit(q.x, q.y, q.z, 0, 0, 0, sd > 0 ? '#ff5a3c' : '#ffb347', 2.2 * k, 2.2 * k, 0.07, 0, 0, 0.9);
       }
     },
     end: lanesClose,
@@ -1026,20 +1026,20 @@ Object.assign(EVENTS, {
   },
   // Jungle Odyssey: the river leg (a boat) and the sky leg (a plane)
   riverSurge: {
-    name: 'River Surge', icon: '🌊', line: 'RIVER SURGE! The current speeds up in the glowing channels, ride it!', warn: 4, dur: 14, weight: 3, cue: 'wave', leg: { zone: 1 },
+    name: 'River Surge', icon: '🌊', line: 'RIVER SURGE! The current speeds up in the glowing channels, ride it!', warn: 4, dur: 14, weight: 3, cue: 'wave', leg: { zone: 1, skew: 1.2 },
     ...streamEvent({ zone: 1, len: 30, col: '#7fe8ff', sound: 'wave', label: 'RIDE THE SURGE', glow: ['#ffffff', '#7fe8ff'], foam: true }),
   },
   jetStream: {
-    name: 'Jet Stream', icon: '💨', line: 'JET STREAM! Fly through the glowing lanes for a boost!', warn: 4, dur: 14, weight: 3, cue: 'wind', leg: { zone: 2 },
+    name: 'Jet Stream', icon: '💨', line: 'JET STREAM! Fly through the glowing lanes for a boost!', warn: 4, dur: 14, weight: 3, cue: 'wind', leg: { zone: 2, skew: 1.15 },
     ...streamEvent({ zone: 2, len: 36, col: '#c9efff', margin: 5, sound: 'wind', label: 'JET STREAM', glow: ['#ffffff', '#c9efff'] }),
   },
   // Island Hopper: the canal leg (a boat) and the volcano leg (the road)
   harborSwell: {
-    name: 'Harbor Swell', icon: '🌊', line: 'HARBOR SWELL! Big swells roll down the canal, catch one!', warn: 4, dur: 14, weight: 3, cue: 'wave', leg: { zone: 1 },
+    name: 'Harbor Swell', icon: '🌊', line: 'HARBOR SWELL! Big swells roll down the canal, catch one!', warn: 4, dur: 14, weight: 3, cue: 'wave', leg: { zone: 1, skew: 1.1 },
     ...streamEvent({ zone: 1, len: 26, col: '#7fe8ff', sound: 'wave', label: 'SWELL RIDER', glow: ['#ffffff', '#7fe8ff'], foam: true, move: 9 }),
   },
   ashCloud: {
-    name: 'Ash Cloud', icon: '🌋', line: 'ASH CLOUD! Smoke rolls over the climb, ride the lit lanes through it!', warn: 4, dur: 15, weight: 3, cue: 'rumble', vis: true, leg: { leg: 1 },
+    name: 'Ash Cloud', icon: '🌋', line: 'ASH CLOUD! Smoke rolls over the climb, ride the lit lanes through it!', warn: 4, dur: 15, weight: 3, cue: 'rumble', vis: true, leg: { leg: 1, skew: 1.1 },
     ...streamEvent({ len: 18, col: '#ffd23f', margin: 3, sound: 'rumble', label: 'ASH DASH', glow: ['#ffb347', '#ffd23f'], vis: 0.55, fog: '#5a4a48', edge: '#ff8a3a', ash: '#9a8a86' }),
   },
   // Balloon Battle arenas (events here only shove, slow and hop karts; the battle rules decide every balloon)
