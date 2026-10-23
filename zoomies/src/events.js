@@ -622,7 +622,7 @@ const impactMeteors = (o) => rain({
   finish(sys) { sys.layer('crater').clear(); },
   each(sys, e, t) {
     const k = env(t, o.dur, 1.5, 2.5);
-    sys.setVis(0.2 * k, '#ff9a4a', '#ffb347'); // solar flare
+    sys.setVis(0.2 * k, '#ff9a4a', null); // solar flare (a tint, no edge strips: the fog stays far)
     if (!o.gravity) return;
     // A gravity pulse every 5.5 s: everything floats for a moment.
     const g = gust(t, 5.5, 1.8);
@@ -1309,7 +1309,7 @@ export class TrackEvents {
     w.fog.color.copy(b.fog).lerp(this.visCol, v);
     ['top', 'horizon', 'bottom'].forEach((n, i) => w.skyMat.uniforms[n].value.copy(b.sky[i]).lerp(this.visCol, v * 0.92));
     this.race.grade.tint = v > 0 ? '#' + this._c.set(b.tint || '#ffffff').lerp(this.visCol, v * 0.25).getHexString() : b.tint;
-    if (v > 0 && !this.layers.edge) {
+    if (v > 0 && this.edgeCol && !this.layers.edge) {
       const tr = this.tr, L = this.layer('edge');
       L.set(1, tr.strip((i) => tr.hw[i] - 0.55, (i) => tr.hw[i] - 0.15, { lift: 0.07 }));
       L.set(-1, tr.strip((i) => -tr.hw[i] + 0.15, (i) => -tr.hw[i] + 0.55, { lift: 0.07 }));
@@ -1318,7 +1318,7 @@ export class TrackEvents {
       const L = this.layers.edge;
       L.flush();
       L.mat.opacity = smoothstep(0.1, 0.5, v) * 0.85;
-      L.mat.color.set(this.edgeCol).multiplyScalar(2.2);
+      if (this.edgeCol) L.mat.color.set(this.edgeCol).multiplyScalar(2.2);
       L.mesh.visible = L.mat.opacity > 0;
     }
   }
