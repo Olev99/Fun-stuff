@@ -356,7 +356,7 @@ const sweep = await A.evaluate(() => {
         if (k.speed < 1.5 && !k.spinTime) { if (t0 === undefined) slow.set(k, r.netClock); else worst = Math.max(worst, r.netClock - t0); } else slow.delete(k);
       }
     }
-    out.push({ tid, secs: +r.netClock.toFixed(0), done: bat ? r.battle.done : r.player.finished, events: [...evSeen].join(','), bad, worst: +worst.toFixed(1), hits, pops, left: r.track.patches.filter((p) => p.ev).length + r.track.boosts.filter((p) => p.ev).length });
+    out.push({ tid, secs: +r.netClock.toFixed(0), done: bat ? r.battle.done : r.player.finished, events: [...evSeen].join(','), bad, worst: +worst.toFixed(1), hits, pops, bat: !!bat, left: r.track.patches.filter((p) => p.ev).length + r.track.boosts.filter((p) => p.ev).length });
   }
   return out;
 });
@@ -366,7 +366,8 @@ ok(sweep.every((x) => x.events), `every track and arena showed an event (${sweep
 ok(sweep.every((x) => !x.bad), `modifiers stay inside the clamps on every track (${sweep.filter((x) => x.bad).map((x) => x.tid)})`);
 ok(sweep.every((x) => x.worst < 5), `no kart is stuck for 5 s or more (worst ${Math.max(...sweep.map((x) => x.worst))} s)`);
 ok(sweep.every((x) => x.hits === 0 && x.pops === 0), `arena events never call a kart hit or pop a balloon (${sweep.filter((x) => x.hits || x.pops).map((x) => `${x.tid} ${x.hits}/${x.pops}`)})`);
-ok(sweep.every((x) => x.left === 0 || !x.done), 'no timed patch or boost lane is left on the road after the events');
+// A Balloon Battle can end in the middle of an arena event; the Track is rebuilt for the next race, so only races with a finish line must be clean.
+ok(sweep.every((x) => x.left === 0 || !x.done || x.bat), 'no timed patch or boost lane is left on the road after the events');
 
 // ---- 10. what the new events do ----
 const eff = await A.evaluate(async () => {
