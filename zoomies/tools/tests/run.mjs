@@ -35,6 +35,7 @@ const SUITES = {
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
   events: ['events.mjs', [], 25],
+  eventsint: ['eventsint.mjs', [], 20],
   shortcuts: ['shortcuts.mjs', [], 25],
   finish: ['finish.mjs', [], 12],
   phase2: ['phase2.mjs', [], 20],

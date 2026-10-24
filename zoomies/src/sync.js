@@ -124,6 +124,9 @@ export function mergeCareer(A, B) {
     if (Array.isArray(sa[k]) || Array.isArray(sb[k])) m.stats[k] = union(sa[k], sb[k]);
     else m.stats[k] = mergeNum(sa[k], sb[k], sbase ? sbase[k] : undefined);
   }
+  // A best (not a running total) takes the higher one; events seen are combined.
+  if (sa.dodgeBest || sb.dodgeBest) m.stats.dodgeBest = Math.max(num(sa.dodgeBest), num(sb.dodgeBest));
+  m.evSeen = union(a.evSeen, b.evSeen);
   // Daily challenge: the latest day done, the longer streaks.
   const da = a.daily || {}, db = b.daily || {};
   const later = (da.done || '') >= (db.done || '') ? da : db;

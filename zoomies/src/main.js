@@ -13,7 +13,7 @@ import { SafeUI } from './safeui.js';
 import { cleanNick } from './nametags.js';
 import { lookOf, cleanLook } from './cosmetics.js';
 import { BODIES, bodyLocked } from './karts.js';
-import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily } from './profile.js';
+import { levelOf, awardRace, grant, checkAchievements, addStat, addToSet, dailyFor, completeDaily, evSeedOf } from './profile.js';
 import { weeklyFor, weeklyFinish, weekNum } from './weekly.js';
 import { medalAward, medalTier, nextMedal, MEDALS } from './medals.js';
 import { encodeChallenge, challengeUrl, decodeChallenge, hasChallenge, challengeText } from './ghostlink.js';
@@ -32,7 +32,7 @@ import { NetSession } from './net.js';
 import { PostFX } from './post.js';
 import { installHeightFog } from './env.js';
 import {
-  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult,
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult, evPlan, evSeedFor,
 } from './career.js';
 import { kitOf } from './workshop.js';
 
@@ -407,7 +407,9 @@ class App {
       // Leader starts at the back.
       order = gp.field.slice().sort((a, b) => gp.points[a] - gp.points[b] || (a === gp.player ? 1 : -1));
     }
-    this.startRace({ mode: 'gp', trackId: gp.tracks[gp.index], reverse: gp.reverse, player: gp.player, speedClass: gp.speedClass, order, ...(gp.extra || {}) });
+    // A cup's races each get their own event seed: the same for the same attempt (Career) or week (Weekly Cup).
+    const evSeed = gp.careerEv && this.careerRun ? evSeedFor(gp.careerEv.id, this.careerRun.attempt, gp.index) : gp.weekly ? evSeedOf(`weekly#${gp.weekly.week}#${gp.index}`) : undefined;
+    this.startRace({ mode: 'gp', trackId: gp.tracks[gp.index], reverse: gp.reverse, player: gp.player, speedClass: gp.speedClass, order, ...(gp.extra || {}), evSeed });
   }
 
   startRace(cfg) {
@@ -428,10 +430,14 @@ class App {
     // Track events follow the Settings in quick races, cups and battles. Time trials and Driving School never
     // have them; the Daily, the Weekly Cup and the Career stay calm until they bring their own (cfg.evMode).
     const evOk = ['quick', 'gp', 'battle'].includes(cfg.mode) && !cfg.careerEv && !cfg.dailyEv && !(this.gp && this.gp.weekly);
-    const evMode = cfg.mode === 'tt' || cfg.school ? 'off' : cfg.evMode ?? (evOk && EV_MODES.includes(this.settings.trackEvents) ? this.settings.trackEvents : 'off');
+    // A twist can set them too (Storm Week: wild, Calm Skies: off).
+    const evMode = cfg.mode === 'tt' || cfg.school ? 'off' : cfg.evMode ?? (cfg.mods && cfg.mods.evMode) ?? (evOk && EV_MODES.includes(this.settings.trackEvents) ? this.settings.trackEvents : 'off');
     const evSeed = evMode === 'off' ? 0 : cfg.evSeed ?? Math.floor(Math.random() * EV_SEED_MAX);
+    // The story can limit an event to some of its track's events (cfg.evOnly).
+    const def0 = trackById(cfg.trackId);
+    const trackDef = cfg.evOnly && def0.events ? { ...def0, events: def0.events.filter((id) => cfg.evOnly.includes(id)) } : def0;
     this.race = new Race(this, {
-      mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
+      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
       look: lookOf(this.career), ghost: cfg.ghost || null, evMode, evSeed,
@@ -668,8 +674,18 @@ class App {
   // ---------------- profile ----------------
   // Coins, XP, stats and achievements for a finished race. Returns the
   // rewards block for the results screen.
+  // What the track events of a finished race give the profile (profile.js awardRace): the events that ran, and
+  // whether a blizzard or sandstorm was driven through to the finish without touching a wall.
+  evSummary(race, me) {
+    const sched = (race.evs && race.evs.sched) || [];
+    const evSeen = sched.filter((s) => s.began).map((s) => s.id);
+    const storms = evSeen.filter((id) => id === 'blizzard' || id === 'sandstorm');
+    return { evSeen, evEye: !!(me && me.finished && storms.length && storms.every((id) => !(race.evWalls && race.evWalls[id]))) };
+  }
+
   profileAward(race, me, extra = {}) {
     const sum = awardRace(this.career, {
+      ...this.evSummary(race, me),
       mode: race.mode, place: me ? me.place : 0, gems: (race.player && race.player.gemsGot) || 0,
       style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id, online: race.mode === 'mp',
       racer: race.player && race.player.ch.id, body: race.player && race.player.bodyDef && race.player.bodyDef.id,
@@ -694,7 +710,7 @@ class App {
     const player = this.career.racer || this.settings.char;
     this.startRace({
       mode: 'quick', trackId: d.track, reverse: d.rev, player, speedClass: d.cls, difficulty: d.diff, mods: d.mod, playerLoadout: this.menuLoadout(),
-      dailyEv: d,
+      dailyEv: d, evSeed: evSeedOf(`daily#${d.day}`),
     });
   }
 
@@ -705,7 +721,7 @@ class App {
     const pass = me.place <= d.goal && gems >= (d.gems || 0);
     const sum = awardRace(this.career, {
       mode: race.mode, place: me.place, gems, style: race.stylePts || 0, styleCounts: race.styleCounts, trackId: race.trackDef.id,
-      racer: race.player.ch.id, body: race.player.bodyDef.id,
+      racer: race.player.ch.id, body: race.player.bodyDef.id, ...this.evSummary(race, me),
     });
     const lines = [];
     let title = pass ? 'Challenge complete!' : 'Not quite!';
@@ -992,15 +1008,22 @@ class App {
     const lo = playerLoadout(c);
     // A League event may set its own speed class (Gold medal times are Zoom class) and a Daily-style twist.
     const cls = ev.cls || chapter.cls, mods = modOf(ev);
-    const base = { trackId: ev.track, reverse: !!ev.rev, player, speedClass: cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0, mods };
-    this.careerRun = { evId };
+    // Track events: the story decides (evPlan); a retry gets a new seed, a replay of one attempt does not.
+    const plan = evPlan(ev, chapter);
+    this.evTries = this.evTries || {};
+    const attempt = (this.evTries[evId] = (this.evTries[evId] || 0) + 1);
+    const base = {
+      trackId: ev.track, reverse: !!ev.rev, player, speedClass: cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0, mods,
+      evMode: plan.mode, evOnly: plan.only, evSeed: plan.mode === 'off' ? 0 : evSeedFor(evId, attempt),
+    };
+    this.careerRun = { evId, attempt };
     if (ev.type === 'cup') {
       this.gp = {
         cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: cls, player, careerEv: ev, wins: 0, gems: 0,
       };
       this._gpField(this.gp, [rival, ...(chapter.field || [])]);
       const others = this.gp.field.filter((id) => id !== player);
-      this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev, mods };
+      this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev, mods, evMode: plan.mode, evOnly: plan.only };
       this.startGPRace();
     } else if (ev.type === 'time') {
       this.startRace({ ...base, mode: 'tt' });

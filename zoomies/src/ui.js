@@ -10,6 +10,7 @@ import { cleanNick } from './nametags.js';
 import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
 import { missionView, missionStreak, MISSION_XP } from './missions.js';
 import { nextUp } from './nextup.js';
+import { evDefs, evChip } from './evint.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
 import { isTouch } from './platform.js';
 import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, WEEKLY_XP_BASE } from './weekly.js';
@@ -579,7 +580,7 @@ export class UI {
     $('class-seg').hidden = this.mode === 'tt';
     $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
-    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
+    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats and no track events in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
     this._syncClass();
     this._renderTrackCards();
     this.show('track');
@@ -591,6 +592,14 @@ export class UI {
     } else {
       this.app.previewTrack(this.app.settings.track, this.app.settings.reverse);
     }
+  }
+
+  // The event chip of a card ('⛈ Events: Normal · ...'); Time Trial and its medals always run without events.
+  _evLine(ids) {
+    const defs = evDefs(ids);
+    if (!defs.length) return '';
+    if (this.mode === 'tt') return '<span class="tb evc">⛈ No events in Time Trial: records stay fair</span>';
+    return `<span class="tb evc${this.app.settings.trackEvents === 'wild' ? ' wild' : ''}">${esc(evChip(ids, this.app.settings.trackEvents || 'normal'))}</span>`;
   }
 
   _renderTrackCards() {
@@ -608,7 +617,7 @@ export class UI {
         b.appendChild(cv);
         const tx = document.createElement('div');
         tx.className = 'tx';
-        tx.innerHTML = `<span class="tn">${cup.name}</span><span class="tb">${cup.reverse ? 'All 4 tracks, reversed' : 'All 4 tracks'}${best ? ` · Best: ${best}` : ''}</span>`;
+        tx.innerHTML = `<span class="tn">${cup.name}</span><span class="tb">${cup.reverse ? 'All 4 tracks, reversed' : 'All 4 tracks'}${best ? ` · Best: ${best}` : ''}</span>${this._evLine(cup.tracks)}`;
         b.appendChild(tx);
         b.addEventListener('click', () => {
           app.audio.play('select');
@@ -633,7 +642,7 @@ export class UI {
         const wins = ((app.records.battle || {})[def.id]) || 0;
         const tx = document.createElement('div');
         tx.className = 'tx';
-        tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz Arena">Arena</span>🎈 ${BATTLE_FIELD} racers${wins ? ` · 🏆 ${wins} win${wins > 1 ? 's' : ''}` : ''}</span><span class="tb">${def.blurb}</span>`;
+        tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz Arena">Arena</span>🎈 ${BATTLE_FIELD} racers${wins ? ` · 🏆 ${wins} win${wins > 1 ? 's' : ''}` : ''}</span>${this._evLine(def.id)}<span class="tb">${def.blurb}</span>`;
         b.appendChild(tx);
         b.addEventListener('click', () => {
           app.audio.play('select');
@@ -660,7 +669,7 @@ export class UI {
       const nFound = ((app.records.found || {})[def.id] || []).length;
       const tx = document.createElement('div');
       tx.className = 'tx';
-      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.legs ? `1 lap · ${def.legs.length} legs · 🚗⛵✈️` : `${def.laps || 3} laps`}${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}${tier ? ` ${MEDALS[tier - 1].icon}` : ''}` : ''}</span>${this.mode === 'tt' && mt ? `<span class="tb medals">${mt.map((t, i) => `<span class="${tier > i ? 'got' : ''}">${MEDALS[i].icon}${fmtTime(t).replace(/^0:/, '')}</span>`).join('')}</span>` : ''}<span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span><span class="tb">${def.blurb}</span>`;
+      tx.innerHTML = `<span class="tn">${def.name}</span><span class="tb"><span class="tz ${def.size}">${def.size}</span>${def.legs ? `1 lap · ${def.legs.length} legs · 🚗⛵✈️` : `${def.laps || 3} laps`}${rec && rec.tt ? ` · Best ${fmtTime(rec.tt)}${tier ? ` ${MEDALS[tier - 1].icon}` : ''}` : ''}</span>${this.mode === 'tt' && mt ? `<span class="tb medals">${mt.map((t, i) => `<span class="${tier > i ? 'got' : ''}">${MEDALS[i].icon}${fmtTime(t).replace(/^0:/, '')}</span>`).join('')}</span>` : ''}<span class="tb sc${nFound >= nSc ? ' all' : ''}">🔍 Shortcuts ${nFound}/${nSc}</span>${this._evLine(def.id)}<span class="tb">${def.blurb}</span>`;
       b.appendChild(tx);
       b.addEventListener('click', () => {
         app.audio.play('select');

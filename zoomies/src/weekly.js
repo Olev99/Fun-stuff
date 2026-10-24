@@ -1,5 +1,5 @@
 import { TRACKS } from './tracks.js';
-import { DAILY_MODS, grant } from './profile.js';
+import { DAILY_MODS, CLASSIC_MODS, grant } from './profile.js';
 import { rng } from './util.js';
 
 // Weekly Cup: one special Grand Prix per ISO week (UTC), the same for everyone,
@@ -58,9 +58,14 @@ export function weeklyFor(week = weekOf()) {
   while (picks.length < 4) picks.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
   // Mixed size: if all four match, the last one is swapped for the next track of another size.
   if (picks.every((t) => t.size === picks[0].size)) picks[3] = pool.find((t) => t.size !== picks[0].size);
-  const mod = WEEKLY_MODS[Math.floor(r() * WEEKLY_MODS.length)];
+  const classic = WEEKLY_MODS.filter((m) => CLASSIC_MODS.includes(m));
+  let mod = classic[Math.floor(r() * classic.length)];
   const cls = mod.cls || ['zoom', 'zoom', 'turbo'][Math.floor(r() * 3)];
   const diff = mod.diff || (r() < 0.5 ? 'normal' : 'hard');
+  // A last roll (after every older one, so old weeks keep their cup) swaps a plain twist for Storm Week or Calm Skies.
+  // Class and difficulty stay as rolled: the weather never changes how hard the cup is.
+  const wx = r();
+  if (!mod.cls && wx < 0.3) mod = DAILY_MODS.find((m) => m.id === (wx < 0.2 ? 'storm' : 'calm'));
   return { week, tracks: picks.map((t) => t.id), cls, diff, mod, name: `Week ${weekNum(week)} Cup` };
 }
 

@@ -717,6 +717,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .pips i { width: 16px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
 .pips i.on { background: var(--mint); }
 .pips.rank i { width: 15px; } .pips.rank i.rw { height: 11px; box-shadow: 0 0 0 1px rgba(255,210,63,.55); } .pips.rank i.on { background: var(--sun); }
+.tcard .tb.evc { font-size: 10.5px; color: var(--cream); opacity: .85; } .tcard .tb.evc.wild { color: var(--sun); opacity: 1; }
+.ev .traits i.evc { background: rgba(54,169,255,.22); } .ev .traits i.evc.wild { background: rgba(255,90,60,.28); color: var(--sun); }
 .ev .twist { font-size: 11.5px; font-weight: 700; line-height: 1.25; color: var(--cream); } .ev .twist b { color: var(--mint); }
 .leaguecard { display: grid; gap: 1px; text-align: left; padding: 6px 10px; border: 3px solid var(--ink); border-radius: 12px; cursor: pointer; color: var(--cream); background: linear-gradient(90deg, rgba(217,165,32,.45), rgba(120,40,90,.7)); box-shadow: 0 3px 0 var(--ink); }
 .leaguecard b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--sun); }
@@ -1479,7 +1481,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <div class="row"><div><div class="lbl">Event warnings</div><div class="hint">Full: the announcer's tip and a countdown. Short: just the countdown, 3 seconds before.</div></div>
         <div class="seg" id="set-evwarn"><button data-v="full">Full</button><button data-v="short">Short</button></div></div>
       <div class="row"><div><div class="lbl">Use Workshop parts in quick modes</div><div class="hint">Your fitted parts count in Quick Race, Grand Prix, Balloon Battle and online. Time Trial, the Daily Challenge, the Weekly Cup and Driving School always use stock stats.</div></div><label class="toggle"><input type="checkbox" id="set-ws" aria-label="Use Workshop parts in quick modes"></label></div>
-      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes, stock stats.</div></div>
+      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes, stock stats. Track events are off here.</div></div>
         <button class="btn mint small" data-go="school">Practice</button></div>
       <div class="row no-pause"><div><div class="lbl">Replay intro</div><div class="hint">The first-run controls check again.</div></div>
         <button class="btn alt small" data-go="intro">Replay</button></div>
