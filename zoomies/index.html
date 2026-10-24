@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <!-- Content-Security-Policy: tools/stamp.mjs fills in the hashes of the inline scripts (script-src). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-OpiQrIKjbFHzIPsT9g7ptxy4wHPRO2urZz3wBHRyokk='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-gF1tMxsU6vQPYheVqzJm52/V/77gI5FshN3DSzNtV6Y='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="08c50b1">
+<meta name="zoomies-version" content="653fabc">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -717,6 +717,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 .pips i { width: 16px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
 .pips i.on { background: var(--mint); }
 .pips.rank i { width: 15px; } .pips.rank i.rw { height: 11px; box-shadow: 0 0 0 1px rgba(255,210,63,.55); } .pips.rank i.on { background: var(--sun); }
+.tcard .tb.evc { font-size: 10.5px; color: var(--cream); opacity: .85; } .tcard .tb.evc.wild { color: var(--sun); opacity: 1; }
+.ev .traits i.evc { background: rgba(54,169,255,.22); } .ev .traits i.evc.wild { background: rgba(255,90,60,.28); color: var(--sun); }
 .ev .twist { font-size: 11.5px; font-weight: 700; line-height: 1.25; color: var(--cream); } .ev .twist b { color: var(--mint); }
 .leaguecard { display: grid; gap: 1px; text-align: left; padding: 6px 10px; border: 3px solid var(--ink); border-radius: 12px; cursor: pointer; color: var(--cream); background: linear-gradient(90deg, rgba(217,165,32,.45), rgba(120,40,90,.7)); box-shadow: 0 3px 0 var(--ink); }
 .leaguecard b { font-family: var(--font-display); font-weight: 400; font-size: 14px; color: var(--sun); }
@@ -777,6 +779,20 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
 #hud-split.show { animation: splitIn 3s ease-out forwards; }
 #hud-split.ahead { color: var(--mint); } #hud-split.behind { color: var(--berry); }
 @keyframes splitIn { 0% { opacity: 0; transform: scale(1.4); } 8% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* Track events: the warning (announcer line and countdown), then a small tag while it lasts */
+#hud-ev { margin-top: 4px; display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; border-radius: 14px; background: rgba(29,21,55,.78); border: 2px solid var(--tang); max-width: min(560px, 74vw); text-align: left; }
+#hud-ev .ev-ic { font-size: 26px; line-height: 1; }
+#hud-ev .ev-tx { display: flex; flex-direction: column; min-width: 0; }
+#hud-ev .ev-tx b { font-family: var(--font-display); font-weight: 400; font-size: 17px; color: var(--sun); white-space: nowrap; }
+#hud-ev .ev-tx small { font-weight: 800; font-size: 11.5px; color: var(--cream); line-height: 1.2; }
+#hud-ev .ev-tx small:empty { display: none; }
+#hud-ev .ev-cd { font-family: var(--font-display); font-size: 26px; color: var(--cream); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; min-width: 18px; text-align: center; }
+#hud-ev.warn { animation: evPulse .5s ease-in-out infinite alternate; }
+#hud-ev.on { padding: 2px 10px 2px 6px; border-color: rgba(255,247,232,.6); gap: 6px; }
+#hud-ev.on .ev-ic { font-size: 17px; }
+#hud-ev.on .ev-tx b { font-size: 13px; color: var(--cream); }
+#hud-ev.on .ev-cd { font-size: 14px; -webkit-text-stroke: 0; color: var(--sun); }
+@keyframes evPulse { from { border-color: var(--tang); } to { border-color: var(--sun); box-shadow: 0 0 12px rgba(255,210,63,.55); } }
 #hud-goal { margin-top: 3px; padding: 3px 10px 2px; border-radius: 10px; background: rgba(29,21,55,.62); border: 2px solid rgba(255,210,63,.7); font-family: var(--font-display); font-size: 12.5px; color: var(--sun); white-space: nowrap; }
 
 /* ---------- HUD ---------- */
@@ -843,6 +859,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px;
   -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); opacity: 0; white-space: nowrap;
 }
 #hud-toast.show { animation: toast 1.3s ease-out forwards; }
+#hud:has(#hud-ev.warn:not([hidden])) #hud-toast { top: 34%; } /* keep toasts clear of an event warning */
 #hud-hint {
   position: absolute; left: 50%; bottom: calc(18px + var(--sab)); transform: translateX(-50%); padding: 6px 12px; border-radius: 12px;
   background: rgba(29,21,55,.78); border: 2px solid rgba(255,247,232,.5); font-weight: 800; font-size: 13px; white-space: nowrap; opacity: 0; transition: opacity .25s;
@@ -1008,6 +1025,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
 @keyframes load { from { transform: translateX(-20%); } to { transform: translateX(260%); } }
 @media (prefers-reduced-motion: reduce) {
   #speedlines.on { animation: none; }
+  #hud-ev.warn { animation: none; }
   .btn, .card, .tcard { transition: none; }
 }
 @media (max-height: 360px) {
@@ -1038,6 +1056,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
     <div id="hud-time">0:00.00</div>
     <div id="hud-goal" hidden></div>
     <div id="hud-split"></div>
+    <div id="hud-ev" hidden><span class="ev-ic"></span><span class="ev-tx"><b></b><small></small></span><span class="ev-cd"></span></div>
   </div>
   <button id="btn-pause" aria-label="Pause">II</button>
   <div class="hud-tr">
@@ -1457,8 +1476,12 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <div class="row"><div class="lbl">Show FPS</div><label class="toggle"><input type="checkbox" id="set-fps" aria-label="Show FPS"></label></div>
       <div class="row"><div><div class="lbl">Screen shake</div><div class="hint">Camera shake, the boost zoom, the short freeze on big hits and phone buzzes.</div></div>
         <div class="seg" id="set-shake"><button data-v="off">Off</button><button data-v="low">Low</button><button data-v="normal">Normal</button></div></div>
+      <div class="row"><div><div class="lbl">Track events</div><div class="hint">Blizzards, lava rain, sandstorms and tides mid-race in Quick Race, Grand Prix, Balloon Battle and online (the host's setting). Wild brings more and stronger ones. Never in Time Trial.</div></div>
+        <div class="seg" id="set-events"><button data-v="off">Off</button><button data-v="normal">Normal</button><button data-v="wild">Wild</button></div></div>
+      <div class="row"><div><div class="lbl">Event warnings</div><div class="hint">Full: the announcer's tip and a countdown. Short: just the countdown, 3 seconds before.</div></div>
+        <div class="seg" id="set-evwarn"><button data-v="full">Full</button><button data-v="short">Short</button></div></div>
       <div class="row"><div><div class="lbl">Use Workshop parts in quick modes</div><div class="hint">Your fitted parts count in Quick Race, Grand Prix, Balloon Battle and online. Time Trial, the Daily Challenge, the Weekly Cup and Driving School always use stock stats.</div></div><label class="toggle"><input type="checkbox" id="set-ws" aria-label="Use Workshop parts in quick modes"></label></div>
-      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes, stock stats.</div></div>
+      <div class="row no-pause"><div><div class="lbl">Driving School</div><div class="hint">A calm practice lap with the steering, drift, boost and item lessons. No stakes, stock stats. Track events are off here.</div></div>
         <button class="btn mint small" data-go="school">Practice</button></div>
       <div class="row no-pause"><div><div class="lbl">Replay intro</div><div class="hint">The first-run controls check again.</div></div>
         <button class="btn alt small" data-go="intro">Replay</button></div>
@@ -1622,7 +1645,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=251ba426", "./src/arenas.js": "./src/arenas.js?v=f6f98eeb", "./src/audio.js": "./src/audio.js?v=e248fec3", "./src/backup.js": "./src/backup.js?v=8c4c7717", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=27251046", "./src/careerui.js": "./src/careerui.js?v=0552952d", "./src/characters.js": "./src/characters.js?v=86619e10", "./src/coach.js": "./src/coach.js?v=d2a23bd0", "./src/cosmetics.js": "./src/cosmetics.js?v=242b95b1", "./src/env.js": "./src/env.js?v=de0c051a", "./src/ghost.js": "./src/ghost.js?v=ac13c7a6", "./src/ghostlink.js": "./src/ghostlink.js?v=7957bf0f", "./src/gumballui.js": "./src/gumballui.js?v=a36ce4ca", "./src/hud.js": "./src/hud.js?v=2704b015", "./src/input.js": "./src/input.js?v=e177d516", "./src/items.js": "./src/items.js?v=b633418c", "./src/kart.js": "./src/kart.js?v=2ef21281", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/league.js": "./src/league.js?v=82591c37", "./src/main.js": "./src/main.js?v=c11f62a3", "./src/mastery.js": "./src/mastery.js?v=eff00973", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=903fd996", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=718499b7", "./src/nextup.js": "./src/nextup.js?v=b88378c8", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=a74ec9ae", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=a645f892", "./src/pwa.js": "./src/pwa.js?v=9f2ff847", "./src/race.js": "./src/race.js?v=64332032", "./src/safeui.js": "./src/safeui.js?v=9bbad7bd", "./src/settings.js": "./src/settings.js?v=e1affb3b", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=31acb476", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=3b02d7f1", "./src/ui.js": "./src/ui.js?v=df8800dd", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/weekly.js": "./src/weekly.js?v=bf8edef8", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=95e28ab3", "./src/world.js": "./src/world.js?v=d59799e7", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
-<script type="module" src="./src/main.js?v=c11f62a3"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=7a6fe224", "./src/arenas.js": "./src/arenas.js?v=3c7b65f4", "./src/audio.js": "./src/audio.js?v=28191a7d", "./src/backup.js": "./src/backup.js?v=8c4c7717", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=39f25d32", "./src/careerui.js": "./src/careerui.js?v=f995bd81", "./src/characters.js": "./src/characters.js?v=86619e10", "./src/coach.js": "./src/coach.js?v=d2a23bd0", "./src/cosmetics.js": "./src/cosmetics.js?v=242b95b1", "./src/env.js": "./src/env.js?v=de0c051a", "./src/events.js": "./src/events.js?v=7d47b43c", "./src/evint.js": "./src/evint.js?v=b1c86a32", "./src/ghost.js": "./src/ghost.js?v=ac13c7a6", "./src/ghostlink.js": "./src/ghostlink.js?v=7957bf0f", "./src/gumballui.js": "./src/gumballui.js?v=a36ce4ca", "./src/hud.js": "./src/hud.js?v=8f5592a4", "./src/input.js": "./src/input.js?v=e177d516", "./src/items.js": "./src/items.js?v=b633418c", "./src/kart.js": "./src/kart.js?v=cfca3f32", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/league.js": "./src/league.js?v=774d61f1", "./src/main.js": "./src/main.js?v=519e3ebe", "./src/mastery.js": "./src/mastery.js?v=eff00973", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=903fd996", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=1c454db3", "./src/nextup.js": "./src/nextup.js?v=b88378c8", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=a74ec9ae", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=abaa1b6e", "./src/pwa.js": "./src/pwa.js?v=9f2ff847", "./src/race.js": "./src/race.js?v=c2eb2ad3", "./src/safeui.js": "./src/safeui.js?v=9bbad7bd", "./src/settings.js": "./src/settings.js?v=eb86117d", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=c6c406ed", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=0b41fa15", "./src/ui.js": "./src/ui.js?v=9a25dfcc", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/weekly.js": "./src/weekly.js?v=dc631afb", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=95e28ab3", "./src/world.js": "./src/world.js?v=d59799e7", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=519e3ebe"></script>
 </body>
 </html>

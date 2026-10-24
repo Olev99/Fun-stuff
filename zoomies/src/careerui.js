@@ -3,11 +3,12 @@ import { BODY_LIST, bodyById, kartStats } from './karts.js';
 import {
   CHAPTERS, LEAGUE, modOf, TYPE_ICON, SPEAKERS, PAINTS, RACER_PRICE, paintById, eventStars, chapterStars, totalStars, MAX_STARS, chapterUnlocked,
   eventUnlocked, currentChapter, rivalFor, goalLabel, starHints, trackLabel, racerAvailable, saveCareer, BOSS_NEEDS,
-  trackTraits, grampsTip, chaptersDone, storyClues,
+  trackTraits, grampsTip, chaptersDone, storyClues, evPlan, eventIds,
 } from './career.js';
 import { PART_LIST, partById, TIER_NAME } from './parts.js';
 import { rankInfo, leagueStars, LEAGUE_MAX_STARS, RANK_REWARDS, REWARD_RANKS, MAX_RANK, RANK_STARS } from './league.js';
 import { cosmeticById } from './cosmetics.js';
+import { evDefs, evNames } from './evint.js';
 import {
   loadout, socketsOf, owned, freeCopies, fittedCount, equip, unequip, savePreset, loadPreset, buy, sell, sellValue, inStock,
   chassisCost, buyChassis, PRESET_NAMES,
@@ -221,7 +222,12 @@ export class CareerUI {
   _eventHints(ev) {
     const c = this.c;
     const traits = trackTraits(ev.type === 'cup' ? ev.tracks[0] : ev.track);
-    let h = traits.length ? `<span class="traits">${traits.map((t) => `<i>${t.icon} ${t.label}</i>`).join('')}</span>` : '';
+    // Track events this story event has (career.js evPlan): an icon chip with their names.
+    const evs = evDefs(ev.type === 'cup' ? ev.tracks : ev.track, evPlan(ev, this.list[this.ci]).only).filter((d) => eventIds(ev).includes(d.id));
+    const evWild = evs.length && evPlan(ev, this.list[this.ci]).mode === 'wild';
+    const chips = traits.map((t) => `<i>${t.icon} ${t.label}</i>`);
+    if (evs.length) chips.push(`<i class="evc${evWild ? ' wild' : ''}">${esc(evNames(evs))}${evWild ? ' · Wild' : ''}</i>`);
+    let h = chips.length ? `<span class="traits">${chips.join('')}</span>` : '';
     const mod = modOf(ev);
     if (mod) h += `<span class="twist"><b>${mod.icon} Twist: ${mod.name}.</b> ${esc(mod.desc)}</span>`;
     const p = ev.drop && partById(ev.drop);

@@ -330,6 +330,42 @@ export class Audio {
       case 'bee':
         this._tone('sawtooth', 220, 260, 0.4, 0.06);
         break;
+      // Track events (events.js)
+      case 'evAlert': // the warning chime
+        [0, 7, 0, 7].forEach((st, i) => this._tone('square', mtof(81 + st), 0, 0.1, 0.09, i * 0.12));
+        break;
+      case 'rumble': // the ground shaking
+        this._noise(2.2, 0.55, 'lowpass', 220, 60, 0, this.sfx, 0.7);
+        this._tone('sine', 48, 34, 2, 0.35);
+        break;
+      case 'wind': // a gust howling past
+        this._noise(2.4, 0.3, 'bandpass', 380, 1300, 0, this.sfx, 3);
+        this._noise(1.8, 0.16, 'bandpass', 1200, 500, 0.4, this.sfx, 5);
+        break;
+      case 'thunder':
+        this._noise(0.15, 0.45, 'highpass', 2500, 5000);
+        this._noise(2, 0.6, 'lowpass', 700, 50, 0.08, this.sfx, 0.6);
+        this._tone('sine', 70, 30, 1.6, 0.3, 0.08);
+        break;
+      case 'siren': // a rising and falling alarm
+        for (let i = 0; i < 3; i++) { this._tone('sawtooth', 520, 880, 0.35, 0.06, i * 0.7); this._tone('sawtooth', 880, 520, 0.35, 0.06, i * 0.7 + 0.35); }
+        break;
+      case 'wave': // a wave rolling in
+        this._noise(1.6, 0.35, 'lowpass', 400, 2600, 0, this.sfx, 0.8);
+        this._noise(1.2, 0.2, 'bandpass', 3000, 900, 0.5, this.sfx, 1.5);
+        break;
+      case 'chime': // lanterns, sparks and fireworks
+        [0, 4, 7, 12].forEach((st, i) => this._tone('sine', mtof(84 + st), 0, 0.45, 0.08, i * 0.08));
+        break;
+      case 'crack': // ice or glass splitting
+        this._noise(0.12, 0.5, 'highpass', 3000, 6000);
+        this._noise(0.5, 0.3, 'bandpass', 2400, 700, 0.05, this.sfx, 4);
+        this._tone('triangle', 1400, 300, 0.25, 0.08);
+        break;
+      case 'thud': // a press stamping, a boulder landing
+        this._tone('sine', 110, 38, 0.3, 0.45);
+        this._noise(0.25, 0.4, 'lowpass', 500, 90);
+        break;
       case 'lap':
         [0, 7, 12].forEach((s, i) => this._tone('triangle', mtof(79 + s), 0, 0.14, 0.16, i * 0.09));
         break;

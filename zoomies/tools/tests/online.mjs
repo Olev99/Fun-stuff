@@ -43,6 +43,11 @@ for (let i = 0; i < 60; i++) {
 const st = async (p) => p.evaluate(() => { const r = window.zoomies.race; return { mode: r.mode, state: r.state, rt: r.raceTime.toFixed(1), slot: r.mySlot, me: r.player.ch.id, karts: r.karts.map(k => `${k.ch.id}${k.isPlayer ? '*' : ''}${k.remote ? 'R' : ''}${k.ai ? 'A' : ''}:${k.total.toFixed(0)}/${k.place}`).join(' ') }; });
 console.log('A', JSON.stringify(await st(A)));
 console.log('B', JSON.stringify(await st(B)));
+// Track events: the guest computes the same schedule from the host's seed and mode.
+const evOf = (p) => p.evaluate(() => { const r = window.zoomies.race; return JSON.stringify({ evs: !!r.evs, track: r.trackDef.id, sched: r.evs ? r.evs.sched : [] }); });
+const evA = await evOf(A), evB = await evOf(B);
+console.log('track events host:', evA.slice(0, 160), '| same on guest:', evA === evB);
+if (evA !== evB) console.log('events errors 1');
 await A.screenshot({ path: 'mp-race-host.png' });
 await B.screenshot({ path: 'mp-race-guest.png' });
 // Guest uses a ball; host should spawn it

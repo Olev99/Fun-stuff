@@ -34,6 +34,8 @@ const SUITES = {
   racers: ['racers.mjs', [], 6],
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
+  events: ['events.mjs', [], 25],
+  eventsint: ['eventsint.mjs', [], 20],
   shortcuts: ['shortcuts.mjs', [], 25],
   finish: ['finish.mjs', [], 12],
   phase2: ['phase2.mjs', [], 20],
@@ -86,7 +88,7 @@ let plan;
 if (argv[0] && SUITES[argv[0]]) plan = [[argv[0], argv.length > 1 ? argv.slice(1) : null]];
 else plan = (argv[0] === 'full' ? Object.keys(SUITES).filter((n) => n !== 'visual-audit' && n !== 'balance') : QUICK).map((n) => [n, null]);
 
-for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv', 'fin']) await mkdir(join(out, d), { recursive: true });
+for (const d of ['', 'car', 'ui', 'bat', 'items', 'adv', 'fin', 'ev']) await mkdir(join(out, d), { recursive: true });
 const srv = await serve();
 const results = [];
 for (const [name, args] of plan) {
@@ -94,6 +96,10 @@ for (const [name, args] of plan) {
   process.stdout.write(`${name} … `);
   const r = await run(name, script, args || defArgs, mins);
   console.log(`${r.ok ? 'PASS' : 'FAIL'} (${r.secs}s)`);
+  if (!r.ok) { // the log can be long: always show the lines that say what failed, then the tail
+    const why = r.log.split('\n').filter((l) => /^FAIL|\[pageerror\]|\[timeout\]|Content Security Policy/.test(l)).slice(0, 30);
+    if (why.length) console.log('--- what failed:\n' + why.join('\n') + '\n--- end of log:');
+  }
   if (!r.ok || plan.length === 1) console.log(r.log.split('\n').slice(-40).join('\n'));
   results.push(r);
 }

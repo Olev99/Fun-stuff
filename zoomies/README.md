@@ -90,7 +90,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Online too: every phone pops its own balloons, and steals, comebacks and knock-outs sync between phones. A ram is decided once, on the phone of the racer who was rammed, so a steal always takes a balloon from someone, even with lag. The host calls the end and sends everyone the results. A friend who is knocked out watches the rest of the fight.
 - **Coins come from the Career:** coins are earned in Career events, plus a one-off reward for each trophy. Every race in every mode still pays XP, and online races pay extra XP. Style points count for half. Each level takes longer than the last: a good racer needs about 25 races for level 10 and 100 for level 18. Each level-up shows what it unlocks: racers you can now hire, and a free prize capsule every 5th level. The daily reward also gives a free capsule. Whatever you buy or hire in the Career (karts, bikes, racers) can be used in quick races, cups, time trials and online. The chip on the title screen shows your level, coins and daily streak.
 - **Daily Challenge:** the same challenge for everyone on a given day, with a twist on top, such as bombs only, black ice everywhere, moon gravity, no items, turbo speed or gem hunting. Clear it to grow your streak; longer streaks pay more.
-- **Weekly Cup:** every ISO week (Monday to Sunday, UTC) has one special Grand Prix, the same for everyone and worked out from the week number: 4 different tracks of mixed size (no Epic adventures), a speed class, Normal or Hard racers and one twist from the Daily list (bombs only, black ice, moon gravity, turbo speed, no items and more; the Gem Rush goal stays Daily-only). Cup points work like a normal Grand Prix. Retry the whole cup as often as you like: your **best** placing of the week counts. The title screen has a Weekly Cup card next to Daily with the twist, the time left and your best placing.
+- **Weekly Cup:** every ISO week (Monday to Sunday, UTC) has one special Grand Prix, the same for everyone and worked out from the week number: 4 different tracks of mixed size (no Epic adventures), a speed class, Normal or Hard racers and one twist from the Daily list (bombs only, black ice, moon gravity, turbo speed, no items and more; the Gem Rush goal stays Daily-only). Some weeks the twist is **Storm Week** (track events go Wild on every track that has them) or **Calm Skies** (no track events); they never change the class or difficulty, and the Daily Challenge never rolls them. Cup points work like a normal Grand Prix. Retry the whole cup as often as you like: your **best** placing of the week counts. The title screen has a Weekly Cup card next to Daily with the twist, the time left and your best placing.
   - No coins. XP by cup placing: 1st 500, 2nd 350, 3rd 250, finished 150, paid only for the part you improve on this week's best, so a week pays 500 XP at most however often you retry.
   - The first podium of a week adds a **Week N** badge to your profile and gives a free prize capsule (once a week). A 🔥 streak counts consecutive weeks with a podium.
   - Saved as `weekly` (week, best, trophies, streak, last, capGiven). Syncing two devices keeps the better placing of the same week, every trophy and capsule, and the streak of the device that played a podium last.
@@ -99,7 +99,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Every racer has a funny **title** at levels 3, 6 and 10 (Mochi: Whisker Rookie, Nine-Lives Drifter, Grand Cat of the Circuit), shown on the racer screen and the profile. A coloured ★ with the level shows on the racer and ride cards (bronze, silver, gold, mint, pink for level 10).
   - The profile has a mastery list with progress bars. Every 5 mastery levels gained across all racers and rides give a free prize capsule. The results screen shows the mastery gained and any level-up or title.
   - Saved as `mastery` (`r` racers, `b` rides, `capLevels`); syncing keeps the higher XP of each.
-- **Trophies:** 46 achievements with progress bars, from your first win to beating every rival, finding every shortcut, winning online and earning Gold and Zoomie medals. Each pays coins and XP. Tap 🏆 on the title screen.
+- **Trophies:** 50 achievements with progress bars, from your first win to beating every rival, finding every shortcut, winning online, earning Gold and Zoomie medals and four for track events: **Storm Surfer** (10 gust or wave-crest boosts), **Dodge Master** (10 dodges in one race), **Eye of the Storm** (finish through a blizzard or sandstorm without touching a wall) and **Weather Report** (see every track's signature event, the first on its list). Each pays coins and XP. Tap 🏆 on the title screen.
 - **Medals:** every track has four time targets for your best Time Trial: 🥉 Bronze, 🥈 Silver, 🥇 Gold and ⚡ Zoomie. Gold matches what a Hard computer racer can do in the stock Zoom Classic. Zoomie is 6% faster than that, so it needs the shortcuts and a clean lap. The track cards show your medal and (in Time Trial) all four times, the Time Trial results show your medal and "next medal in X.XXs", and the Trophies screen shows your medal total (a Gold track counts 3). Improving your tier pays a one-off XP bonus (Bronze 50, Silver 100, Gold 200, Zoomie 400). Medals are worked out from your best time, so nothing extra is saved. Reverse laps don't have medals.
 - **Daily missions:** three small goals a day, the same for everyone (drift-boost 10 times, finish 3 races, win on a bike, collect 25 gems, pop balloons in a battle and more), shown with progress bars on the title screen. Each pays 100 XP, and finishing all three gives a free prize capsule. A 🔥 streak counts days in a row with all three done.
 - **Results screen:** the XP bar fills (through a level-up), the missions and medals you moved are listed, and a **Next up** line picks the closest goal (a mission nearly done, a medal just out of reach, the next level or the next Career event). **Race again** restarts the same race in one tap. Tap the rewards to skip the animation.
@@ -122,6 +122,35 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - **Throwing behind:** when you hold an item that can be aimed, a **⤵️ THROW BACK** button appears next to ITEM. Tap it to throw or drop behind you. You can also swipe ITEM up or down, or hold BRAKE while tapping it.
 - **Prize orbs:** items come from spinning crystal orbs with a star inside, not boxes. Every regular shortcut has its own orbs as a reward for finding it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
+
+## Track events
+
+Things happen during a race, always announced first: a banner with an icon, a line from Mic the Announcer and a countdown (at least 3 seconds), plus a sound and marks on the road. While one lasts, a small tag under the lap counter shows how long is left.
+
+- **Frostbite Pass: Blizzard.** Crosswind gusts that swap sides, a whiteout and patches of black ice. The road edges glow so you can always see them. Let a drift boost go in a gust to surf it (**STORM SURFER**).
+- **Frostbite Pass: Avalanche.** Red-striped spots across the road rumble, then lumps of snow slide over them. Drive through a gap for **DODGED!**; a lump buries you (half your speed and a short slide, never a dead stop).
+- **Magma Mountain: Lava Rain.** Glowing circles mark where meteors land 2 seconds later; each leaves a lava puddle for 8 seconds that spins you out. Steer out of a circle in time for **DODGED!**
+- **Magma Mountain: Eruption.** The ground shakes, ash darkens the sky and short boost lanes open up through the smoke (**ASH DASH**).
+- **Dune Dash Canyon: Sandstorm.** A wall of dust rolls in, the wind pushes you towards one side and the view closes in, but the road edges glow. Gusts can be surfed like in the blizzard.
+- **Coral Cove and Tidal Twist: Rising Tide.** Waves wash over parts of the boardwalk with a clear foam line. Water slows you; keep to the dry side, or cross the crest as it rolls in for a boost (**STORM SURFER**).
+- **Sprout Speedway: Harvest Gust.** A crosswind sweeps petals and hay over the road; let a drift boost go in a gust for **GUST SURFER**.
+- **Blossom Gardens: Lantern Festival.** Lantern-lit boost lanes appear along the best line for a few seconds (**LANTERN LIGHT**).
+- **Sweet Tooth Valley: Syrup Shower.** Syrup lands on the pink circles and leaves sticky, slow puddles for 8 seconds. Drive through a candy spark to wipe the puddles round it (**SWEET RELIEF**).
+- **Windmill Downs: Twister Crossing.** A twister wanders across the field and the road over a striped path. A hit is a hop-spin, never a stall; wait it out for **TWISTER DANCE**.
+- **Spooky Hollow: Ghost Parade.** Friendly ghosts float across the road in diagonal rows while fog rolls in and lantern light marks the edges. Slip through for **BOO-GIE**.
+- **Jungle Ruins: Temple Tremor.** The ground shakes and boulders drop on marked circles; then the temple gate opens a boost lane (**TEMPLE RUSH**).
+- **Gearworks: Factory Alarm.** Conveyor strips push you forward, then reverse on every siren (**CONVEYOR RIDE**), and presses slam down on a 2.4-second beat (**UNDER THE PRESS**).
+- **Maple Ridge: Leaf Storm.** Swirling gusts of leaves push you sideways and hide the line; the wind drops in the eye, where a boost lane forms (**EYE OF THE STORM**).
+- **Neon Nebula: Power Surge.** The city blacks out for a few seconds, only the road edges, lane lights and boost arrows glow (**LIGHTS OUT**), then a big light show.
+- **Cloud Carnival: Fireworks Finale.** Fireworks light the sky and sparkle lanes open (**SPARKLE RUSH**); rainbow gusts push you along (**RAINBOW SURFER**).
+- **Glacier Gorge: Ice Quake.** Cracks run over striped sections one after another and each turns to black ice (**BLACK ICE SLIDE** for staying on the road).
+- **Obsidian Rush: Glass Crack.** Panels flash, then crack on a 4-second beat; the cracked half has low grip, so drive the safe side (**GLASS WALKER**).
+- **Moonbase Loop: Meteor Shower.** Meteors land on marked circles and leave craters that are small bumps; gravity pulses lower (**MOON HOP**) and a solar flare tints the sky.
+- **Jungle Odyssey: River Surge** (the boat leg) and **Jet Stream** (the sky leg). Glowing lanes give a boost if you ride them (**RIDE THE SURGE**, **JET STREAM**).
+- **Island Hopper: Harbor Swell** (the canal leg: swells roll down the canal, **SWELL RIDER**) and **Ash Cloud** (the volcano leg: smoke and lit lanes, **ASH DASH**).
+- **Balloon Battle arenas:** **Hay Stampede** (Barnyard Bowl: hay carts roll over marked lines), **Whiteout** (Snowglobe Rink: gusts and snow), **Overload** (Neon Pinball: faster lasers, boost strips flash on), **Tide Rush** (Sandcastle Cove: the sea floods the outer rim) and **Meteor Strike** (Moon Crater: marked impacts leave bumps). Arena events only shove, slow and hop karts; they never pop a balloon.
+
+Fair play: no event in the countdown, before 25 seconds, in the last 8% of a race or within 20 seconds of the last one, and only one at a time. **Settings → Track events** (Off, Normal or Wild; Normal by default) works in Quick Race, Grand Prix and Balloon Battle; online, the host's setting counts and every phone sees the same events at the same moments. Wild brings more events and stronger ones. **Settings → Event warnings** (Full or Short): Short shows just the name and a 3-second countdown. In the Career and the Legends League the story decides: the prologue and chapter 1 are calm, chapter 2 has two mild events (Sun & Surf), chapters 3 to 5 use each track's own events, chapters 6 and 7 and League season 3 are Wild for the big events and boss duels, and League season 2 is Wild for its lava run and the masked duel. Career event cards show a chip with the event names and a hint from Gramps; each attempt gets its own seed. Quick Race, cup and arena cards show the setting and the track's events (Time Trial cards say events are off there). Time Trial (and its medals) and Driving School never have events; the Daily Challenge stays calm too, and the Weekly Cup only has events in a Storm Week.
 
 ## First steps
 
@@ -213,6 +242,7 @@ How it works:
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
 - **Steering assist:** Off, Light or Strong in Settings (new saves start on Light). It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
 - **Screen shake:** Off, Low or Normal in Settings.
+- **Track events:** Off, Normal or Wild in Settings, and Event warnings Full or Short (see Track events above).
 - **Name tags:** the other karts show their name and current place above them, so you can see when you pass someone. In online races, friends get big tags in their kart colour that show from far away; computer racers get small tags up close. Settings switches tags between Everyone, Friends and Off.
 - **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are mostly slow unless you hit them with a boost (Snowmobile Trail and Dune Surf, in both directions, still pay off without one).
 - **Gems:** each one adds a little top speed, up to 10. Getting hit drops 3.
@@ -250,6 +280,7 @@ zoomies/
   src/safeui.js       the Backup and About screens
   sw.js               service worker: offline cache and safe updates (file list in precache.json, written by tools/stamp.mjs)
   src/race.js         race loop, laps, positions, collisions, camera, network sync
+  src/events.js       track events: schedule from a seed, the events and their shared effects
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
   src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur
   src/env.js          image-based lighting (sky and studio environment maps)
@@ -272,7 +303,7 @@ zoomies/
   src/audio.js        synthesised sound effects and music
   tools/build-single.mjs  bundles everything into one HTML file
   tools/economy.mjs   Career and League coin income, shop stock and drops
-  tools/balance.mjs   AI balance report (`--tuned` runs the player with Workshop parts)
+  tools/balance.mjs   AI balance report (`--tuned` runs the player with Workshop parts, `--events normal|wild` turns track events on)
   tools/league-sim.mjs  League races with a computer-driven player (AI strength check)
 ```
 

@@ -24,6 +24,8 @@ export const DEFAULTS = {
   tags: 'all', // name tags over karts: all | friends | off
   assist: 'light', // steering assist: off | light | strong (new saves start on Light)
   shake: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : 'normal', // screen shake: off | low | normal
+  trackEvents: 'normal', // track events in quick races, cups and battles: off | normal | wild
+  evWarn: 'full', // track event warnings: full (announcer line, 4-5 s) | short (3 s)
   workshopParts: true, // Workshop parts count in quick races, cups, battles and online (not in time trials or the daily and weekly)
   tiltZero: 0, // tilt angle that counts as level (set in the intro's tilt step)
 };

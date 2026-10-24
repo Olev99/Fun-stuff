@@ -1,8 +1,9 @@
 import { CHARACTERS, charById } from './characters.js';
 import { BODIES, kartStats } from './karts.js';
-import { trackById } from './tracks.js';
+import { trackById, TRACKS } from './tracks.js';
+import { ARENAS } from './arenas.js';
 import { fmtTime } from './util.js';
-import { levelOf, oldLevel, DAILY_MODS } from './profile.js';
+import { levelOf, oldLevel, DAILY_MODS, evSeedOf, MAX_EV_SEEN } from './profile.js';
 import { LEAGUE, legendRank, grantLeagueRewards, enforceLeagueRewards } from './league.js';
 import { emptyWeekly } from './weekly.js';
 import { RACER_IDS, BODY_IDS, MAX_XP, emptyMastery } from './mastery.js';
@@ -58,7 +59,7 @@ export const SPEAKERS = {
 // `ai.up` / `boss.up` are flat stat levels for the computer racers (parts.js).
 export const CHAPTERS = [
   {
-    id: 'c1', name: 'Rookie Road', rival: 'hopper', alt: 'pip', cls: 'chill', diff: 'easy', bossDiff: 'normal',
+    id: 'c1', name: 'Rookie Road', ev: 'off', rival: 'hopper', alt: 'pip', cls: 'chill', diff: 'easy', bossDiff: 'normal',
     blurb: 'Farm lanes and beach laps. Everyone starts somewhere.',
     ai: { bodies: ['buggy'], up: 0 }, boss: { body: 'buggy', up: 1 },
     clue: 'Boost Corp sells every team the same "approved" kart, and hides fine print in the deal.',
@@ -96,7 +97,7 @@ export const CHAPTERS = [
     ],
   },
   {
-    id: 'c2', name: 'Sun & Surf', rival: 'zorp', alt: 'ember', cls: 'chill', diff: 'normal', bossDiff: 'normal',
+    id: 'c2', name: 'Sun & Surf', ev: 'off', rival: 'zorp', alt: 'ember', cls: 'chill', diff: 'normal', bossDiff: 'normal',
     blurb: 'Boardwalks, blossoms and sand in everything.',
     ai: { bodies: ['buggy', 'classic'], up: 0 }, boss: { body: 'tub', up: 0 },
     clue: 'The Starbolt statue in the Boost Corp lobby says the Baron designed it alone.',
@@ -112,15 +113,21 @@ export const CHAPTERS = [
       ['gramps', 'That elbow is my best feature. ...Gearbox Gus, they called me. Champion, once. A long time ago.'],
     ],
     events: [
-      { id: 'c2-1', type: 'race', track: 'tidal', goal: 3, title: 'Twist and Shout', reward: 220, drop: 'turbo1' },
+      { id: 'c2-1', type: 'race', track: 'tidal', ev: 'signature', goal: 3, title: 'Twist and Shout', reward: 220, drop: 'turbo1' },
       { id: 'c2-2', type: 'gems', track: 'blossom', n: 14, title: 'Petal Pickup', reward: 220, drop: 'armor1' },
       { id: 'c2-3', type: 'time', track: 'coral', target: 106, title: 'Sandbar Sprint', reward: 220 },
-      { id: 'c2-4', type: 'race', track: 'dunes', goal: 3, title: 'Desert Heat', reward: 250 },
+      {
+        id: 'c2-4', type: 'race', track: 'dunes', ev: 'signature', goal: 3, title: 'Desert Heat', reward: 250,
+        after: [
+          ['mic', 'A sandstorm rolled through the canyon halfway round and our scrapyard star came out the other side with a free paint job. Sand-coloured!'],
+          ['gramps', 'Wind pushes you toward the wall, kid. Lean away from it, and watch the edge: it glows when the dust gets thick.'],
+        ],
+      },
       { id: 'c2-b', type: 'duel', track: 'tidal', title: 'Close Encounter', reward: 550, boss: true, drop: 'gemVac', bp: true },
     ],
   },
   {
-    id: 'c3', name: 'Frostbite Trials', rival: 'pip', alt: 'volt', cls: 'zoom', diff: 'normal', bossDiff: 'normal',
+    id: 'c3', name: 'Frostbite Trials', ev: 'signature', rival: 'pip', alt: 'volt', cls: 'zoom', diff: 'normal', bossDiff: 'normal',
     blurb: 'Snow, black ice and a penguin who never brakes.',
     ai: { bodies: ['classic'], up: 0 }, boss: { body: 'classic', up: 1 },
     clue: 'Gramps and the Baron built the Starbolt together. The Baron kept the plans and pushed Gramps out.',
@@ -128,6 +135,7 @@ export const CHAPTERS = [
       ['mic', 'Frostbite Trials! It is minus twenty and the tyres are not happy about it.'],
       ['pip', 'Ice is my best friend. It is about to be your worst enemy!'],
       ['gramps', 'Less grip up here. Lift before the bend, drift long and do not fight the slide. Fresh Tyres or Ice Studs in the sockets help a lot.'],
+      ['mic', 'And the weather is part of the show now, folks! Blizzards, avalanches, the lot. Every one comes with a warning, so keep an eye on the banner.'],
     ],
     bossIntro: [['pip', 'Glacier Gorge. Just you, me and a whole lot of nothing to hold on to.']],
     outro: [
@@ -136,7 +144,13 @@ export const CHAPTERS = [
       ['gramps', 'Speed class goes up from here. Time to think about a proper kart.'],
     ],
     events: [
-      { id: 'c3-1', type: 'race', track: 'frost', goal: 3, title: 'Cold Start', reward: 280, drop: 'tyres2' },
+      {
+        id: 'c3-1', type: 'race', track: 'frost', goal: 3, title: 'Cold Start', reward: 280, drop: 'tyres2',
+        after: [
+          ['mic', 'WHITEOUT on the first lap, folks! One minute it is a road, the next it is a very large snowball with a kart in it!'],
+          ['gramps', 'That was the blizzard. Ice patches turn up when the wind does. Lift, steer small, and let the kart find the grip.'],
+        ],
+      },
       { id: 'c3-2', type: 'race', track: 'candy', goal: 3, title: 'Sugar Rush', reward: 280 },
       { id: 'c3-3', type: 'gems', track: 'frost', rev: true, n: 15, title: 'Ice Crystals', reward: 280, drop: 'turbo2' },
       { id: 'c3-4', type: 'time', track: 'glacier', target: 126, title: 'Black Ice', reward: 300 },
@@ -144,7 +158,7 @@ export const CHAPTERS = [
     ],
   },
   {
-    id: 'c4', name: 'Spooky Season', rival: 'ember', alt: 'zorp', cls: 'zoom', diff: 'normal', bossDiff: 'hard',
+    id: 'c4', name: 'Spooky Season', ev: 'signature', rival: 'ember', alt: 'zorp', cls: 'zoom', diff: 'normal', bossDiff: 'hard',
     blurb: 'Haunted lanes, falling leaves and a fox with a grudge.',
     ai: { bodies: ['classic', 'tub'], up: 1 }, boss: { body: 'comet', up: 2 },
     clue: 'Ember drove for Boost Corp until she read her contract. Rivals can change sides.',
@@ -168,7 +182,7 @@ export const CHAPTERS = [
     ],
   },
   {
-    id: 'c5', name: 'Heavy Metal', rival: 'volt', alt: 'rexi', cls: 'zoom', diff: 'normal', bossDiff: 'hard',
+    id: 'c5', name: 'Heavy Metal', ev: 'signature', rival: 'volt', alt: 'rexi', cls: 'zoom', diff: 'normal', bossDiff: 'hard',
     blurb: 'Oil slicks, barrels and a robot that never makes mistakes.',
     ai: { bodies: ['classic', 'comet', 'tub'], up: 1 }, boss: { body: 'comet', up: 3 },
     clue: 'The Baron offered you a golden seat. You folded the contract into a paper plane.',
@@ -193,7 +207,7 @@ export const CHAPTERS = [
     ],
   },
   {
-    id: 'c6', name: 'Trial by Fire', rival: 'rexi', alt: 'bruno', cls: 'turbo', diff: 'normal', bossDiff: 'hard',
+    id: 'c6', name: 'Trial by Fire', ev: 'signature', rival: 'rexi', alt: 'bruno', cls: 'turbo', diff: 'normal', bossDiff: 'hard',
     blurb: 'Lava, obsidian and a floating fairground. Turbo class.',
     ai: { bodies: ['classic', 'comet', 'stomper'], up: 2 }, boss: { body: 'stomper', up: 3 },
     clue: 'The Baron keeps a locked garage on the moon base. Gramps\'s first Starbolt blueprint is inside.',
@@ -209,15 +223,21 @@ export const CHAPTERS = [
       ['gramps', 'Behind that door sits the first Starbolt blueprint, with my name on the corner. I would bet my spanner on it.'],
     ],
     events: [
-      { id: 'c6-1', type: 'race', track: 'magma', goal: 3, title: 'Hot Wheels', reward: 480 },
+      {
+        id: 'c6-1', type: 'race', track: 'magma', ev: 'wild', goal: 3, title: 'Hot Wheels', reward: 480,
+        after: [
+          ['mic', 'Lava is falling from the SKY, ladies and gentlemen! Glowing circles first, meteors second. Please do not stand in the circles.'],
+          ['rexi', 'STOMP! I stood in a circle! It was warm! I regret nothing!'],
+        ],
+      },
       { id: 'c6-2', type: 'race', track: 'obsidian', goal: 2, title: 'Black Glass', reward: 500 },
       { id: 'c6-3', type: 'time', track: 'cloud', target: 99, title: 'Head in the Clouds', reward: 480, drop: 'turbo2' },
       { id: 'c6-4', type: 'gems', track: 'obsidian', rev: true, n: 20, title: 'Lava Gems', reward: 480 },
-      { id: 'c6-b', type: 'duel', track: 'magma', title: 'Dino Might', reward: 1200, boss: true, drop: 'bumperPlate', bp: true },
+      { id: 'c6-b', type: 'duel', track: 'magma', ev: 'wild', title: 'Dino Might', reward: 1200, boss: true, drop: 'bumperPlate', bp: true },
     ],
   },
   {
-    id: 'c7', name: 'To the Moon', rival: 'baron', alt: 'bruno', field: ['bruno'], joins: ['bruno'], cls: 'turbo', diff: 'hard', bossDiff: 'hard',
+    id: 'c7', name: 'To the Moon', ev: 'wild', rival: 'baron', alt: 'bruno', field: ['bruno'], joins: ['bruno'], cls: 'turbo', diff: 'hard', bossDiff: 'hard',
     blurb: 'Low gravity, the Big Bear and the Golden Wheel.',
     ai: { bodies: ['comet', 'stomper', 'classic'], up: 2 }, boss: { body: 'bolt', up: 3 },
     clue: 'The Baron raced the Golden Wheel himself, in a kart that was the same as everyone else\'s.',
@@ -226,6 +246,7 @@ export const CHAPTERS = [
       ['bruno', 'Five years I have held the Golden Wheel, kid. You and that junk heap will not change that.'],
       ['baron', 'Bruno, please. A gentleman steps in when it matters. I have entered the Golden Wheel Cup myself. Do try to keep up, scrapyard.'],
       ['gramps', 'Win the Golden Wheel Cup and the title is yours. No pressure. Well. A little pressure.'],
+      ['mic', 'The forecast for the moon says "wild, with a chance of meteors". I asked how a forecast works up here. They said, "very carefully".'],
     ],
     bossIntro: [['baron', 'Four races. One Wheel. And a company that owns the road. Shall we?']],
     outro: [
@@ -244,11 +265,42 @@ export const CHAPTERS = [
       { id: 'c7-1', type: 'race', track: 'moon', goal: 3, title: 'One Small Step', reward: 560 },
       { id: 'c7-2', type: 'time', track: 'moon', target: 94, title: 'Moonwalk', reward: 560 },
       { id: 'c7-3', type: 'race', track: 'glacier', rev: true, goal: 3, title: 'Frozen Flip', reward: 580 },
-      { id: 'c7-4', type: 'gems', track: 'cloud', n: 22, title: 'Sky High', reward: 560 },
+      { id: 'c7-4', type: 'gems', track: 'cloud', ev: 'signature', n: 22, title: 'Sky High', reward: 560 },
       { id: 'c7-b', type: 'cup', tracks: ['moon', 'obsidian', 'glacier', 'neon'], title: 'Golden Wheel Cup', reward: 2500, boss: true, drop: 'rocketPill', bp: true },
     ],
   },
 ];
+
+// Track events in the story (events.js). `ev` on a chapter is the default for its events, `ev` on an event
+// overrides it: 'off' (calm; the prologue and chapter 1), 'signature' (the track's own events, Normal) or
+// 'wild' (Wild). `evOnly: [ids]` limits an event to some of its track's events. Time events never have them.
+export const EV_ASSIGN = ['off', 'signature', 'wild'];
+export function evPlan(ev, ch) {
+  const a = ev.ev ?? ch.ev ?? 'off';
+  return { mode: ev.type === 'time' ? 'off' : a === 'wild' ? 'wild' : a === 'signature' ? 'normal' : 'off', only: Array.isArray(ev.evOnly) ? ev.evOnly : null };
+}
+// One seed per attempt: a retry may differ, a replay of the same attempt (and race of a cup) is the same.
+export const evSeedFor = (evId, attempt, i = 0) => evSeedOf(`${evId}#${attempt}#${i}`);
+
+// What Gramps says about each track event (a fallback covers the rest).
+export const EV_HINTS = {
+  blizzard: 'Ice patches come with the wind. Lift, steer small and let the kart find grip.',
+  avalanche: 'Lift before the avalanche, then drift through the gap.',
+  sandstorm: 'The wind shoves you at the wall. Lean into it and follow the glowing edge.',
+  tide: 'Read the wave line. Ride the crest for a boost and keep off the wet sand.',
+  lavaRain: 'Glowing circles mean a meteor in two seconds. Steer round them and skip the puddles.',
+  eruption: 'Brace for the shake and stay off the lava river as it shifts.',
+};
+export const EV_HINT_DEFAULT = 'Watch the banner: every event warns you a few seconds ahead. The clever line even pays a boost.';
+
+// The ids of the track events a career event can have (its tracks' lists, cut down by evOnly); none when they are off.
+export function eventIds(ev) {
+  const ch = (eventById(ev.id) || {}).chapter;
+  if (!ch || evPlan(ev, ch).mode === 'off') return [];
+  const only = evPlan(ev, ch).only;
+  const ids = (ev.type === 'cup' ? ev.tracks : [ev.track]).flatMap((t) => trackById(t).events || []);
+  return [...new Set(ids)].filter((id) => !only || only.includes(id));
+}
 
 export const TYPE_ICON = { race: '🏁', gems: '💎', time: '⏱️', duel: '⚔️', cup: '🏆', battle: '🎈' };
 
@@ -278,7 +330,7 @@ export function newCareer() {
     pv: 2, upgrades: {}, parts: {}, bought: {}, sold: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
-    xp: 0, stats: {}, ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
     missions: { day: '', prog: {}, done: [], streak: 0, last: '' }, // daily missions (missions.js)
     weekly: emptyWeekly(), // Weekly Cup (weekly.js)
     mastery: emptyMastery(), // racer and ride mastery (mastery.js)
@@ -377,6 +429,9 @@ export function cleanCareer(saved) {
   if (saved.pv !== 2 && Object.keys(c.done).length) c.done['c1-0'] = true;
   c.seen = mapObj(saved.seen, flag);
   c.best = mapObj(saved.best, (v) => (Number.isFinite(v) && v > 0 ? v : undefined));
+  // Track events seen (profile.js addEvSeen): only ids some track or arena really lists, at most MAX_EV_SEEN of them.
+  const known = new Set([...TRACKS, ...ARENAS].flatMap((t) => t.events || []));
+  c.evSeen = Array.isArray(saved.evSeen) ? [...new Set(saved.evSeen.filter((x) => isStr(x) && known.has(x)))].slice(0, MAX_EV_SEEN) : [];
   c.ach = mapObj(saved.ach, (v) => (v === true || (Number.isFinite(v) && v > 0) ? v : undefined));
   // Lifetime stats: counters, or lists of ids.
   c.stats = mapObj(saved.stats, (v) => (Array.isArray(v) ? v.filter((x) => isStr(x) || Number.isFinite(x)).slice(0, 1000) : Number.isFinite(v) ? count(v) : undefined));
@@ -520,6 +575,8 @@ export function grampsTip(ev) {
   else if (ev.type === 'battle') tips.push('Bumper Plate wins the shoving, Armour keeps your balloons, and a Comeback Spring never hurts.');
   for (const k of ['ice', 'mud', 'sand', 'oil', 'glide', 'lowg', 'shortcuts', 'narrow']) if (traits.has(k) && tips.length < 2) tips.push(TIPS[k]);
   if (!tips.length) tips.push('Engine for the straights, Tyres for the bends. Try both.');
+  const evs = eventIds(ev);
+  if (evs.length) tips.push(evs.slice(0, 2).map((id) => EV_HINTS[id] || EV_HINT_DEFAULT).filter((h, i, a) => a.indexOf(h) === i).join(' '));
   return tips.join(' ');
 }
 

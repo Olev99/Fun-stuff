@@ -14,6 +14,7 @@ import { SHAKE } from './settings.js';
 import { SkidMarks } from './skids.js';
 import { Battle, BattleAI, MAX_BALLOONS } from './battle.js';
 import * as TX from './textures.js';
+import { TrackEvents } from './events.js';
 
 export const SPEED_CLASSES = {
   chill: { id: 'chill', name: 'Chill', top: 27 },
@@ -168,6 +169,7 @@ export class Race {
     this.stylePts = 0;
     this.styleCounts = {};
     this.lapWalls = 0;
+    this.evWalls = {}; // player wall hits per track event id while that event is active (the Eye of the Storm trophy)
     this._lastPlace = 0;
     this._overtakeT = 0;
     this.lookBack = false;
@@ -189,6 +191,10 @@ export class Race {
       this.player.item = 'chili';
       this.player.itemCount = 3;
     }
+
+    // Track events (events.js): null when this race has none.
+    this.evMods = null;
+    this.evs = TrackEvents.create(this, opts);
 
     this.camYaw = this.player ? this.player.yaw : 0;
     this.camPos = new THREE.Vector3();
@@ -307,6 +313,7 @@ export class Race {
     }
 
     this._rubberBand();
+    if (this.evs) this.evs.update(dt);
 
     const steps = Math.min(5, Math.max(1, Math.ceil(dt / PHYS_DT - 0.01)));
     const h = dt / steps;
@@ -485,6 +492,7 @@ export class Race {
     for (let i = 0; i < ev.length; i += 2) {
       const type = ev[i], data = ev[i + 1];
       if (coach) coach.event(type, data, k);
+      if (this.evs) this.evs.kartEvent(k, type, data);
       switch (type) {
         case 'useItem': {
           const used = this.items.use(k, null, null, k.ctl.aim || 0);
@@ -571,6 +579,7 @@ export class Race {
           break;
         case 'wall':
           if (k.isPlayer) this.lapWalls++;
+          if (k.isPlayer && this.evs && this.evs.cur && this.evs.cur.began) this.evWalls[this.evs.cur.id] = (this.evWalls[this.evs.cur.id] || 0) + 1;
           if (k.isPlayer) { a.play('wall', data); this.shake = Math.max(this.shake, Math.min(0.4, data * 0.02)); }
           this.fx.burst(k.pos.x + Math.sin(k.yaw) * 1.2, k.pos.y + 0.5, k.pos.z + Math.cos(k.yaw) * 1.2, ['#ffd23f', '#ffffff'], 6, 7, 0.3, 0.3, 14);
           break;
@@ -1519,6 +1528,7 @@ export class Race {
     if (this.ghost) this.ghost.dispose(this.scene);
     this.world.dispose();
     this.items.dispose();
+    if (this.evs) this.evs.dispose();
     this.fx.dispose();
     this.wheelMesh.material.dispose();
     this.wheelMesh.dispose();

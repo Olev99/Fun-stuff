@@ -428,6 +428,8 @@ export class Kart {
 
     // Longitudinal
     const patch = (this.patch = this._patchAt());
+    // Track events (events.js): timed grip, traction, gravity and a crosswind; null when none is on.
+    const em = this.race.evMods;
     // What the patch does to this kart: Mud Boots shrug off mud, sand and oil, Ice Studs ice and snow,
     // and race-spec tyres are worse on soft ground.
     let pSpeed = 1, pTrac = 1, pGrip = 1;
@@ -443,7 +445,7 @@ export class Kart {
         pTrac = 1 - (1 - pTrac) * 0.3; pGrip = 1 - (1 - pGrip) * 0.15; pSpeed = Math.max(pSpeed, 1);
       }
     }
-    const trac = this.traction * pTrac;
+    const trac = this.traction * pTrac * (em ? em.traction : 1);
     if (spinning) {
       this.spinTime -= dt;
       if (this.spinTime <= 0 && this.comeback) {
@@ -506,10 +508,12 @@ export class Kart {
     rxk = -fz; rzk = fx;
     vf = vx * fx + vz * fz;
     vl = vx * rxk + vz * rzk;
-    const gm = this.path.gripMul * pGrip * (this.slipTime > 0 ? 0.12 : 1);
+    const gm = this.path.gripMul * pGrip * (this.slipTime > 0 ? 0.12 : 1) * (em ? em.grip : 1);
     // Boats slide through turns, planes float round them.
     const zg = this.mode === 1 ? (this.drifting ? 0.85 : 0.5) : this.mode === 2 ? (this.drifting ? 0.9 : 0.6) : 1;
     const grip = !this.grounded ? 0.8 : (this.drifting ? this.driftGrip : this.offroad ? this.grip * 0.8 : this.grip) * gm * zg;
+    // Wind pushes sideways across the road (a small, clamped term; grip resists it).
+    if (em && em.wind && this.grounded && this.mode === 0 && this.trk.rx !== undefined) vl += em.wind * (this.trk.rx * rxk + this.trk.rz * rzk) * dt;
     vl *= Math.exp(-grip * dt);
     vx = fx * vf + rxk * vl;
     vz = fz * vf + rzk * vl;
@@ -623,9 +627,9 @@ export class Kart {
         // Hold BRAKE to fold the wings and dive, to land where you want.
         this.diving = !!c.brake;
         const wing = this.perks.wingKit;
-        this.vy -= GRAVITY * this.gravityK * (this.diving ? 1.15 : wing ? 0.19 : 0.28) * dt;
+        this.vy -= GRAVITY * this.gravityK * (em ? em.gravity : 1) * (this.diving ? 1.15 : wing ? 0.19 : 0.28) * dt;
         if (!this.diving && this.vy < (wing ? -3.4 : -5)) this.vy = wing ? -3.4 : -5;
-      } else this.vy -= GRAVITY * this.gravityK * dt;
+      } else this.vy -= GRAVITY * this.gravityK * (em ? em.gravity : 1) * dt;
       this.pos.y += this.vy * dt;
       this.airTime += dt;
       if (this.pos.y <= groundY) {

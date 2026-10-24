@@ -1,4 +1,5 @@
 import { TRACKS, trackById } from './tracks.js';
+import { ARENAS } from './arenas.js';
 import { BODY_LIST } from './karts.js';
 import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
@@ -44,6 +45,7 @@ const PLACE_XP = [80, 60, 45, 35, 28, 20, 14, 10];
 const STYLE_STATS = {
   'PERFECT START': ['perfect'], 'SPARK BOOST': ['turbos'], 'BLAZE BOOST': ['turbos'], 'NOVA BOOST': ['turbos', 'ultra'],
   TRICK: ['tricks'], HIT: ['hits'], SLIPSTREAM: ['slips'], 'CLEAN LAP': ['clean'], OVERTAKE: ['overtakes'], SHORTCUT: ['shortcutRuns'],
+  'STORM SURFER': ['surfs'], // a gust or crest boost (events.js); 'DODGED!' is counted per race below
 };
 
 function addStat(c, k, n = 1) {
@@ -58,7 +60,7 @@ function addToSet(c, k, v) {
 }
 
 // Apply a finished race to the profile. info: { mode, place, gems, style,
-// styleCounts, trackId, online, coins (override), xpBonus, careerCoins }.
+// styleCounts, trackId, online, coins (override), xpBonus, careerCoins, evSeen (event ids that ran), evEye }.
 // Returns what was earned, for the results screen.
 export function awardRace(c, info) {
   const place = info.place || 0;
@@ -82,6 +84,11 @@ export function awardRace(c, info) {
   addStat(c, 'gems', info.gems || 0);
   if (info.trackId) addToSet(c, 'tracks', info.trackId);
   for (const [label, n] of Object.entries(info.styleCounts || {})) for (const st of STYLE_STATS[label] || []) addStat(c, st, n);
+  // Track events: the most dodges in one race, a stormy finish with no wall hit, and the events seen (Weather Report).
+  const dodged = Math.min(1000, (info.styleCounts || {})['DODGED!'] || 0);
+  if (dodged > (c.stats.dodgeBest || 0)) c.stats.dodgeBest = dodged;
+  if (info.evEye) addStat(c, 'eyes');
+  addEvSeen(c, info.evSeen);
   // Daily missions: +100 XP each, counted with this race's XP so level-ups show once.
   const mis = bumpMissions(c, info, info.day);
   const sum = grant(c, coins, xp + mis.xp);
@@ -113,6 +120,16 @@ export function grant(c, coins, xp) {
   // Level-ups no longer pay coins (coins come from the career only).
   return { coins, xp, levelCoins: 0, ups, caps, level: after, from: { level: before, pct: Math.round((lv0.into / lv0.need) * 100) } };
 }
+
+// Track events the player has seen run (bounded list of ids, c.evSeen).
+export const MAX_EV_SEEN = 60;
+export function addEvSeen(c, ids) {
+  c.evSeen = Array.isArray(c.evSeen) ? c.evSeen : [];
+  const known = new Set([...TRACKS, ...ARENAS].flatMap((t) => t.events || []));
+  for (const id of ids || []) if (known.has(id) && !c.evSeen.includes(id) && c.evSeen.length < MAX_EV_SEEN) c.evSeen.push(id);
+}
+// Each track's signature event is the first in its list.
+export const SIGNATURE_EVENTS = [...new Set(TRACKS.filter((t) => t.events && t.events.length).map((t) => t.events[0]))];
 
 // ---------------- achievements ----------------
 const S = (c, k) => (Array.isArray(c.stats[k]) ? c.stats[k].length : c.stats[k] || 0);
@@ -169,6 +186,11 @@ export const ACHIEVEMENTS = [
   { id: 'legend', icon: '🦄', name: 'Lucky Dip', desc: 'Win a legendary prize', reward: 250, prog: (c) => [(c.cos || []).some((id) => (cosmeticById(id) || {}).rarity === 'legendary') ? 1 : 0, 1] },
   { id: 'garage', icon: '🏎️', name: 'Full Garage', desc: 'Own every kart', reward: 800, prog: (c) => [c.bodies.length, BODY_LIST.length] },
   { id: 'champ', icon: '🥇', name: 'Golden Wheel', desc: 'Become the career champion', reward: 1000, prog: (c) => [c.champion ? 1 : 0, 1] },
+  // Track events (events.js)
+  { id: 'surf10', icon: '🏄', name: 'Storm Surfer', desc: 'Surf 10 gusts or wave crests for a boost', reward: 250, ...count('surfs', 10) },
+  { id: 'dodge10', icon: '🎯', name: 'Dodge Master', desc: 'Dodge 10 marked impacts or slides in one race', reward: 300, ...count('dodgeBest', 10) },
+  { id: 'eye', icon: '🌀', name: 'Eye of the Storm', desc: 'Finish a race through a blizzard or sandstorm without a wall hit', reward: 400, ...count('eyes', 1) },
+  { id: 'weather', icon: '🌦️', name: 'Weather Report', desc: 'See every track\'s signature event', reward: 600, prog: (c) => [SIGNATURE_EVENTS.filter((id) => (c.evSeen || []).includes(id)).length, Math.max(1, SIGNATURE_EVENTS.length)] },
   // Legends League (league.js)
   { id: 'lgfirst', icon: '🎪', name: 'League Debut', desc: 'Clear a Legends League event', reward: 200, prog: (c) => [LEAGUE_EVENTS.some((e) => c.done && c.done[e.id]) ? 1 : 0, 1] },
   { id: 'lgseasons', icon: '📆', name: 'Three-Season Run', desc: 'Clear all 3 Legends League seasons', reward: 500, prog: (c) => [LEAGUE.filter((s) => c.done && c.done[s.events.find((e) => e.boss).id]).length, LEAGUE.length] },
@@ -204,7 +226,12 @@ export const DAILY_MODS = [
   { id: 'bees', name: 'Bee Swarm', icon: '🐝', desc: 'Buzz bees, boomerangs and bumper balls only.', items: ['bee', 'boomerang', 'ball'] },
   { id: 'gems', name: 'Gem Rush', icon: '💎', desc: 'Grab 25 gems and finish in the top 3.', gems: 25 },
   { id: 'ghosts', name: 'Spooky Swap', icon: '👻', desc: 'Only Spook Masks, oil and honey. Sneaky!', items: ['ghost', 'oil', 'honey'] },
+  // Track events (events.js). Always last and never picked by the Daily's hash: the Weekly Cup rolls them
+  // separately (weekly.js), so the old days and weeks keep their twist.
+  { id: 'storm', name: 'Storm Week', icon: '⛈️', desc: 'Track events go Wild on every track that has them: weather, warnings and gusts to surf.', evMode: 'wild' },
+  { id: 'calm', name: 'Calm Skies', icon: '☀️', desc: 'No track events at all. Just you, the road and clean racing.', evMode: 'off' },
 ];
+export const CLASSIC_MODS = DAILY_MODS.filter((m) => !m.evMode);
 
 export function today(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
@@ -223,12 +250,15 @@ function hashStr(s) {
   return h >>> 0;
 }
 
+// A track-event seed (events.js) from any string: whole number in range, the same everywhere.
+export const evSeedOf = (s) => hashStr(s) % 0x7fffffff;
+
 // The same challenge for everyone on a given day.
 export function dailyFor(day = today()) {
   const r = rng(hashStr(`zoomies-${day}`) % 100000 + 1);
   const track = TRACKS[Math.floor(r() * TRACKS.length)];
   const rev = r() < 0.3;
-  const mod = DAILY_MODS[Math.floor(r() * DAILY_MODS.length)];
+  const mod = CLASSIC_MODS[Math.floor(r() * CLASSIC_MODS.length)];
   const goal = mod.gems ? 3 : r() < 0.35 ? 1 : 3;
   const cls = mod.cls || ['zoom', 'zoom', 'turbo'][Math.floor(r() * 3)];
   const diff = mod.diff || (goal === 1 ? 'normal' : 'hard');

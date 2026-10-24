@@ -28,10 +28,16 @@ console.log('guest summary:', (await B.textContent('#lobby-settings')).slice(0, 
 await A.screenshot({ path: 'bat/mp-lobby.png' });
 await A.tap('#scr-lobby [data-go="start"]');
 const tick = (p, n) => p.evaluate((n) => { const a = window.zoomies; a.paused = true; for (let i = 0; i < n; i++) if (a.race) a.race.update(1 / 30); return a.race ? a.race.mode + ' ' + a.race.state + ' ' + a.race.raceTime.toFixed(1) : '-'; }, n);
-for (let i = 0; i < 400; i++) { // a busy machine can take a while to build the arena on both phones
+let ready = false;
+for (let i = 0; i < 1000; i++) { // a busy machine can take a while to build the arena on both phones
   const sa = await tick(A, 6); const sb = await tick(B, 6);
   await A.waitForTimeout(60);
-  if (sa.startsWith('mp race') && sb.startsWith('mp race') && parseFloat(sa.split(' ')[2]) > 3) break;
+  if (sa.startsWith('mp race') && sb.startsWith('mp race') && parseFloat(sa.split(' ')[2]) > 3) { ready = true; break; }
+}
+if (!ready) {
+  await B.screenshot({ path: 'bat/guest-never-started.png' });
+  console.log('guest never started the race: A', await tick(A, 0), '| B', await tick(B, 0), '| B screen:', await B.evaluate(() => window.zoomies.ui && window.zoomies.ui.current));
+  process.exit(1);
 }
 const st = (p) => p.evaluate(() => { const r = window.zoomies.race; return `${r.state} battle=${!!r.battle} t=${r.battle ? r.battle.timeLeft.toFixed(0) : '-'} ` + r.karts.map((k) => `${k.ch.id}${k.isPlayer ? '*' : ''}${k.remote ? 'R' : ''}:${k.down ? 'D' : k.out ? 'X' : k.balloons}`).join(' '); });
 console.log('A', await st(A)); console.log('B', await st(B));
