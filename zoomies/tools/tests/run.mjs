@@ -96,6 +96,10 @@ for (const [name, args] of plan) {
   process.stdout.write(`${name} … `);
   const r = await run(name, script, args || defArgs, mins);
   console.log(`${r.ok ? 'PASS' : 'FAIL'} (${r.secs}s)`);
+  if (!r.ok) { // the log can be long: always show the lines that say what failed, then the tail
+    const why = r.log.split('\n').filter((l) => /^FAIL|\[pageerror\]|\[timeout\]|Content Security Policy/.test(l)).slice(0, 30);
+    if (why.length) console.log('--- what failed:\n' + why.join('\n') + '\n--- end of log:');
+  }
   if (!r.ok || plan.length === 1) console.log(r.log.split('\n').slice(-40).join('\n'));
   results.push(r);
 }
