@@ -16,6 +16,7 @@ function ring(R, { n = 28, sx = 1, sz = 1, hills = 0, waves = 2, base = 0.5 } = 
 export const ARENAS = [
   {
     id: 'barnyard', arena: true, name: 'Barnyard Bowl', theme: 'meadow',
+    events: ['stampede'], // track events (events.js)
     blurb: 'A grassy bowl round the old hay barn. Hay bales roll across.',
     music: { key: 2, bpm: 146, seed: 211, scale: 'major' },
     points: ring(46, { hills: 1.6 }), width: 56, shoulder: 2.5, wallH: 1.6,
@@ -26,6 +27,7 @@ export const ARENAS = [
   },
   {
     id: 'snowglobe', arena: true, name: 'Snowglobe Rink', theme: 'frost',
+    events: ['whiteout'], // track events (events.js)
     blurb: 'A frozen rink inside a snowglobe. Everything slides!',
     music: { key: 1, bpm: 136, seed: 223, scale: 'minor' },
     points: ring(42), width: 52, shoulder: 2.5, wallH: 1.6,
@@ -37,6 +39,7 @@ export const ARENAS = [
   },
   {
     id: 'pinball', arena: true, name: 'Neon Pinball', theme: 'neon',
+    events: ['overload'], // track events (events.js)
     blurb: 'A long neon oval with boost strips and laser sweepers.',
     music: { key: 7, bpm: 152, seed: 239, scale: 'minor' },
     points: ring(46, { sx: 1.22, sz: 0.92, n: 32 }), width: 50, shoulder: 2.5, wallH: 1.6,
@@ -46,6 +49,7 @@ export const ARENAS = [
   },
   {
     id: 'sandcastle', arena: true, name: 'Sandcastle Cove', theme: 'beach',
+    events: ['tideRush'], // track events (events.js)
     blurb: 'Rolling dunes round a palm island. Mind the crabs.',
     music: { key: 9, bpm: 142, seed: 251, scale: 'major' },
     points: ring(50, { hills: 2.4, waves: 3 }), width: 60, shoulder: 2.5, wallH: 1.6,
@@ -56,6 +60,7 @@ export const ARENAS = [
   },
   {
     id: 'crater', arena: true, name: 'Moon Crater', theme: 'moon',
+    events: ['craterMeteors'], // track events (events.js)
     blurb: 'Low gravity and big bumps: every hill is a jump.',
     music: { key: 4, bpm: 128, seed: 263, scale: 'minor' },
     points: ring(48, { hills: 3.6, waves: 4, n: 32 }), width: 56, shoulder: 2.5, wallH: 1.6,

@@ -27,22 +27,25 @@ const A = await page('A');
 
 // ---- 1. the schedule: fairness rules, determinism, Off, Wild ----
 const sch = await A.evaluate(async () => {
-  const { schedule, estRaceTime, EV_FIRST, EV_GAP, EV_LAST, EVENTS } = await import('./src/events.js');
+  const { schedule, estRaceTime, legWindow, EV_FIRST, EV_GAP, EV_LAST, EVENTS } = await import('./src/events.js');
   const { TRACKS } = await import('./src/tracks.js');
+  const { ARENAS } = await import('./src/arenas.js');
   const { Track } = await import('./src/track.js');
   const { SPEED_CLASSES } = await import('./src/race.js');
   const bad = [];
   const count = { normal: 0, wild: 0 };
   let n = 0;
-  for (const def of TRACKS.filter((t) => t.events)) for (const rev of [false, true]) {
+  for (const def of [...TRACKS, ...ARENAS].filter((t) => t.events)) for (const rev of def.arena || def.laps === 1 ? [false] : [false, true]) {
     const tr = new Track(def, rev);
     for (const cls of Object.values(SPEED_CLASSES)) {
-      const T = estRaceTime(tr.length, def.laps || 3, cls.top);
+      const T = def.arena ? 150 : estRaceTime(tr.length, def.laps || 3, cls.top);
+      const wins = {};
+      for (const id of def.events) if (EVENTS[id].leg) wins[id] = legWindow(tr, EVENTS[id].leg);
       for (const mode of ['normal', 'wild']) for (let seed = 1; seed < 160; seed++) {
-        const s = schedule(seed * 7919, mode, def.events, T);
+        const s = schedule(seed * 7919, mode, def.events, T, wins);
         n++;
         count[mode] += s.length;
-        if (JSON.stringify(s) !== JSON.stringify(schedule(seed * 7919, mode, def.events, T))) bad.push(`${def.id} not deterministic`);
+        if (JSON.stringify(s) !== JSON.stringify(schedule(seed * 7919, mode, def.events, T, wins))) bad.push(`${def.id} not deterministic`);
         s.forEach((e, i) => {
           if (e.warnAt < EV_FIRST) bad.push(`${def.id} ${mode} ${seed}: warning at ${e.warnAt}`);
           if (e.at - e.warnAt < 3) bad.push(`${def.id} ${mode} ${seed}: warning only ${e.at - e.warnAt}s`);
@@ -109,7 +112,8 @@ ok(hostile.good, 'a valid seed and mode pass through');
 const prep = () => {
   window.evStart = (tid, seed, mode = 'normal', extra = {}) => {
     const a = window.zoomies;
-    a.startRace({ mode: 'quick', trackId: tid, reverse: false, player: 'mochi', speedClass: 'zoom', evMode: mode, evSeed: seed, ...extra });
+    const arena = ['barnyard', 'snowglobe', 'pinball', 'sandcastle', 'crater'].includes(tid);
+    a.startRace({ mode: arena ? 'battle' : 'quick', trackId: tid, reverse: false, player: 'mochi', speedClass: 'zoom', evMode: mode, evSeed: seed, ...extra });
     a.paused = true;
     const r = a.race;
     r.skipIntro = true;
@@ -251,14 +255,16 @@ const B = await page('B');
 await B.evaluate(prep);
 const fp = async (p) => p.evaluate(() => {
   const out = [];
-  for (const [tid, seed] of [['frost', 1234], ['magma', 777], ['dunes', 99], ['coral', 4321], ['tidal', 55]]) {
+  for (const [tid, seed] of [['frost', 1234], ['magma', 777], ['dunes', 99], ['coral', 4321], ['tidal', 55],
+    ['sprout', 11], ['blossom', 12], ['candy', 13], ['downs', 14], ['hollow', 15], ['jungle', 16], ['gear', 17], ['maple', 18], ['neon', 19], ['cloud', 20], ['glacier', 21], ['obsidian', 22], ['moon', 23],
+    ['odyssey', 24], ['hopper', 25], ['barnyard', 26], ['snowglobe', 27], ['pinball', 28], ['sandcastle', 29], ['crater', 30]]) {
     const r = window.evStart(tid, seed, 'wild');
     const sched = r.evs.sched.map((e) => `${e.id}@${e.warnAt}/${e.at}/${e.end}`).join(',');
     const seen = [];
     for (const e of r.evs.sched) {
       window.evRun(r, e.at + 2.5);
       const c = r.evs.cur;
-      const pts = (c.rocks || c.ice || c.spots || c.lanes || c.zones || []).map((q) => `${q.x.toFixed(2)},${q.z.toFixed(2)}`).join(' ');
+      const pts = (c.rocks || c.ice || c.spots || c.lanes || c.zones || c.cracks || c.panels || c.belts || []).map((q) => `${q.x.toFixed(2)},${q.z.toFixed(2)}`).join(' ');
       const hz = r.evs.hazards.map((h) => `${h.pos.x.toFixed(2)},${h.pos.z.toFixed(2)}`).join(' ');
       seen.push(`${e.id}[${pts}](${hz}) side ${c.side ?? ''} wind ${r.evMods ? r.evMods.wind.toFixed(3) : '-'}`);
     }
@@ -273,19 +279,27 @@ await B.close();
 
 // ---- 7. screenshots (warning, peak, end) and draw calls ----
 await A.evaluate(async () => { window.evMod = await import('./src/events.js'); });
-const SHOTS = [['frost', 'blizzard'], ['frost', 'avalanche'], ['magma', 'lavaRain'], ['magma', 'eruption'], ['dunes', 'sandstorm'], ['coral', 'tide'], ['tidal', 'tide']];
-for (const [tid, id] of SHOTS) {
+const SHOTS = [['frost', 'blizzard'], ['frost', 'avalanche'], ['magma', 'lavaRain'], ['magma', 'eruption'], ['dunes', 'sandstorm'], ['coral', 'tide'], ['tidal', 'tide'],
+  ['sprout', 'harvestGust'], ['blossom', 'lanternFest'], ['candy', 'syrupShower'], ['downs', 'twisterCrossing'], ['hollow', 'ghostParade'], ['jungle', 'templeTremor'],
+  ['gear', 'factoryAlarm'], ['maple', 'leafStorm'], ['neon', 'powerSurge'], ['cloud', 'fireworks'], ['glacier', 'iceQuake'], ['obsidian', 'glassCrack'], ['moon', 'meteorShower'],
+  ['odyssey', 'riverSurge'], ['odyssey', 'jetStream'], ['hopper', 'harborSwell'], ['hopper', 'ashCloud'],
+  ['barnyard', 'stampede'], ['snowglobe', 'whiteout'], ['pinball', 'overload'], ['sandcastle', 'tideRush'], ['crater', 'craterMeteors']];
+// Seconds into the effect that show an event at its best (default: 45% of it).
+const PEAK = { tide: 3.2, tideRush: 3.5, powerSurge: 4.5, glassCrack: 2.2, factoryAlarm: 7.4, templeTremor: 10, twisterCrossing: 6.3, ghostParade: 6.2, syrupShower: 9, iceQuake: 6, harborSwell: 3, stampede: 3.2 };
+const shotInfo = [];
+const ONLY = process.env.EV_ONLY ? process.env.EV_ONLY.split(',') : null;
+for (const [tid, id] of SHOTS.filter(([, i]) => !ONLY || ONLY.includes(i))) {
   for (const [phase, at] of [['warn', -2], ['peak', 0.45], ['end', 1]]) {
-    const info = await A.evaluate(({ tid, id, phase, at }) => {
+    const info = await A.evaluate(({ tid, id, phase, at, peak }) => {
       const a = window.zoomies;
-      const { r, e } = window.evFind(tid, id);
+      const { r, e } = window.evFind(tid, id, ['jetStream', 'ashCloud', 'harborSwell'].includes(id) ? 'wild' : 'normal');
       const { EVENTS } = window.evMod;
       const def = EVENTS[id];
-      const t = phase === 'warn' ? e.at + at : phase === 'peak' ? e.at + (id === 'tide' ? 3.2 : def.dur * at) : e.end + at;
+      const t = phase === 'warn' ? e.at + at : phase === 'peak' ? e.at + (peak ?? def.dur * at) : e.end + at;
       // Drive to a little before the moment, then put the player just before the action.
       window.evRun(r, t - 1.2);
       const c = r.evs.cur;
-      const spot = c && (c.spots || c.lanes || c.zones || c.ice || (c.rocks && c.rocks.filter((q) => q.st === 1 || q.st === 2)));
+      const spot = c && (c.spots || c.lanes || c.zones || c.ice || c.cracks || c.panels || c.belts || (c.rocks && c.rocks.filter((q) => q.st === 1 || q.st === 2)));
       if (spot && spot.length) r.player.placeAt((spot[0].s - 52 + r.track.length) % r.track.length, 0);
       r.camSeg = -1; // the camera's track hint is stale after a teleport
       const k = r.player, sp = 24;
@@ -301,12 +315,153 @@ for (const [tid, id] of SHOTS) {
       const without = draw();
       r.evs.group.visible = true;
       return { t: +t.toFixed(1), withEv, without, fogFar: r.world.fog.far.toFixed(0), hud: r.evs.hud && `${r.evs.hud.phase} ${r.evs.hud.name} ${r.evs.hud.secs}`, mods: r.evMods && JSON.stringify(r.evMods) };
-    }, { tid, id, phase, at });
+    }, { tid, id, phase, at, peak: PEAK[id] });
     await A.waitForTimeout(2600); // let the HUD's own animations (GO!, toasts) settle
     await A.evaluate(() => window.evShot());
     await A.screenshot({ path: `ev/${tid}-${id}-${phase}.png` });
     console.log(`shot ev/${tid}-${id}-${phase}.png`, JSON.stringify(info));
+    shotInfo.push({ tid, id, phase, ...info });
   }
 }
+// ---- 8. draw calls and triangles of every new event at its peak, hidden versus shown (from the shots above) ----
+const heavy = shotInfo.filter((x) => x.phase === 'peak' && (x.withEv.calls - x.without.calls > 2 || x.withEv.tris - x.without.tris > 10000));
+shotInfo.filter((x) => x.phase === 'peak').forEach((x) => console.log(`  cost ${x.tid}/${x.id}: +${x.withEv.calls - x.without.calls} calls, +${x.withEv.tris - x.without.tris} triangles`));
+ok(heavy.length === 0, `every event stays within +2 draw calls and +10000 triangles at its peak ${heavy.map((x) => `${x.id} +${x.withEv.calls - x.without.calls}/+${x.withEv.tris - x.without.tris}`).join('; ')}`);
+
+// ---- 9. a seeded Wild race on every track and arena: no page errors, it finishes, effects stay inside the clamps, nothing kills or stalls ----
+const sweep = await A.evaluate(() => {
+  const ids = ['sprout', 'coral', 'dunes', 'frost', 'candy', 'neon', 'magma', 'cloud', 'downs', 'tidal', 'glacier', 'obsidian', 'hollow', 'jungle', 'gear', 'moon', 'maple', 'blossom', 'odyssey', 'hopper',
+    'barnyard', 'snowglobe', 'pinball', 'sandcastle', 'crater'];
+  const out = [];
+  for (const tid of ids) {
+    const r = window.evStart(tid, 9001 + tid.length, 'wild');
+    const bat = !!r.battle;
+    let n = 0, bad = '', stall = 0, worst = 0, hits = 0, pops = 0, inEv = false, evSeen = new Set();
+    const upd = r.evs.update.bind(r.evs);
+    r.evs.update = (dt) => { inEv = true; upd(dt); inEv = false; };
+    if (bat) {
+      for (const k of r.karts) { const h = k.hit.bind(k); k.hit = (...a) => { if (inEv) hits++; return h(...a); }; }
+      const oh = r.battle.onHit.bind(r.battle);
+      r.battle.onHit = (k) => { if (inEv) pops++; return oh(k); };
+    }
+    const slow = new Map();
+    while (n++ < 60 * 420 && !(bat ? r.battle.done : r.player.finished)) {
+      r.update(1 / 60);
+      const m = r.evMods;
+      if (m && (m.wind < -8 || m.wind > 8 || m.grip < 0.6 || m.grip > 1 || m.traction < 0.6 || m.traction > 1 || m.gravity < 0.6 || m.gravity > 1.2)) bad = 'modifier out of range';
+      if (r.evs.cur) evSeen.add(r.evs.cur.id);
+      if (r.netClock > 8 && r.state === 'race') for (const k of r.karts) {
+        if (k.out || k.finished) { slow.delete(k); continue; }
+        const t0 = slow.get(k);
+        if (k.speed < 1.5 && !k.spinTime) { if (t0 === undefined) slow.set(k, r.netClock); else worst = Math.max(worst, r.netClock - t0); } else slow.delete(k);
+      }
+    }
+    out.push({ tid, secs: +r.netClock.toFixed(0), done: bat ? r.battle.done : r.player.finished, events: [...evSeen].join(','), bad, worst: +worst.toFixed(1), hits, pops, left: r.track.patches.filter((p) => p.ev).length + r.track.boosts.filter((p) => p.ev).length });
+  }
+  return out;
+});
+for (const x of sweep) console.log('  race', JSON.stringify(x));
+ok(sweep.every((x) => x.done), `a Wild race finishes on every track and arena (${sweep.filter((x) => !x.done).map((x) => x.tid)})`);
+ok(sweep.every((x) => x.events), `every track and arena showed an event (${sweep.filter((x) => !x.events).map((x) => x.tid)})`);
+ok(sweep.every((x) => !x.bad), `modifiers stay inside the clamps on every track (${sweep.filter((x) => x.bad).map((x) => x.tid)})`);
+ok(sweep.every((x) => x.worst < 5), `no kart is stuck for 5 s or more (worst ${Math.max(...sweep.map((x) => x.worst))} s)`);
+ok(sweep.every((x) => x.hits === 0 && x.pops === 0), `arena events never call a kart hit or pop a balloon (${sweep.filter((x) => x.hits || x.pops).map((x) => `${x.tid} ${x.hits}/${x.pops}`)})`);
+ok(sweep.every((x) => x.left === 0 || !x.done), 'no timed patch or boost lane is left on the road after the events');
+
+// ---- 10. what the new events do ----
+const eff = await A.evaluate(async () => {
+  const { PATCHES } = await import('./src/track.js');
+  const out = {};
+  const onEvent = (tid, id, extra = 1.5) => {
+    const f = window.evFind(tid, id, ['jetStream', 'ashCloud', 'harborSwell', 'riverSurge', 'templeTremor'].includes(id) ? 'wild' : 'normal');
+    window.evRun(f.r, f.e.at + extra);
+    return f;
+  };
+  const free = (k) => { k.invuln = 0; k.starTime = 0; k.rocketTime = 0; k.ghostTime = 0; k.shield = 0; k.spinTime = 0; k.slipTime = 0; };
+  { // lanes pay a boost
+    const { r } = onEvent('blossom', 'lanternFest');
+    const ln = r.evs.cur.live[0], k = r.karts[2];
+    free(k); k.boostTime = 0; k._padCool = 0;
+    k.placeAt(ln.s + 2, ln.d);
+    k.vel.set(Math.sin(k.yaw) * 20, 0, Math.cos(k.yaw) * 20);
+    r._checkPads(k);
+    out.lane = { boost: k.boostTime, lanes: r.evs.cur.live.length };
+  }
+  { // syrup: sticky mud, and a candy spark wipes the puddles round it
+    const { r } = onEvent('candy', 'syrupShower', 9);
+    const c = r.evs.cur.rocks.find((q) => q.st === 2), k = r.karts[3];
+    free(k);
+    k.placeAt(c.s, c.d);
+    k.step(1 / 60, false);
+    out.syrup = { mud: k.patch === PATCHES.mud, puddles: r.evs.cur.rocks.filter((q) => q.st === 2).length };
+    const sp = r.evs.cur.sparks.find((q) => !q.got && q.from < 9);
+    if (sp) {
+      k.placeAt(sp.s, sp.d);
+      r.update(1 / 60);
+      out.syrup.after = r.evs.cur.rocks.filter((q) => q.st === 2).length;
+      out.syrup.got = sp.got;
+    }
+  }
+  { // twister: a hop-spin, never a stall
+    const { r } = onEvent('downs', 'twisterCrossing', 6.5);
+    const sp = r.evs.cur.spots[0], k = r.karts[4];
+    free(k);
+    const q = r.evs.hazards[0];
+    const pr = r.track.project(q.pos.x, q.pos.z, -1, {});
+    k.placeAt(pr.s, Math.max(-pr.hw + 1, Math.min(pr.hw - 1, pr.d)));
+    k.vel.set(Math.sin(k.yaw) * 22, 0, Math.cos(k.yaw) * 22);
+    r.update(1 / 60);
+    let minS = 99;
+    for (let i = 0; i < 90; i++) { r.update(1 / 60); minS = Math.min(minS, k.speed); }
+    out.twister = { hit: k._evHit > 0, minS, spin: k.spinDur };
+  }
+  { // black ice and glass: grip drops on the section
+    const { r } = onEvent('glacier', 'iceQuake', 1);
+    const c = r.evs.cur.cracks[0], k = r.karts[2];
+    k.placeAt(c.s + 3, 0); k.vel.set(Math.sin(k.yaw) * 20, 0, Math.cos(k.yaw) * 20); k.step(1 / 60, false);
+    out.ice = { on: k.patch === PATCHES.ice };
+    const g = onEvent('obsidian', 'glassCrack', 2.6);
+    const p = g.r.evs.cur.panels[0], k2 = g.r.karts[2];
+    k2.placeAt(p.s + 3, p.side * p.hw / 2); k2.vel.set(Math.sin(k2.yaw) * 20, 0, Math.cos(k2.yaw) * 20); k2.step(1 / 60, false);
+    out.glass = { st: p.st, on: k2.patch === PATCHES.ice };
+  }
+  { // factory: the belt pushes along the road, forwards then backwards
+    const { r } = onEvent('gear', 'factoryAlarm', 1.5);
+    const b = r.evs.cur.belts[0], k = r.karts[2];
+    free(k);
+    const speed = () => { k.placeAt(b.s + 4, 0); k.vel.set(Math.sin(k.yaw) * 10, 0, Math.cos(k.yaw) * 10); for (let i = 0; i < 15; i++) { r.evs.update(1 / 60); k.step(1 / 60, false); } return k.fwdSpeed ?? k.speed; };
+    out.belt = { forward: speed() };
+    window.evRun(r, r.evs.cur.at + 6.5);
+    out.belt.back = speed();
+    out.belt.dir = r.evs.laneDir;
+  }
+  { // meteor craters: a small hop, no spin
+    const { r } = onEvent('moon', 'meteorShower', 8);
+    const c = r.evs.cur.rocks.find((q) => q.st === 2), k = r.karts[2];
+    free(k);
+    k.placeAt(c.s, c.d);
+    k.vel.set(Math.sin(k.yaw) * 20, 0, Math.cos(k.yaw) * 20);
+    r.update(1 / 60);
+    out.crater = { vy: k.vy, spin: k.spinTime, craters: r.evs.cur.rocks.filter((q) => q.st === 2).length };
+  }
+  { // battle: an event shove slows and hops a kart but leaves its balloons alone
+    const f = window.evStart('barnyard', 5, 'wild');
+    const k = f.karts[3], b0 = f.karts.map((x) => x.balloons).join();
+    free(k);
+    k.vel.set(0, 0, 20);
+    const ok1 = f.evs.hurt(k, 'spin');
+    out.battle = { ok: ok1, v: Math.hypot(k.vel.x, k.vel.z), same: f.karts.map((x) => x.balloons).join() === b0 };
+  }
+  return out;
+});
+console.log('  effects', JSON.stringify(eff));
+ok(eff.lane.boost > 0.5, `a Lantern Festival lane boosts a kart (${eff.lane.boost.toFixed(2)} s, ${eff.lane.lanes} lanes)`);
+ok(eff.syrup.mud && eff.syrup.puddles > 0 && (eff.syrup.got ? eff.syrup.after < eff.syrup.puddles : true), `syrup puddles are sticky mud and a candy spark wipes them (${JSON.stringify(eff.syrup)})`);
+ok(eff.twister.hit && eff.twister.minS > 3, `a twister hit is a hop-spin, never a stall (${JSON.stringify(eff.twister)})`);
+ok(eff.ice.on && eff.glass.st === 'crack' && eff.glass.on, `ice quake and glass crack sections drop the grip (${JSON.stringify([eff.ice, eff.glass])})`);
+ok(eff.belt.forward > 10.5 && eff.belt.back < eff.belt.forward - 2, `conveyors push forwards then backwards (${eff.belt.forward.toFixed(1)} then ${eff.belt.back.toFixed(1)} m/s from 10, direction ${eff.belt.dir})`);
+ok(eff.crater.vy > 2 && eff.crater.spin === 0 && eff.crater.craters > 0, `a crater is a small hop, no spin (${JSON.stringify(eff.crater)})`);
+ok(eff.battle.ok && eff.battle.v < 14 && eff.battle.same, `in a battle an event shove slows a kart and leaves the balloons (${JSON.stringify(eff.battle)})`);
+
 console.log('errors', errors);
 await b.close();
