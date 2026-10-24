@@ -123,6 +123,19 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 - **Prize orbs:** items come from spinning crystal orbs with a star inside, not boxes. Every regular shortcut has its own orbs as a reward for finding it.
 - **Controls:** tilt the phone like a steering wheel. Gas is automatic. There are big thumb buttons for DRIFT, ITEM and BRAKE. Touch steering and keyboard controls are also available.
 
+## Track events
+
+Things happen during a race, always announced first: a banner with an icon, a line from Mic the Announcer and a countdown (at least 3 seconds), plus a sound and marks on the road. While one lasts, a small tag under the lap counter shows how long is left.
+
+- **Frostbite Pass: Blizzard.** Crosswind gusts that swap sides, a whiteout and patches of black ice. The road edges glow so you can always see them. Let a drift boost go in a gust to surf it (**STORM SURFER**).
+- **Frostbite Pass: Avalanche.** Red-striped spots across the road rumble, then lumps of snow slide over them. Drive through a gap for **DODGED!**; a lump buries you (half your speed and a short slide, never a dead stop).
+- **Magma Mountain: Lava Rain.** Glowing circles mark where meteors land 2 seconds later; each leaves a lava puddle for 8 seconds that spins you out. Steer out of a circle in time for **DODGED!**
+- **Magma Mountain: Eruption.** The ground shakes, ash darkens the sky and short boost lanes open up through the smoke (**ASH DASH**).
+- **Dune Dash Canyon: Sandstorm.** A wall of dust rolls in, the wind pushes you towards one side and the view closes in, but the road edges glow. Gusts can be surfed like in the blizzard.
+- **Coral Cove and Tidal Twist: Rising Tide.** Waves wash over parts of the boardwalk with a clear foam line. Water slows you; keep to the dry side, or cross the crest as it rolls in for a boost (**STORM SURFER**).
+
+Fair play: no event in the countdown, before 25 seconds, in the last 8% of a race or within 20 seconds of the last one, and only one at a time. **Settings → Track events** (Off, Normal or Wild; Normal by default) works in Quick Race, Grand Prix and Balloon Battle (no arena has an event yet); online, the host's setting counts and every phone sees the same events at the same moments. Wild brings more events and stronger ones. **Settings → Event warnings** (Full or Short): Short shows just the name and a 3-second countdown. Time Trial (and its medals) and Driving School never have events; the Career, the Daily Challenge and the Weekly Cup stay calm for now.
+
 ## First steps
 
 - **Start your story:** a brand-new save opens with one big button. A single screen then checks your controls: on a phone, hold it like a steering wheel and watch the dot follow, tap **Set level** to set straight-ahead, or tap **Use touch steering instead**. If motion access is refused or no tilt arrives within 2 seconds, touch steering is picked for you. On a computer it shows the keyboard keys. Then the story starts. Players with an existing save never see it; **Settings → Replay intro** shows it again.
@@ -213,6 +226,7 @@ How it works:
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
 - **Steering assist:** Off, Light or Strong in Settings (new saves start on Light). It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
 - **Screen shake:** Off, Low or Normal in Settings.
+- **Track events:** Off, Normal or Wild in Settings, and Event warnings Full or Short (see Track events above).
 - **Name tags:** the other karts show their name and current place above them, so you can see when you pass someone. In online races, friends get big tags in their kart colour that show from far away; computer racers get small tags up close. Settings switches tags between Everyone, Friends and Off.
 - **Shortcuts:** look for gaps in the wall, stacked crates and odd side paths. The sandy or candy-floss ones are mostly slow unless you hit them with a boost (Snowmobile Trail and Dune Surf, in both directions, still pay off without one).
 - **Gems:** each one adds a little top speed, up to 10. Getting hit drops 3.
@@ -250,6 +264,7 @@ zoomies/
   src/safeui.js       the Backup and About screens
   sw.js               service worker: offline cache and safe updates (file list in precache.json, written by tools/stamp.mjs)
   src/race.js         race loop, laps, positions, collisions, camera, network sync
+  src/events.js       track events: schedule from a seed, the events and their shared effects
   src/net.js          multiplayer sessions (PeerJS / BroadcastChannel transports)
   src/post.js         HDR post-processing: bloom, tone mapping, grading, speed blur
   src/env.js          image-based lighting (sky and studio environment maps)
@@ -272,7 +287,7 @@ zoomies/
   src/audio.js        synthesised sound effects and music
   tools/build-single.mjs  bundles everything into one HTML file
   tools/economy.mjs   Career and League coin income, shop stock and drops
-  tools/balance.mjs   AI balance report (`--tuned` runs the player with Workshop parts)
+  tools/balance.mjs   AI balance report (`--tuned` runs the player with Workshop parts, `--events normal|wild` turns track events on)
   tools/league-sim.mjs  League races with a computer-driven player (AI strength check)
 ```
 

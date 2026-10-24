@@ -14,6 +14,7 @@ import { SHAKE } from './settings.js';
 import { SkidMarks } from './skids.js';
 import { Battle, BattleAI, MAX_BALLOONS } from './battle.js';
 import * as TX from './textures.js';
+import { TrackEvents } from './events.js';
 
 export const SPEED_CLASSES = {
   chill: { id: 'chill', name: 'Chill', top: 27 },
@@ -190,6 +191,10 @@ export class Race {
       this.player.itemCount = 3;
     }
 
+    // Track events (events.js): null when this race has none.
+    this.evMods = null;
+    this.evs = TrackEvents.create(this, opts);
+
     this.camYaw = this.player ? this.player.yaw : 0;
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
@@ -307,6 +312,7 @@ export class Race {
     }
 
     this._rubberBand();
+    if (this.evs) this.evs.update(dt);
 
     const steps = Math.min(5, Math.max(1, Math.ceil(dt / PHYS_DT - 0.01)));
     const h = dt / steps;
@@ -485,6 +491,7 @@ export class Race {
     for (let i = 0; i < ev.length; i += 2) {
       const type = ev[i], data = ev[i + 1];
       if (coach) coach.event(type, data, k);
+      if (this.evs) this.evs.kartEvent(k, type, data);
       switch (type) {
         case 'useItem': {
           const used = this.items.use(k, null, null, k.ctl.aim || 0);
@@ -1519,6 +1526,7 @@ export class Race {
     if (this.ghost) this.ghost.dispose(this.scene);
     this.world.dispose();
     this.items.dispose();
+    if (this.evs) this.evs.dispose();
     this.fx.dispose();
     this.wheelMesh.material.dispose();
     this.wheelMesh.dispose();

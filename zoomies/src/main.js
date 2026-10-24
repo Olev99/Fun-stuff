@@ -25,6 +25,7 @@ import { CHARACTERS, charById, charLocked } from './characters.js';
 import { TRACKS, CUPS, trackById } from './tracks.js';
 import { ARENAS, arenaById } from './arenas.js';
 import { BATTLE_FIELD } from './battle.js';
+import { EV_MODES, EV_SEED_MAX } from './events.js';
 import { setMaxAniso } from './textures.js';
 import { fmtTime, ordinal } from './util.js';
 import { NetSession } from './net.js';
@@ -424,11 +425,16 @@ class App {
     let loadouts = byId && cfg.mode !== 'tt' ? grid.map((id) => (id === cfg.player ? cfg.playerLoadout : byId[id]) || null) : null;
     // Outside the career, some computer racers ride bikes.
     if (!byId && cfg.mode !== 'tt') loadouts = grid.map((id) => (id === cfg.player ? cfg.playerLoadout || null : Math.random() < 0.35 ? { body: 'bike' } : null));
+    // Track events follow the Settings in quick races, cups and battles. Time trials and Driving School never
+    // have them; the Daily, the Weekly Cup and the Career stay calm until they bring their own (cfg.evMode).
+    const evOk = ['quick', 'gp', 'battle'].includes(cfg.mode) && !cfg.careerEv && !cfg.dailyEv && !(this.gp && this.gp.weekly);
+    const evMode = cfg.mode === 'tt' || cfg.school ? 'off' : cfg.evMode ?? (evOk && EV_MODES.includes(this.settings.trackEvents) ? this.settings.trackEvents : 'off');
+    const evSeed = evMode === 'off' ? 0 : cfg.evSeed ?? Math.floor(Math.random() * EV_SEED_MAX);
     this.race = new Race(this, {
       mode: cfg.mode, trackDef: trackById(cfg.trackId), reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
       difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
-      look: lookOf(this.career), ghost: cfg.ghost || null,
+      look: lookOf(this.career), ghost: cfg.ghost || null, evMode, evSeed,
     });
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
@@ -1198,7 +1204,9 @@ class App {
     const hs = shuffle(humans.slice());
     const slots = [];
     for (const h of hs) { slots.push({ id: h.id, slot: grid.length, nick: h.nick, look: h.look }); grid.push(h.char); }
-    const cfg = { trackId: L.track, reverse: arena ? false : L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots };
+    // Track events: the host's setting and one seed; every phone computes the same schedule from them.
+    const evMode = EV_MODES.includes(this.settings.trackEvents) ? this.settings.trackEvents : 'normal';
+    const cfg = { trackId: L.track, reverse: arena ? false : L.reverse, speedClass: L.speedClass, difficulty: L.difficulty, grid, humans: slots, evMode, evSeed: Math.floor(Math.random() * EV_SEED_MAX) };
     ses.inRace = true;
     ses.send({ t: 'start', cfg });
     this.startNetRace(cfg);
@@ -1233,6 +1241,7 @@ class App {
       humanSlots: cfg.humans.map((h) => h.slot),
       nicks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanNick(h.nick)])),
       looks: Object.fromEntries(cfg.humans.map((h) => [h.slot, cleanLook(h.look)])),
+      evMode: cfg.evMode, evSeed: cfg.evSeed, // checked by validStart (net.js) on a guest
     });
     ses.race = this.race;
     this.race.setSize(this.w, this.h, this.pr);

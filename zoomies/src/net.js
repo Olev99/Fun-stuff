@@ -6,6 +6,7 @@
 
 import { cleanNick } from './nametags.js';
 import { cleanLook } from './cosmetics.js';
+import { cleanEvCfg } from './events.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const MAX_PLAYERS = 4;
@@ -46,9 +47,12 @@ function cleanPlayers(list) {
 }
 
 // The race setup a guest receives from the host.
-function validStart(cfg) {
+export function validStart(cfg) {
   if (!isObj(cfg) || !Array.isArray(cfg.grid) || cfg.grid.length > 16 || !Array.isArray(cfg.humans) || cfg.humans.length > MAX_PLAYERS) return false;
-  return cfg.humans.every((h) => isObj(h) && typeof h.id === 'string' && Number.isInteger(h.slot) && h.slot >= 0 && h.slot < cfg.grid.length);
+  if (!cfg.humans.every((h) => isObj(h) && typeof h.id === 'string' && Number.isInteger(h.slot) && h.slot >= 0 && h.slot < cfg.grid.length)) return false;
+  // Track events: an integer seed in range and a known mode; anything else turns them off.
+  Object.assign(cfg, cleanEvCfg(cfg.evSeed, cfg.evMode));
+  return true;
 }
 
 const HEARTBEAT_MS = 1500;

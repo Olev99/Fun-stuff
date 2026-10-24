@@ -33,6 +33,7 @@ export class HUD {
     this.goalEl = $('hud-goal');
     this.styleEl = $('hud-style');
     this.rearEl = $('hud-rear');
+    this.evEl = $('hud-ev');
     // Hold the minimap to look behind you.
     const look = (on) => (e) => { e.preventDefault(); this.app.input.lookBack = on; };
     this.map.addEventListener('pointerdown', look(true));
@@ -59,6 +60,7 @@ export class HUD {
     this._buildMap(race);
     this.goalEl.hidden = !(race.careerEv && (race.careerEv.type !== 'cup' || race.careerEv.mod)) && !race.dailyEv;
     this.styleEl.innerHTML = '';
+    this.evEl.hidden = true;
     this.app.input.lookBack = false;
     const sp = document.getElementById('hud-split');
     if (sp) sp.className = '';
@@ -319,6 +321,8 @@ export class HUD {
     this._set('wrong', p.wrongWay > 1.2 && race.state === 'race', (v) => { this.wrong.hidden = !v; });
     this._set('flash', Math.round(race.flash * 20), (v) => { this.flash.style.opacity = (v / 20) * 0.85; });
 
+    this._event(race.evs && race.evs.hud);
+
     this.mapFrame++;
     if (this.mapFrame % 2 === 0) this._drawMap(race);
 
@@ -326,6 +330,20 @@ export class HUD {
       this.hintT -= dt;
       if (this.hintT <= 0) this.hintEl.classList.remove('show');
     }
+  }
+
+  // Track events: the warning with the announcer's line and a countdown, then a small tag while it lasts.
+  _event(ev) {
+    this._set('ev', ev ? `${ev.phase}${ev.id}${ev.secs}${ev.line ? 1 : 0}` : '', () => {
+      const el = this.evEl;
+      el.hidden = !ev;
+      if (!ev) return;
+      el.className = ev.phase;
+      el.querySelector('.ev-ic').textContent = ev.icon;
+      el.querySelector('b').textContent = ev.phase === 'warn' ? `${ev.name.toUpperCase()} IN` : ev.name;
+      el.querySelector('small').textContent = ev.phase === 'warn' ? ev.line : '';
+      el.querySelector('.ev-cd').textContent = ev.phase === 'warn' ? ev.secs : `${ev.secs}s`;
+    });
   }
 
   countdown(n) {
