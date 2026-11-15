@@ -902,6 +902,7 @@ class EngineCore {
     if (S.on) {
       const age = now - S.lastGood;
       parts.push(S.lastGood && age < 2500 ? 'GPS OK' : !S.gpsSeen ? bad('GPS venter') : bad('GPS borte'));
+      if (S.dir === 'R') parts.push('Rygger');
     }
     const html = parts.join(' · ');
     if (html !== st.sys) { st.sys = html; $('#stSys').innerHTML = html; }
@@ -1074,7 +1075,8 @@ registerProcessor('m4-engine', M4Proc);`;
   const S = { on: false, vEst: 0, gpsV: null, gpsT: 0, aGps: 0, aGpsT: 0, F: [0, 0, 0], fwd: null, gLP: null, lastT: 0, aF: 0, bias: 0,
     thr: 0, brk: 0, motionT: 0, motionSeen: false, gpsSeen: false, motionDenied: false,
     lat: null, lon: null, hdg: null, acc: null, accBase: 12, lastGood: 0, goodN: 0, everGood: false, vHold: 0, tickT: 0, uiT: 0,
-    hist: [], fixNow: 0, rotHold: 0, gRef: null, offT: 0, grade: 0, gBase: 0, saveT: 0 };
+    hist: [], fixNow: 0, rotHold: 0, gRef: null, offT: 0, grade: 0, gBase: 0, saveT: 0,
+    dir: 'F', rI: 0, heldT: 0, rv0: null, rvA: null, rvP: null, rvB: 0, rvLast: null };
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const nrm = (a) => Math.hypot(a[0], a[1], a[2]);
   const GPS_LAG = 1000; // ms: GPS-farten beskriver bilen omtrent ett sekund tilbake i tid
@@ -1098,7 +1100,7 @@ registerProcessor('m4-engine', M4Proc);`;
     try { localStorage.setItem(CAL_KEY, JSON.stringify({ t: Date.now(), F: S.F, g: S.gRef, gb: S.gBase, b: S.bias })); } catch (e) {}
   }
   function calReset() {
-    S.F = [0, 0, 0]; S.fwd = null; S.gRef = null; S.offT = 0; S.grade = 0; S.gBase = 0; S.bias = 0;
+    S.F = [0, 0, 0]; S.fwd = null; S.gRef = null; S.offT = 0; S.grade = 0; S.gBase = 0; S.bias = 0; S.rv0 = null; S.dir = 'F';
     try { localStorage.removeItem(CAL_KEY); } catch (e) {}
   }
   calLoad();
@@ -1110,7 +1112,7 @@ registerProcessor('m4-engine', M4Proc);`;
 
   // ---- historikk: estimert fart og akselerasjon de siste sekundene, for å sammenligne med forsinket GPS ----
   function histPush(now, h, ok) {
-    S.hist.push({ t: now, v: S.vEst, a: S.aF, h: h, ok: ok });
+    S.hist.push({ t: now, v: S.vEst, a: S.aF, h: h, ok: ok, r: S.rI });
     while (S.hist.length && S.hist[0].t < now - 3000) S.hist.shift();
   }
   function histAt(t) {
@@ -1132,16 +1134,21 @@ registerProcessor('m4-engine', M4Proc);`;
 
   // Felles fusjon: langsgående akselerasjon -> fart, gass og brems. held: telefonen rykkes/løftes, frys gass og brems.
   function fuse(aLong, dt, h, held) {
-    S.aF += ((held ? 0 : aLong) - S.aF) * Math.min(1, dt / 0.035);
+    // Rygging: integral av rå akselerasjon langs "fremover" (fortegnet), og når den sist var upålitelig.
+    if (held || !h || !S.fwd) S.heldT = performance.now(); else S.rI += aLong * dt;
+    const sg = S.dir === 'R' ? -1 : 1; // i revers peker fartsretningen bakover
+    S.aF += ((held ? 0 : sg * aLong) - S.aF) * Math.min(1, dt / 0.035);
     let v = S.vEst + S.aF * dt;
     if (st.tunGps || st.tunMap) v += (S.vHold - v) * dt / 25; // uten GPS: ikke la integrasjonen drive av gårde
     // GPS sier stopp: hold farten på null, men ikke når akselerometeret ser at vi kjører av gårde (GPS er et sekund bak)
     if (S.gpsV !== null && S.gpsV < 0.3 && performance.now() - S.lastGood < 2500 && S.aF < 0.4) v = 0;
     S.vEst = v = clamp(v, 0, 90);
+    // revers bremset til null (fart eller sensorintegral), eller urimelig lenge: neste start er fremover til det motsatte er vist
+    if (sg < 0 && (v < 0.05 || !S.rvA || rvNow(S.rvA) > -0.2 || performance.now() - S.rvA.t > 40000)) S.dir = 'F';
     const aDrag = 0.12 + 0.00026 * v * v;
     const aAvail = Math.min(9.5, 344000 / (1750 * Math.max(v, 4)));
     // Bakke: tyngdekraftens bidrag langs veien. Opp: trengs gass for å holde farten; ned: holde farten er å slippe.
-    const aEff = S.aF + (v > 2 ? 9.81 * S.grade : 0);
+    const aEff = S.aF + (v > 2 ? 9.81 * S.grade * sg : 0);
     let t;
     if (v < 0.5) t = clamp(S.aF / 4, 0, 1);
     else if (aEff < -0.35) t = 0; // elbil: regenerering ved slipp = motorbrems
@@ -1152,7 +1159,61 @@ registerProcessor('m4-engine', M4Proc);`;
       S.brk += (b - S.brk) * Math.min(1, dt / 0.1);
     }
     histPush(performance.now(), h, !held);
-    if (st.mode === 'drive') send({ k: 'drive', v: S.vEst, thr: S.thr, brake: S.brk });
+    // Revers: motoren blir i 1. gir på lavt turtall (fart ×0,8 som R-utvekslingen, maks 3,4 m/s ≈ 1500 o/min), dempet gass.
+    if (st.mode === 'drive') send(sg < 0 ? { k: 'drive', v: Math.min(S.vEst * 0.8, 3.4), thr: Math.min(S.thr, 0.5), brake: S.brk }
+      : { k: 'drive', v: S.vEst, thr: S.thr, brake: S.brk });
+  }
+
+  // ---- revers: GPS-farten har ikke fortegn. Retningen avgjøres bare når bilen kjører fra stillstand, ved å
+  // integrere akselerasjonen langs lært "fremover" fra et rolig øyeblikk i stillstand til fixen som viser fart.
+  // Fremover gir +fart, revers -fart. Usikkert, ugyldig eller høy fart: fremover (falsk revers er verst).
+  const RV_GO = 0.8, RV_MAXV = 4, RV_OUT = 8;
+  function setDir(d, v) { if (d === 'R') S.vEst = Math.max(S.vEst, v); S.dir = d; }
+  function rvNow(r0) { return S.rI - r0.r - S.rvB * (performance.now() - r0.t) / 1000; } // fortegnet fart nå, fra ankeret
+  function quietAt(t0, t1) { // siste historikkpunkt der snittakselerasjonen ±0,25 s er nær null
+    const H = S.hist;
+    for (let i = H.length - 16; i >= 15; i--) {
+      if (H[i].t > t1) continue;
+      if (H[i].t < t0) break;
+      const a = (H[i + 15].r - H[i - 15].r) / ((H[i + 15].t - H[i - 15].t) / 1000) - S.rvB;
+      if (Math.abs(a) < 0.3) return H[i];
+    }
+    return null;
+  }
+  function dirFix(v, now) {
+    const tP = now - GPS_LAG, p = histAt(tP), prev = S.rvP;
+    S.rvP = p ? { t: tP, r: p.r, v: v } : null;
+    if (!p) { S.rv0 = null; if (S.dir === 'R') setDir('F'); return; }
+    const live = S.motionSeen && now - S.motionT < 600 && !!S.fwd;
+    if (v < 0.3) { // stillstand: retningen kan bare skifte her
+      if (S.dir === 'R') setDir('F');
+      // Anker = siste rolige øyeblikk (fart null) 0,5-1,6 s tilbake: tåler at den ekte GPS-forsinkelsen avviker fra 1 s.
+      const r0 = S.rv0, a0 = quietAt(now - 1600, now - 500);
+      if (!a0) return; // ingen rolig stund i vinduet (GPS-støy i lav fart): behold forrige anker
+      if (r0 && live && S.heldT < r0.t && a0.t - r0.t > 500) { // nullpunkt i ro; vinduer med bevegelse forkastes
+        const b = (a0.r - r0.r) / ((a0.t - r0.t) / 1000);
+        if (Math.abs(b) < 0.25) S.rvB += (b - S.rvB) * 0.3;
+      }
+      S.rv0 = { t: a0.t, r: a0.r };
+      return;
+    }
+    if (S.dir === 'R') { // ut av revers: for fort, eller sensor og GPS-akselerasjon har samme fortegn (= fremover)
+      let out = v > RV_OUT || !live;
+      if (!out && prev && S.heldT < prev.t && tP - prev.t > 300) {
+        const T = (tP - prev.t) / 1000, ag = (v - prev.v) / T, a = (p.r - prev.r) / T - S.rvB;
+        out = Math.abs(ag) > 0.5 && a * ag > 0.3 * ag * ag;
+      }
+      if (out) setDir('F');
+      return;
+    }
+    if (!S.rv0 || v < RV_GO) return;
+    const r0 = S.rv0, T = (tP - r0.t) / 1000;
+    if (!live || S.heldT >= r0.t || T > 6 || v > RV_MAXV) { S.rv0 = null; return; }
+    const u = p.r - r0.r - S.rvB * T, lim = Math.max(0.4, 0.5 * v); // u: fortegnet fart langs "fremover" da fixen gjaldt
+    if (Math.abs(u) < lim) return; // uklart (GPS-tiden kan avvike fra antatt): vent på neste fix, kjør som fremover
+    S.rv0 = null; S.rvLast = { u: u, v: v, T: T };
+    // revers bare hvis sensorene sier at bilen fortsatt ruller bakover nå (sen avgjørelse etter at den har stoppet: nei)
+    if (u < 0 && u > -(2.5 * v + 1) && rvNow(r0) < -0.3) { S.rvA = r0; setDir('R', v); }
   }
 
   function onGps(pos) {
@@ -1165,16 +1226,18 @@ registerProcessor('m4-engine', M4Proc);`;
     if (good) {
       if (acc < 30) S.accBase += (acc - S.accBase) * 0.1;
       const v = c.speed, tPast = now - GPS_LAG;
+      dirFix(v, now);
+      const learn = S.dir !== 'R' && !(S.rv0 && v >= 0.3); // ikke lær akse/skjevhet i revers eller før retningen er avgjort
       if (S.gpsV !== null) {
         const dt = t - S.gpsT;
         if (dt > 0.3 && dt < 3) {
           S.aGps = (v - S.gpsV) / dt; S.aGpsT = now;
           // Sammenlign med det sensorene målte i det samme (forsinkede) tidsrommet.
           const w = histWin(S.fixNow - GPS_LAG, tPast);
-          if (w.n > 5 && w.ok) {
+          if (w.n > 5 && w.ok && learn) {
             if (S.fwd) S.bias = clamp(S.bias + (w.a - S.aGps) * 0.08, -1, 1);
             // Lær retningen "fremover" i telefonens akser fra GPS-akselerasjonens fortegn, fortløpende.
-            if (Math.abs(S.aGps) > 0.7 && S.vEst > 3) {
+            if (Math.abs(S.aGps) > 0.7 && S.vEst > 5) { // over 18 km/t: nesten aldri revers
               const sg = Math.sign(S.aGps);
               for (let i = 0; i < 3; i++) S.F[i] += sg * w.h[i] * dt;
               const m = nrm(S.F); if (m > 20) for (let i = 0; i < 3; i++) S.F[i] *= 20 / m;
@@ -1201,7 +1264,11 @@ registerProcessor('m4-engine', M4Proc);`;
       S.lastGood = now; S.goodN++; S.everGood = true;
       if (st.tunGps && S.goodN >= 2) { st.tunGps = false; applyTunnel(); }
       mapUpdate(now);
-    } else S.goodN = 0;
+    } else {
+      S.goodN = 0;
+      // iPhone gir ofte fart -1 når bilen står: med god posisjon og lav fart sist regnes det som stillstand for reversvalget
+      if (!hasV && acc <= Math.max(35, 2.5 * S.accBase) && S.gpsV !== null && S.gpsV < 0.6 && now - S.lastGood < 3000) dirFix(0, now);
+    }
     $('#dpGps').textContent = good ? 'OK, ±' + Math.round(acc) + ' m' : hasV ? 'Svakt, ±' + Math.round(acc) + ' m' : 'Gir ikke fart';
   }
   function onGpsErr(err) {
@@ -1432,7 +1499,7 @@ registerProcessor('m4-engine', M4Proc);`;
     g.strokeStyle = rp > 6600 ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
     g.beginPath(); g.moveTo(cx + Math.cos(na) * R * 0.52, cy + Math.sin(na) * R * 0.52); g.lineTo(cx + Math.cos(na) * R * 0.72, cy + Math.sin(na) * R * 0.72); g.stroke();
     g.fillStyle = t.shift ? COL.accent : t.lim ? COL.hot : COL.ink; g.font = '700 ' + R * 0.42 + 'px ' + COL.disp;
-    g.fillText(String(t.gear), cx, cy - R * 0.02);
+    g.fillText(st.mode === 'drive' && S.dir === 'R' ? 'R' : String(t.gear), cx, cy - R * 0.02);
     g.fillStyle = COL.dim; g.font = '600 ' + R * 0.12 + 'px ' + COL.disp;
     g.fillText(Math.round(st.vD * 3.6) + ' km/t', cx, cy + R * 0.34);
     g.font = '600 ' + R * 0.085 + 'px ' + COL.disp;
