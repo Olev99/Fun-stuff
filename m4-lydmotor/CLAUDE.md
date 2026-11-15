@@ -23,6 +23,7 @@ A private artifact with the same page exists for quick sound tests (test mode an
 - `index.html`: the built single file that GitHub Pages serves. Do not edit it by hand.
 - `src/template.html`: markup and styles. `src/main.js`: page script (UI, sensors, GPS and motion fusion, tunnel detection, settings). `src/engine.js`: class `EngineCore`, the whole sound and drivetrain model.
 - `src/build.py`: `python3 m4-lydmotor/src/build.py` inlines `engine.js` and `main.js` into `template.html` and writes `m4-lydmotor/index.html`. Rebuild and commit `index.html` with every source change.
+- `src/sensortest.js`: `node m4-lydmotor/src/sensortest.js` loads the built page in headless Chrome over localhost, checks the test-to-drive switch and console errors, then runs a synthetic drive through the real fusion code (60 Hz accelerometer with noise and bias, GPS speed one second late): speed error and jumps at GPS fixes, 6 % up/down hills at constant speed, a phone jolt, throttle step response and noise. `NO_UI=1 node ... <old.html>` runs only the drive part against an older build (that build must export `onMotion` in `window.__m4`).
 - `src/test.js`: offline Node checks. `node m4-lydmotor/src/test.js` runs them (about 40 checks: spectrum, firing frequency, shift trajectories, pops, limiter, tunnel tail, clipping, CPU cost); `node m4-lydmotor/src/test.js demo` renders a demo drive to WAV.
 
 ## Constraints that bite
@@ -40,7 +41,15 @@ A private artifact with the same page exists for quick sound tests (test mode an
 - The waveform is peaky (crest factor about 14 dB at full throttle) and may sound harsher than a cabin recording; check by ear.
 - An early version let the half order dominate (a three-cylinder-like beat). It is fixed in the model, but confirm by ear that the six sounds smooth.
 - Gear ratios and final drive (5.000/3.200/2.143/1.720/1.313/1.000/0.823/0.640, 3.154) come from one spec site; a second site listed a different set that was not checked against a BMW source.
-- Throttle inferred from acceleration is wrong on slopes and with noisy readings, which can cause occasional wrong shifts or kick-downs.
+- Sensor fusion (main.js) is only checked with the synthetic drive in `sensortest.js`; the real car may differ:
+  - GPS delay is assumed to be 1.0 s (`GPS_LAG`). The real iPhone delay is not measured; if speed still lags or overshoots at each fix, tune it.
+  - Slope compensation reads the grade from the OS gravity vector along the learned forward axis (bounded to ±10 %, slow baseline, only when the OS separates gravity). Downhill at constant speed now reads as lift-off (overrun sound); uphill as more throttle. Braking downhill at constant speed is not detected as braking. Unverified in a real car.
+  - The jolt guard freezes throttle and brake for 0.7 s when rotation exceeds 80 °/s. Normal cornering should stay well below that (a 90° turn in 2 s is 45 °/s), but check that it never freezes in normal driving, and that lifting the phone out of the holder does not cause kick-downs.
+  - The saved calibration (`m4cal` in localStorage, 14 days) is discarded when the phone's gravity direction differs by more than about 25° for 3 s. Rotating the phone in the plane perpendicular to gravity is not detected; the owner then has to press Nullstill kalibrering.
+  - The throttle path is faster (accelerometer filter 35 ms, throttle 30 ms up and 80 ms down); in the synthetic drive, noise rose from 0.013 to 0.020 (std). Real holder vibration may need a longer filter.
+- Reversing: GPS speed has no sign, so reversing sounds like slow driving forward in first gear. No cheap, safe heuristic was found (the forward-axis acceleration at a standstill is too ambiguous); left as is.
+- The audio watchdog (resume every 1 s, then every 5 s after five failures; also restarts the silent keep-alive track) and the wake-lock re-request were only exercised in desktop Chrome (suspend/resume). iOS call and Siri interruptions and the `interrupted` state need a real iPhone.
+- Exhaust flap (engine.js): Sport is open in gears 1-3 while moving, above about 55 % load or 4,500 rpm, otherwise 0.2; it opens in 30 ms and closes over 0.4 s. Sport idle is a little quieter than before by design. Judge by ear whether cruising in Sport (flap mostly closed) is too tame.
 - The live OpenStreetMap request (optional tunnel lookup) was never exercised; only the matching code was tested with a synthetic tunnel.
 
 ## Workflow
