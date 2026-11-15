@@ -45,6 +45,8 @@ h1 { font: 700 20px/1 var(--f-display); letter-spacing: .04em; margin: 0; text-w
 .gaugebox canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .status { font-size: 15px; white-space: nowrap; overflow: hidden; color: var(--dim); display: flex; justify-content: space-between; gap: 10px; min-height: 20px; }
 .status b { color: var(--ink); font-weight: 600; }
+.sys { font: 600 18px/1.2 var(--f-body); letter-spacing: .02em; color: var(--ink); min-height: 22px; }
+.sys .bad { color: var(--hot); }
 .pedals { display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px; height: clamp(150px, 28vh, 240px); }
 .pedal {
   position: relative; border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
@@ -118,6 +120,7 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
 
   <div class="gaugebox"><canvas id="gauge" aria-label="Turteller"></canvas></div>
   <div class="status"><span id="stLat">Lyd av</span><span class="evt" id="stEv" aria-live="off"></span></div>
+  <div class="sys" id="stSys" aria-live="polite"></div>
 
   <div class="pedals">
     <div class="pedal brake" id="brake"><small>hold</small><div class="fill"></div><span>BREMS</span></div>
@@ -159,7 +162,9 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
       <label class="chk" for="idle"><input id="idle" type="checkbox" checked> <span>Tomgangslyd når bilen står stille</span></label>
       <label class="chk" for="tunGps"><input id="tunGps" type="checkbox" checked> <span>Automatisk tunnel fra GPS-bortfall</span></label>
       <label class="chk" for="tunMap"><input id="tunMap" type="checkbox"> <span>Slå opp tunneler i kart (OpenStreetMap)</span></label>
-      <p class="hint">Eksos: Komfort har lukkede klaffer og nesten ingen smell. Sport åpner klaffene og gir burble når du slipper gassen. Bane er høyest, med raskest skift.</p>
+      <button type="button" class="btn" id="calReset">Nullstill kalibrering</button>
+      <p class="hint">Appen husker hvilken vei som er fremover for telefonen i holderen. Flytter du holderen, trykk Nullstill og gi gass rett frem en gang. Flyttes telefonen tydelig, lærer den på nytt av seg selv.</p>
+      <p class="hint">Eksos: Komfort har lukkede klaffer og nesten ingen smell. Sport åpner klaffene i lave gir, ved mye gass og høyt turtall, og gir burble når du slipper gassen. Bane er høyest, med raskest skift.</p>
       <p class="hint">Tunnel: Knappen virker alltid. GPS-bortfall oppdager en tunnel først to til tre sekunder etter at signalet forsvinner, og kan slå feil under bruer og i parkeringshus. Kartoppslag vet om tunnelen før du kjører inn, men trenger mobilnett og sender posisjonen din til en åpen OpenStreetMap-tjener (overpass-api.de). Det er derfor av til du slår det på.</p>
       <p class="hint">Kjøremodus trenger GPS og bevegelsessensor. Det virker bare når siden ligger på sin egen https-adresse og er åpnet i Safari, ikke inne i Claude-appen. Skjermen må være på hele turen.</p>
       <p class="hint">Tastatur: W eller pil opp for gass, mellomrom for brems, Q og E for gir, A for auto, T for tunnel.</p>

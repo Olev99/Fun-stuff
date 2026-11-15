@@ -347,13 +347,20 @@ class EngineCore {
     this.flutPh += dt * (16 + 26 * this.bov);
 
     // ---- klaff ----
+    // Bane: alltid åpen. Sport: åpen i lave gir (i fart), ved høy last eller høyt turtall, ellers nesten lukket.
+    // Komfort: lukket ved lavt turtall/lett last, åpner ved høy last. Åpner raskt, lukker sakte.
     let fl = 1;
-    if (m < 2) {
+    if (m === 1) {
+      let a = (this.load - 0.45) / 0.2; if (a < 0) a = 0; if (a > 1) a = 1;
+      let b = (this.rpm - 4200) / 600; if (b < 0) b = 0; if (b > 1) b = 1;
+      const c = this.gear <= 3 && this.v > 1 ? 1 : 0;
+      fl = 0.2 + 0.8 * Math.max(a, b, c);
+    } else if (m === 0) {
       let a = (this.load - 0.3) * 2.2; if (a < 0) a = 0; if (a > 1) a = 1;
       let b = (this.rpm - 2200) / 1800; if (b < 0) b = 0; if (b > 1) b = 1;
-      fl = m === 0 ? 0.08 + 0.72 * a * b : Math.max(0.6, a * b);
+      fl = 0.08 + 0.72 * a * b;
     }
-    this.flap += (fl - this.flap) * (1 - Math.exp(-dt / 0.12));
+    this.flap += (fl - this.flap) * (1 - Math.exp(-dt / (fl > this.flap ? 0.03 : 0.4)));
 
     // ---- demping (tomgang av når bilen står) ----
     const mute = (!this.idleOn && this.v < 0.6 && thr < 0.03) ? 0 : 1;

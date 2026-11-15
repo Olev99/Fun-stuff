@@ -9,7 +9,8 @@
   const st = { ctx: null, node: null, core: null, started: false, mode: 'test', auto: true, exMode: 1,
     thrPed: 0, thrKey: 0, brake: 0, keyGas: false,
     tele: { rpm: 780, gear: 1, v: 0, load: 0, lim: false, shift: 0, ev: [] }, rpmD: 780, vD: 0,
-    evText: '', evT: 0, tunManual: false, tunGps: false, tunMap: false, tunOn: false, wake: null };
+    evText: '', evT: 0, tunManual: false, tunGps: false, tunMap: false, tunOn: false, wake: null, wakeT: -1e9,
+    resT: -1e9, resN: 0, drawT: 0, sys: '' };
 
   // ---------- lagrede innstillinger ----------
   const store = {
@@ -82,9 +83,37 @@
     if (st.keep && st.keep.paused) st.keep.play().catch(() => {});
   }
   function wakeLock() {
+    if (st.wake || !navigator.wakeLock || document.hidden) return;
+    st.wakeT = performance.now();
     try {
-      if (navigator.wakeLock && !document.hidden) navigator.wakeLock.request('screen').then((w) => { st.wake = w; }).catch(() => {});
+      navigator.wakeLock.request('screen').then((w) => {
+        st.wake = w;
+        // iOS slipper låsen av og til (f.eks. etter et anrop); be om den igjen så lenge siden vises
+        w.addEventListener('release', () => { st.wake = null; if (!document.hidden) setTimeout(wakeLock, 1000); });
+      }).catch(() => {});
     } catch (e) {}
+  }
+  // Vakt fire ganger i sekundet: lyd avbrutt (anrop, Siri), stille lydspor stoppet, skjermlås borte. Viser status.
+  function sysTick() {
+    const c = st.ctx, now = performance.now();
+    if (!c) return;
+    const audioOk = c.state === 'running' && !(st.keep && st.keep.paused);
+    if (!document.hidden) {
+      if (audioOk) st.resN = 0;
+      else if (now - st.resT > (st.resN > 5 ? 5000 : 1000)) { st.resT = now; st.resN++; resumeAudio(); }
+      if (!st.wake && now - st.wakeT > 10000) wakeLock();
+    }
+    const bad = (t) => '<span class="bad">' + t + '</span>';
+    const parts = [
+      !navigator.wakeLock ? bad('Skjermlås støttes ikke') : st.wake ? 'Skjerm våken' : bad('Skjermen kan slukke'),
+      audioOk ? 'Lyd på' : bad(c.state === 'interrupted' ? 'Lyd avbrutt' : 'Lyd pauset')
+    ];
+    if (S.on) {
+      const age = now - S.lastGood;
+      parts.push(S.lastGood && age < 2500 ? 'GPS OK' : !S.gpsSeen ? bad('GPS venter') : bad('GPS borte'));
+    }
+    const html = parts.join(' · ');
+    if (html !== st.sys) { st.sys = html; $('#stSys').innerHTML = html; }
   }
 
   async function startAudio(mode) {
@@ -140,6 +169,7 @@ registerProcessor('m4-engine', M4Proc);`;
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { resumeAudio(); wakeLock(); } });
     addEventListener('pointerdown', resumeAudio, { passive: true });
     wakeLock();
+    setInterval(sysTick, 250);
     if (mode === 'drive') enableSensors(motionP);
   }
   function showLatency() {
@@ -244,33 +274,93 @@ registerProcessor('m4-engine', M4Proc);`;
     if (st.started) { send({ k: 'mode', drive: m === 'drive' }); pushCfg(); }
   }
   $('#mTest').addEventListener('click', () => setMode('test'));
-  $('#mDrive').addEventListener('click', () => setMode('drive'));
+  // Bytte til kjøremodus er selv trykket som iOS krever for bevegelsessensoren.
+  $('#mDrive').addEventListener('click', () => { const p = st.started && !S.on ? askMotion() : null; setMode('drive'); if (p) enableSensors(p); });
 
   // =====================================================================
   // Kjøremodus: GPS + bevegelsessensor
   // =====================================================================
   const S = { on: false, vEst: 0, gpsV: null, gpsT: 0, aGps: 0, aGpsT: 0, F: [0, 0, 0], fwd: null, gLP: null, lastT: 0, aF: 0, bias: 0,
     thr: 0, brk: 0, motionT: 0, motionSeen: false, gpsSeen: false, motionDenied: false,
-    lat: null, lon: null, hdg: null, acc: null, accBase: 12, lastGood: 0, goodN: 0, everGood: false, vHold: 0, tickT: 0, uiT: 0 };
+    lat: null, lon: null, hdg: null, acc: null, accBase: 12, lastGood: 0, goodN: 0, everGood: false, vHold: 0, tickT: 0, uiT: 0,
+    hist: [], fixNow: 0, rotHold: 0, gRef: null, offT: 0, grade: 0, gBase: 0, saveT: 0 };
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const nrm = (a) => Math.hypot(a[0], a[1], a[2]);
+  const GPS_LAG = 1000; // ms: GPS-farten beskriver bilen omtrent ett sekund tilbake i tid
 
-  // Felles fusjon: langsgående akselerasjon -> fart, gass og brems.
-  function fuse(aLong, dt) {
-    S.aF += (aLong - S.aF) * Math.min(1, dt / 0.045);
+  // ---- lagret kalibrering (hvilken vei som er fremover i telefonen) ----
+  const CAL_KEY = 'm4cal', CAL_MAX_AGE = 14 * 864e5;
+  function calLoad() {
+    try {
+      const c = JSON.parse(localStorage.getItem(CAL_KEY) || 'null');
+      if (!c || !(Date.now() - c.t < CAL_MAX_AGE) || !Array.isArray(c.F) || !Array.isArray(c.g)) return;
+      const fin = (a) => a.length === 3 && a.every((x) => typeof x === 'number' && isFinite(x));
+      if (!fin(c.F) || !fin(c.g)) return;
+      const F = c.F, g = c.g, m = nrm(F);
+      if (!(m > 2 && m < 20.5) || !(Math.abs(nrm(g) - 1) < 0.05) || Math.abs(dot(F, g)) / m > 0.3) return;
+      S.F = F; S.fwd = F.map((x) => x / m); S.gRef = g;
+      S.gBase = clamp(+c.gb || 0, -0.05, 0.05); S.bias = clamp(+c.b || 0, -0.5, 0.5);
+    } catch (e) {}
+  }
+  function calSave() {
+    if (!S.fwd || !S.gRef) return;
+    try { localStorage.setItem(CAL_KEY, JSON.stringify({ t: Date.now(), F: S.F, g: S.gRef, gb: S.gBase, b: S.bias })); } catch (e) {}
+  }
+  function calReset() {
+    S.F = [0, 0, 0]; S.fwd = null; S.gRef = null; S.offT = 0; S.grade = 0; S.gBase = 0; S.bias = 0;
+    try { localStorage.removeItem(CAL_KEY); } catch (e) {}
+  }
+  calLoad();
+  $('#calReset').addEventListener('click', () => {
+    calReset();
+    $('#calReset').textContent = 'Kalibrering nullstilt';
+    setTimeout(() => { $('#calReset').textContent = 'Nullstill kalibrering'; }, 2500);
+  });
+
+  // ---- historikk: estimert fart og akselerasjon de siste sekundene, for å sammenligne med forsinket GPS ----
+  function histPush(now, h, ok) {
+    S.hist.push({ t: now, v: S.vEst, a: S.aF, h: h, ok: ok });
+    while (S.hist.length && S.hist[0].t < now - 3000) S.hist.shift();
+  }
+  function histAt(t) {
+    const H = S.hist;
+    if (!H.length || t < H[0].t - 100 || t > H[H.length - 1].t + 100) return null;
+    let best = H[0];
+    for (const x of H) if (Math.abs(x.t - t) < Math.abs(best.t - t)) best = x;
+    return best;
+  }
+  function histWin(t0, t1) { // snitt av akselerasjon og "vannrett" sensorvektor i et tidsvindu
+    let n = 0, a = 0, ok = true; const h = [0, 0, 0];
+    for (const x of S.hist) {
+      if (x.t < t0 || x.t > t1) continue;
+      n++; a += x.a; ok = ok && x.ok;
+      if (x.h) { h[0] += x.h[0]; h[1] += x.h[1]; h[2] += x.h[2]; } else ok = false;
+    }
+    return n ? { n: n, a: a / n, h: [h[0] / n, h[1] / n, h[2] / n], ok: ok } : { n: 0 };
+  }
+
+  // Felles fusjon: langsgående akselerasjon -> fart, gass og brems. held: telefonen rykkes/løftes, frys gass og brems.
+  function fuse(aLong, dt, h, held) {
+    S.aF += ((held ? 0 : aLong) - S.aF) * Math.min(1, dt / 0.035);
     let v = S.vEst + S.aF * dt;
     if (st.tunGps || st.tunMap) v += (S.vHold - v) * dt / 25; // uten GPS: ikke la integrasjonen drive av gårde
-    if (S.gpsV !== null && S.gpsV < 0.3 && performance.now() - S.lastGood < 2500) v = 0;
+    // GPS sier stopp: hold farten på null, men ikke når akselerometeret ser at vi kjører av gårde (GPS er et sekund bak)
+    if (S.gpsV !== null && S.gpsV < 0.3 && performance.now() - S.lastGood < 2500 && S.aF < 0.4) v = 0;
     S.vEst = v = clamp(v, 0, 90);
     const aDrag = 0.12 + 0.00026 * v * v;
     const aAvail = Math.min(9.5, 344000 / (1750 * Math.max(v, 4)));
+    // Bakke: tyngdekraftens bidrag langs veien. Opp: trengs gass for å holde farten; ned: holde farten er å slippe.
+    const aEff = S.aF + (v > 2 ? 9.81 * S.grade : 0);
     let t;
     if (v < 0.5) t = clamp(S.aF / 4, 0, 1);
-    else if (S.aF < -0.35) t = 0; // elbil: regenerering ved slipp = motorbrems
-    else t = Math.pow(clamp(1.3 * (S.aF + aDrag) / aAvail, 0, 1), 0.8);
+    else if (aEff < -0.35) t = 0; // elbil: regenerering ved slipp = motorbrems
+    else t = Math.pow(clamp(1.3 * (aEff + aDrag) / aAvail, 0, 1), 0.8);
     const b = v > 0.5 ? clamp((-S.aF - 2.0) / 5, 0, 1) : 0; // hardere enn vanlig regen regnes som brems
-    S.thr += (t - S.thr) * Math.min(1, dt / (t > S.thr ? 0.06 : 0.12));
-    S.brk += (b - S.brk) * Math.min(1, dt / 0.1);
+    if (!held) {
+      S.thr += (t - S.thr) * Math.min(1, dt / (t > S.thr ? 0.03 : 0.08));
+      S.brk += (b - S.brk) * Math.min(1, dt / 0.1);
+    }
+    histPush(performance.now(), h, !held);
     if (st.mode === 'drive') send({ k: 'drive', v: S.vEst, thr: S.thr, brake: S.brk });
   }
 
@@ -283,10 +373,23 @@ registerProcessor('m4-engine', M4Proc);`;
     S.acc = acc;
     if (good) {
       if (acc < 30) S.accBase += (acc - S.accBase) * 0.1;
-      const v = c.speed;
+      const v = c.speed, tPast = now - GPS_LAG;
       if (S.gpsV !== null) {
         const dt = t - S.gpsT;
-        if (dt > 0.3 && dt < 3) { S.aGps = (v - S.gpsV) / dt; S.aGpsT = now; S.bias += ((S.aF - S.aGps) - S.bias) * 0.08; }
+        if (dt > 0.3 && dt < 3) {
+          S.aGps = (v - S.gpsV) / dt; S.aGpsT = now;
+          // Sammenlign med det sensorene målte i det samme (forsinkede) tidsrommet.
+          const w = histWin(S.fixNow - GPS_LAG, tPast);
+          if (w.n > 5 && w.ok) {
+            if (S.fwd) S.bias = clamp(S.bias + (w.a - S.aGps) * 0.08, -1, 1);
+            // Lær retningen "fremover" i telefonens akser fra GPS-akselerasjonens fortegn, fortløpende.
+            if (Math.abs(S.aGps) > 0.7 && S.vEst > 3) {
+              const sg = Math.sign(S.aGps);
+              for (let i = 0; i < 3; i++) S.F[i] += sg * w.h[i] * dt;
+              const m = nrm(S.F); if (m > 20) for (let i = 0; i < 3; i++) S.F[i] *= 20 / m;
+            }
+          }
+        }
       }
       // retning: bruk GPS-kurs, ellers regn fra forrige posisjon
       if (c.heading != null && !isNaN(c.heading) && v > 2) S.hdg = c.heading;
@@ -294,8 +397,15 @@ registerProcessor('m4-engine', M4Proc);`;
         const dy = (c.latitude - S.lat) * 110540, dx = (c.longitude - S.lon) * 111320 * Math.cos(c.latitude * Math.PI / 180);
         if (dx * dx + dy * dy > 9) S.hdg = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
       }
-      S.gpsV = v; S.gpsT = t; S.lat = c.latitude; S.lon = c.longitude;
-      if (v < 0.3) S.vEst = 0; else S.vEst += (v - S.vEst) * (S.motionSeen && now - S.motionT < 500 ? 0.4 : 0.8);
+      S.gpsV = v; S.gpsT = t; S.fixNow = now; S.lat = c.latitude; S.lon = c.longitude;
+      // Rett opp farten mot det estimatet vi hadde da GPS-målingen gjaldt, ikke mot dagens (ellers sagtann ved akselerasjon).
+      const past = histAt(tPast), ref = past ? past.v : S.vEst;
+      if (v < 0.3 && S.vEst < 2 && S.aF < 0.4) S.vEst = 0;
+      else {
+        const d = (v - ref) * (S.motionSeen && now - S.motionT < 500 ? 0.4 : 0.8);
+        S.vEst = clamp(S.vEst + d, 0, 90);
+        for (const x of S.hist) x.v += d;
+      }
       S.vHold = S.vEst;
       S.lastGood = now; S.goodN++; S.everGood = true;
       if (st.tunGps && S.goodN >= 2) { st.tunGps = false; applyTunnel(); }
@@ -314,8 +424,12 @@ registerProcessor('m4-engine', M4Proc);`;
     const now = performance.now();
     const dt = S.lastT ? clamp((now - S.lastT) / 1000, 0.001, 0.05) : 0.016; S.lastT = now;
     S.motionSeen = true; S.motionT = now;
-    let lin, g;
-    if (a && a.x != null) { lin = [a.x, a.y, a.z]; g = [ag.x - a.x, ag.y - a.y, ag.z - a.z]; }
+    // Telefonen dreies raskt (tas ut av holderen, slag): ikke tolk rykkene som gass eller brems.
+    const rr = e.rotationRate;
+    if (rr && Math.hypot(rr.alpha || 0, rr.beta || 0, rr.gamma || 0) > 80) S.rotHold = now + 700;
+    const held = now < S.rotHold;
+    let lin, g; const osLin = !!(a && a.x != null);
+    if (osLin) { lin = [a.x, a.y, a.z]; g = [ag.x - a.x, ag.y - a.y, ag.z - a.z]; }
     else {
       const x = [ag.x, ag.y, ag.z];
       if (!S.gLP) S.gLP = x.slice();
@@ -324,16 +438,26 @@ registerProcessor('m4-engine', M4Proc);`;
     }
     const gn = nrm(g) || 9.81, gh = [g[0] / gn, g[1] / gn, g[2] / gn];
     const dv = dot(lin, gh), ah = [lin[0] - dv * gh[0], lin[1] - dv * gh[1], lin[2] - dv * gh[2]];
-    // Lær retningen "fremover" i telefonens akser fra GPS-akselerasjon (fortegn og retning), fortløpende.
-    if (Math.abs(S.aGps) > 0.7 && S.vEst > 3 && now - S.aGpsT < 1500) {
-      const sg = Math.sign(S.aGps);
-      for (let i = 0; i < 3; i++) S.F[i] += sg * ah[i] * dt;
-      const m = nrm(S.F); if (m > 20) for (let i = 0; i < 3; i++) S.F[i] *= 20 / m;
-    }
     const fm = nrm(S.F);
-    if (fm > 2) S.fwd = [S.F[0] / fm, S.F[1] / fm, S.F[2] / fm];
+    if (fm > 2) { S.fwd = [S.F[0] / fm, S.F[1] / fm, S.F[2] / fm]; if (!S.gRef) S.gRef = gh.slice(); }
+    if (S.fwd && S.gRef && !held) {
+      // Står telefonen tydelig annerledes enn da den ble kalibrert (flyttet i holderen), lær retningen på nytt.
+      S.offT = dot(gh, S.gRef) < 0.9 ? S.offT + dt : Math.max(0, S.offT - dt);
+      if (S.offT > 3) calReset();
+      else {
+        S.gRef = S.gRef.map((x, i) => x + (gh[i] - x) * dt / 120);
+        const gm = nrm(S.gRef); S.gRef = S.gRef.map((x) => x / gm);
+      }
+    }
+    // Stigning: tyngdens komponent langs "fremover" (null på flat vei fordi retningen læres vinkelrett på tyngden).
+    // Bare med operativsystemets egen tyngdeseparasjon; den lavpassede reserven blandes med akselerasjon.
+    if (S.fwd && osLin && !held) {
+      const sl = dot(gh, S.fwd);
+      S.gBase = clamp(S.gBase + (sl - S.gBase) * dt / 600, -0.05, 0.05);
+      S.grade += (clamp(sl - S.gBase, -0.1, 0.1) - S.grade) * Math.min(1, dt / 1.5);
+    } else if (!S.fwd) S.grade = 0;
     const aLong = S.fwd ? dot(ah, S.fwd) - clamp(S.bias, -0.5, 0.5) : (now - S.aGpsT < 2500 ? S.aGps : 0);
-    fuse(aLong, dt);
+    fuse(aLong, dt, ah, held);
   }
 
   // Går fire ganger i sekundet: reserve uten bevegelsessensor, GPS-vakt for tunnel, statuslinjer.
@@ -341,7 +465,8 @@ registerProcessor('m4-engine', M4Proc);`;
     const now = performance.now(), dt = S.tickT ? clamp((now - S.tickT) / 1000, 0.01, 1) : 0.25; S.tickT = now;
     if (st.mode !== 'drive') return;
     const motionLive = S.motionSeen && now - S.motionT < 600;
-    if (!motionLive) fuse(now - S.aGpsT < 1300 ? S.aGps : 0, dt);
+    if (!motionLive) fuse(now - S.aGpsT < 1300 ? S.aGps : 0, dt, null, false);
+    if (S.fwd && motionLive && now - S.saveT > 30000) { S.saveT = now; calSave(); }
     // GPS-vakt: i fart, og så blir det stille fra GPS-en
     if ($('#tunGps').checked && S.everGood) {
       const age = now - S.lastGood;
@@ -350,7 +475,7 @@ registerProcessor('m4-engine', M4Proc);`;
       if (st.tunGps && S.vEst < 0.5 && age > 20000) { st.tunGps = false; applyTunnel(); }
     }
     mapDeadReckon(dt, now);
-    $('#dpMot').textContent = S.motionDenied ? 'Avslått. Bruker bare GPS (tregere).' : !S.motionSeen ? 'Venter …' : !motionLive ? 'Stoppet' : S.fwd ? 'Kalibrert' : 'Kalibrerer: gi gass rett frem';
+    $('#dpMot').textContent = S.motionDenied ? 'Avslått. Bruker bare GPS (tregere).' : !S.motionSeen ? 'Venter …' : !motionLive ? 'Stoppet' : now < S.rotHold ? 'Telefonen beveges, gass holdes' : S.fwd ? 'Kalibrert' : 'Kalibrerer: gi gass rett frem';
     $('#dpV').textContent = Math.round(S.vEst * 3.6) + ' km/t';
     $('#dpT').textContent = Math.round(S.thr * 100) + ' % / ' + Math.round(S.brk * 100) + ' %';
   }
@@ -488,7 +613,8 @@ registerProcessor('m4-engine', M4Proc);`;
 
   // ---------- turteller ----------
   const cvs = $('#gauge');
-  function draw() {
+  function draw(ts) {
+    requestAnimationFrame(draw);
     const target = st.keyGas ? 1 : 0;
     if (st.keyGas || st.thrKey > 0) {
       st.thrKey += (target - st.thrKey) * (target > st.thrKey ? 0.3 : 0.45); if (st.thrKey < 0.01 && !target) st.thrKey = 0;
@@ -496,6 +622,8 @@ registerProcessor('m4-engine', M4Proc);`;
     }
     const t = st.tele;
     st.rpmD += (t.rpm - st.rpmD) * 0.6; st.vD += (t.v - st.vD) * 0.3;
+    if (ts - st.drawT < 30) return; // tegn med 30 bilder i sekundet, sparer batteri
+    st.drawT = ts;
     const dpr = Math.min(window.devicePixelRatio || 1, 3), w = cvs.clientWidth, h = cvs.clientHeight;
     if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) { cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr); }
     const g = cvs.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
@@ -521,10 +649,9 @@ registerProcessor('m4-engine', M4Proc);`;
     if (st.tunOn) { g.fillStyle = COL.accent; g.fillText('TUNNEL', cx, cy - R * 0.36); }
     const evEl = $('#stEv'), show = performance.now() - st.evT < 1400 ? st.evText : '';
     if (evEl.textContent !== show) evEl.textContent = show;
-    requestAnimationFrame(draw);
   }
   requestAnimationFrame(draw);
 
   // for automatisk test
-  window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, driveTick: driveTick, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate };
+  window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, onMotion: onMotion, calReset: calReset, sysTick: sysTick, driveTick: driveTick, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate };
 })();
