@@ -342,6 +342,10 @@ if (require.main === module) {
     }
     check('eksosmodi: Komfort < Sport <= Bane i nivå og rasp, ingen klipping', lv.every((x) => x.bad === 0 && x.peak < 0.9) && lv[0].rms < lv[1].rms && lv[1].rms <= lv[2].rms * 1.05 && lv[0].hi < lv[2].hi,
       lv.map((x) => 'm' + x.m + ' rms ' + f1(dB(x.rms)) + ' dB, 2-5k ' + f1(x.hi) + ' %, peak ' + x.peak.toFixed(2)).join(' | '));
+    { // klaff i Sport: lukket (~0.2) på tomgang, åpner raskt ved gass, lukker sakte
+      const k = new Sess({ exMode: 1 }); k.run(2, 0); const fIdle = k.e.flap;
+      k.run(0.1, 1); const fOpen = k.e.flap;      check('klaff Sport: ~0.2 på tomgang, > 0.9 etter 0.1 s full gass', fIdle < 0.25 && fIdle > 0.15 && fOpen > 0.9, 'tomgang ' + fIdle.toFixed(2) + ', etter 0.1 s gass ' + fOpen.toFixed(2));
+    }
     const s = new Sess({ idleOn: false }); s.run(2, 0);
     check('tomgang av: stille når bilen står', stats(s.seg(1.5, 2)).rms < 0.002);
   }
