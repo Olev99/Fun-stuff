@@ -1,4 +1,4 @@
-// Offline test- og demo-rigg for EngineCore. Bruk: node test.js [demo]
+// Offline test- og demo-rigg for EngineCore. Bruk: node test.js [bil-id ...] | node test.js demo [bil-id]
 const fs = require('fs');
 const EngineCore = require('./engine.js');
 const SR = 48000, N = 128;
@@ -26,9 +26,12 @@ function fft(re, im) {
 }
 
 // ---- en "sesjon": motor + opptak + hendelseslogg ----
+// Sess.prof / Sess.out: profil og utgang som alle nye sesjoner starter med (null = innebygd standard)
 class Sess {
   constructor(cfg) {
     this.e = new EngineCore(SR);
+    if (Sess.out) this.e.msg({ k: 'out', o: Sess.out, now: true });
+    if (Sess.prof) this.e.msg({ k: 'profile', p: Sess.prof, now: true });
     this.e.msg(Object.assign({ k: 'cfg', vol: 1, burble: 0.7, exMode: 1, auto: true }, cfg || {}));
     this.L = []; this.R = []; this.ev = []; this.trace = []; this.t = 0;
     this.e.onEv = (x) => this.ev.push(x);
@@ -127,15 +130,19 @@ function writeWav(path, L, R) {
   fs.writeFileSync(path, buf);
 }
 
+Sess.prof = null; Sess.out = null;
 module.exports = { Sess, stats, spectrum, bandPct, linePow, dB, applyTunnel, writeWav, SR, N, TUN, EngineCore };
 
 // =====================================================================
 if (require.main === module) {
   const results = []; let fails = 0;
-  const check = (name, ok, info) => { results.push((ok ? 'PASS ' : 'FAIL ') + name + (info ? '  [' + info + ']' : '')); if (!ok) fails++; };
+  const check0 = (name, ok, info) => { results.push((ok ? 'PASS ' : 'FAIL ') + name + (info ? '  [' + info + ']' : '')); if (!ok) fails++; };
   const f1 = (x) => (Math.round(x * 10) / 10).toString();
 
+  const PROFS = EngineCore.profiles();
   if (process.argv[2] === 'demo') {
+    const pid = process.argv[3] || 'm4csl'; Sess.prof = PROFS[pid];
+    if (process.argv[4]) Sess.out = EngineCore.outputs()[process.argv[4]];
     const s = new Sess({ exMode: 1, burble: 0.8, vol: 1 });
     s.e.msg({ k: 'start' });
     s.run(3.0, 0);                                         // start + tomgang
@@ -156,20 +163,28 @@ if (require.main === module) {
     s.e.msg({ k: 'cfg', auto: true });
     s.run(1.8, 0); s.run(4.2, 0, 0.8); s.run(2.5, 0);
     const o = applyTunnel(s, 1);
-    writeWav(__dirname + '/demo.wav', o.L, o.R);
+    const fn = pid === 'm4csl' && !process.argv[4] ? 'demo.wav' : 'demo-' + pid + (process.argv[4] ? '-' + process.argv[4] : '') + '.wav';
+    writeWav(__dirname + '/' + fn, o.L, o.R);
     const st = stats(o.L);
-    console.log('demo.wav', (o.L.length / SR).toFixed(1) + ' s', 'peak', st.peak.toFixed(3), 'rms', st.rms.toFixed(3), 'bad', st.bad, 'softclip-andel', (o.clipFrac * 100).toFixed(2) + '%');
+    console.log(fn, (o.L.length / SR).toFixed(1) + ' s', 'peak', st.peak.toFixed(3), 'rms', st.rms.toFixed(3), 'bad', st.bad, 'softclip-andel', (o.clipFrac * 100).toFixed(2) + '%');
     console.log(s.ev.filter((x) => x.k !== 'pop' && x.k !== 'done').map((x) => x.t.toFixed(2) + ':' + x.k + (x.b !== undefined ? ' ' + x.a + '>' + x.b : '')).join('  '));
     console.log('smell totalt:', s.evs('pop').length);
     process.exit(0);
   }
 
+  // Hele pakken kjøres per bil. Terskler i o/min skaleres med rødsonen (R = rødsone / 7200), så M4 får de opprinnelige tallene.
+  function suite(pid) {
+  const p = PROFS[pid]; Sess.prof = p;
+  const R = p.redline / 7200, rr = (x) => Math.round(x * R), cyl = p.cyl, pre = pid === 'm4csl' ? '' : '[' + p.short + '] ';
+  const check = (name, ok, info) => check0(pre + name, ok, info);
+  const res = {};
   // ---- 1. tomgang ----
   {
     const s = new Sess(); s.run(4, 0);
     const st = stats(s.seg(1, 4));
     check('tomgang: endelig og hørbar', st.bad === 0 && st.rms > 0.01 && st.peak < 0.5, 'rms ' + st.rms.toFixed(3) + ' peak ' + st.peak.toFixed(2) + ' rpm ' + Math.round(s.e.rpm));
-    check('tomgang: turtall 700-860', s.e.rpm > 700 && s.e.rpm < 860);
+    check('tomgang: turtall ' + (p.idle - 80) + '-' + (p.idle + 80), s.e.rpm > p.idle - 80 && s.e.rpm < p.idle + 80);
+    res.idle = stats(s.seg(1.5, 4)).rms;
   }
   // ---- 2. start + full gass gjennom girene ----
   {
@@ -180,15 +195,15 @@ if (require.main === module) {
     check('WOT: toppnivå < 0.9', all.peak < 0.9, 'peak ' + all.peak.toFixed(3));
     check('WOT: 5+ oppgir, i rekkefølge', ups.length >= 5 && ups.every((u, i) => u.a === i + 1 && u.b === i + 2), ups.map((u) => u.t.toFixed(1) + 's ' + u.a + '>' + u.b).join(', '));
     const kmh100 = s.trace.find((x) => x.v * 3.6 >= 100), kmh200 = s.trace.find((x) => x.v * 3.6 >= 200);
-    check('WOT: 0-100 km/t 3.2-4.6 s', kmh100 && kmh100.t - 1 > 3.2 && kmh100.t - 1 < 4.6, kmh100 ? f1(kmh100.t - 1) + ' s; 0-200: ' + (kmh200 ? f1(kmh200.t - 1) + ' s' : '-') : 'nådde ikke');
+    check('WOT: 0-100 km/t ' + f1(p.acc100 - 0.4) + '-' + f1(p.acc100 + 1) + ' s', kmh100 && kmh100.t - 1 > p.acc100 - 0.4 && kmh100.t - 1 < p.acc100 + 1, kmh100 ? f1(kmh100.t - 1) + ' s; 0-200: ' + (kmh200 ? f1(kmh200.t - 1) + ' s' : '-') : 'nådde ikke');
     // oppgir-turtall og fall
     let okTraj = true; const info = [];
     for (const u of ups.slice(0, 5)) {
       const r0 = s.rpmAt(u.t - 0.01), r1 = s.rpmAt(u.t + 0.2), exp = r0 * s.e.ratios[u.b] / s.e.ratios[u.a];
       info.push(Math.round(r0) + '>' + Math.round(r1) + ' (forv. ' + Math.round(exp) + ')');
-      if (r0 < 6800 || Math.abs(r1 - exp) > 260) okTraj = false;
+      if (r0 < rr(6800) || Math.abs(r1 - exp) > rr(260)) okTraj = false;
     }
-    check('WOT-oppgir: skifter > 6800 og lander på neste girs turtall innen 200 ms', okTraj, info.join('; '));
+    check('WOT-oppgir: skifter > ' + rr(6800) + ' og lander på neste girs turtall innen 200 ms', okTraj, info.join('; '));
     // smell i skiftevinduet
     const popsShift = ups.slice(0, 5).map((u) => s.evs('pop', u.t, u.t + 0.25).length);
     check('WOT-oppgir: 1-4 smell per skift', popsShift.every((c) => c >= 1 && c <= 4), popsShift.join(','));
@@ -200,11 +215,11 @@ if (require.main === module) {
     const m4 = new Sess({ auto: false }); m4.run(0.5, 0).run(1.7, 1); m4.shift(1); m4.run(0.4, 0.2); m4.shift(1); m4.run(0.4, 0.2); m4.shift(1); m4.run(0.5, 0.2);
     const tm4 = m4.t; m4.run(16, 1);
     let okFire = true, okBand = true, lv = [];
-    for (const target of [3000, 4000, 5000, 6000, 6800]) {
+    for (const target of [3000, 4000, 5000, 6000, 6800].map(rr)) {
       // finn et øyeblikk i 3. gir eller høyere der turtallet passerer target under last
       const i = m4.trace.findIndex((x) => x.gear === 4 && x.load > 0.9 && x.t > tm4 + 0.6 && Math.abs(x.rpm - target) < 25);
       if (i < 0) { okFire = false; tf.push(target + ': ikke funnet'); continue; }
-      const t = m4.trace[i].t, seg = m4.seg(t - 0.045, t + 0.045), sp = spectrum(seg, 4096), rpm = m4.trace[i].rpm, ff = rpm / 20;
+      const t = m4.trace[i].t, seg = m4.seg(t - 0.045, t + 0.045), sp = spectrum(seg, 4096), rpm = m4.trace[i].rpm, ff = rpm / 60 * cyl / 2;
       const tol = Math.max(8, ff * 0.06);
       const pF = linePow(sp, ff, tol);
       let mx = 0; for (let k = 3; k < sp.mag.length; k++) if (sp.mag[k] > mx) mx = sp.mag[k];
@@ -216,9 +231,10 @@ if (require.main === module) {
       if (rel < -8) okFire = false;
       if (bp[0] + bp[1] < 88 || bp[3] + bp[4] > 3 || bp[2] < 0.15) okBand = false;
     }
-    check('WOT: tenningsfrekvens (o/min / 20) er blant de sterkeste linjene (innen 8 dB)', okFire, '\n      ' + tf.join('\n      '));
+    res.wot = lv.reduce((a, b) => a + b, 0) / lv.length;
+    check('WOT: tenningsfrekvens (o/min / ' + (120 / cyl) + ') er blant de sterkeste linjene (innen 8 dB)', okFire, '\n      ' + tf.join('\n      '));
     check('WOT: spektral balanse (>=88 % under 2 kHz, rasp 2-5 kHz til stede, <3 % over 5 kHz)', okBand);
-    check('WOT: jevnt nivå 2000-6800 o/min (spenn < 9 dB)', Math.max(...lv) - Math.min(...lv) < 9, 'spenn ' + f1(Math.max(...lv) - Math.min(...lv)) + ' dB');
+    check('WOT: jevnt nivå ' + rr(2000) + '-' + rr(6800) + ' o/min (spenn < 9 dB)', Math.max(...lv) - Math.min(...lv) < 9, 'spenn ' + f1(Math.max(...lv) - Math.min(...lv)) + ' dB');
   }
   // ---- 3. myke skift på lett gass ----
   {
@@ -226,32 +242,34 @@ if (require.main === module) {
     const ups = s.evs('up');
     const pops = s.evs('pop').length;
     const rs = ups.map((u) => Math.round(s.rpmAt(u.t - 0.01)));
-    check('lett gass: skifter tidlig (2500-4200) uten smell', ups.length >= 3 && rs.every((r) => r > 2300 && r < 4300) && pops === 0, 'oppgir ved ' + rs.join(',') + ' smell ' + pops);
+    check('lett gass: skifter tidlig (' + rr(2500) + '-' + rr(4200) + ') uten smell', ups.length >= 3 && rs.every((r) => r > rr(2300) && r < rr(4300)) && pops === 0, 'oppgir ved ' + rs.join(',') + ' smell ' + pops);
     const dn = s.evs('blip').length + s.evs('kick').length;
     check('lett gass: ingen girjakt (0 nedgir)', dn === 0, 'nedgir ' + dn);
   }
   // ---- 4. slipp ved høyt turtall (overrun) ----
   {
     const s = new Sess({ auto: false }); s.run(0.5, 0).run(1.2, 1); s.shift(1); s.run(1.9, 1); s.shift(1); s.run(0.4, 1);
-    while (s.e.rpm < 6500 && s.t < 20) s.run(0.02, 1);
+    while (s.e.rpm < rr(6500) && s.t < 20) s.run(0.02, 1);
     const tL = s.t, rL = s.e.rpm; s.run(4, 0);
     const pre = stats(s.seg(tL - 0.2, tL)), a = stats(s.seg(tL + 0.25, tL + 0.6));
     const p01 = s.evs('pop', tL, tL + 1.5).length, p23 = s.evs('pop', tL + 2.5, tL + 4).length;
-    check('slipp: løftet ved ~6500', rL > 6400 && s.evs('lift', tL).length === 1, 'rpm ' + Math.round(rL));
+    check('slipp: løftet ved ~' + rr(6500), rL > rr(6400) && s.evs('lift', tL).length === 1, 'rpm ' + Math.round(rL));
     const z = new Sess({ auto: false, burble: 0 }); z.run(0.5, 0).run(1.2, 1); z.shift(1); z.run(1.9, 1); z.shift(1); z.run(0.4, 1);
-    while (z.e.rpm < 6500 && z.t < 20) z.run(0.02, 1);
+    while (z.e.rpm < rr(6500) && z.t < 20) z.run(0.02, 1);
     const tz = z.t; z.run(1, 0);
     const zd = dB(stats(z.seg(tz + 0.25, tz + 0.6)).rms / stats(z.seg(tz - 0.2, tz)).rms);
     check('slipp: grunnlyden (uten burble) faller > 12 dB', zd < -12, f1(zd) + ' dB');
     check('slipp: med burble ligger overrun 4-16 dB under full gass', dB(a.rms / pre.rms) < -4 && dB(a.rms / pre.rms) > -16, f1(dB(a.rms / pre.rms)) + ' dB');
-    check('slipp: burble samlet tidlig (>=5 smell første 1.5 s, færre senere)', p01 >= 5 && p23 < p01 * 0.6, 'første 1.5 s: ' + p01 + ', 2.5-4 s: ' + p23);
+    // forventet antall følger bilens burble-mengde i Sport (M4 = 5)
+    const minP = Math.max(2, Math.round(5 * Math.min(1, p.ovr.mode[1] * p.ovr.rate * p.popK / (0.8 * 13))));
+    check('slipp: burble samlet tidlig (>=' + minP + ' smell første 1.5 s, færre senere)', p01 >= minP && p23 < p01 * 0.6, 'første 1.5 s: ' + p01 + ', 2.5-4 s: ' + p23);
     const hiP = (seg) => { const sp = spectrum(seg, 8192); return linePow(sp, 3500, 1500); };
     const dRasp = 10 * Math.log10(hiP(s.seg(tL + 0.3, tL + 0.6)) / hiP(s.seg(tL - 0.2, tL)));
     const dRaspZ = 10 * Math.log10(hiP(z.seg(tz + 0.3, tz + 0.6)) / hiP(z.seg(tz - 0.2, tz)));
     check('slipp: raspen (2-5 kHz) faller > 10 dB (uten burble)', dRaspZ < -10, f1(dRaspZ) + ' dB; med burble ' + f1(dRasp) + ' dB');
     // komfort: nesten ingen burble
     const c = new Sess({ auto: false, exMode: 0 }); c.run(0.5, 0).run(1.2, 1); c.shift(1); c.run(1.9, 1); c.shift(1); c.run(0.4, 1);
-    while (c.e.rpm < 6500 && c.t < 20) c.run(0.02, 1);
+    while (c.e.rpm < rr(6500) && c.t < 20) c.run(0.02, 1);
     const tc = c.t; c.run(3, 0);
     check('komfort: lite burble', c.evs('pop', tc).length <= 3, 'smell ' + c.evs('pop', tc).length + ' (sport: ' + s.evs('pop', tL).length + ')');
   }
@@ -270,7 +288,7 @@ if (require.main === module) {
       const target = v / (2 * Math.PI * s.e.wheelR) * 60 * s.e.finalDrive * s.e.ratios[b.b];
       for (let t = b.t; t < b.t + 0.2; t += N / SR) { const r = s.rpmAt(t); if (r > peak) peak = r; if (tHit < 0 && r >= target * 0.97) tHit = t - b.t; }
       info.push(b.a + '>' + b.b + ': ' + Math.round(r0) + '>' + Math.round(peak) + ' på ' + (tHit < 0 ? '?' : Math.round(tHit * 1000)) + ' ms');
-      if (target > 2500 && (tHit < 0 || tHit > 0.13 || peak - r0 < 500 || peak > 7200)) ok = false;
+      if (target > rr(2500) && (tHit < 0 || tHit > 0.13 || peak - r0 < 500 || peak > p.redline)) ok = false;
     }
     check('brems 200->0: >=3 mellomgass-nedgir, turtallet hopper opp til målgir innen 130 ms', ok, 'fra gir ' + g0 + ': ' + info.join('; '));
     const gaps = bl.slice(1).map((b, i) => b.t - bl[i].t);
@@ -280,9 +298,9 @@ if (require.main === module) {
     // blippen skal høres: nivå under blip vs rett før
     const b = bl[0]; const q0 = stats(s.seg(b.t - 0.12, b.t - 0.01)).rms, q1 = stats(s.seg(b.t + 0.01, b.t + 0.14)).rms;
     check('brems: mellomgassen høres (>= +6 dB mot overrun rett før)', dB(q1 / q0) > 6, f1(dB(q1 / q0)) + ' dB');
-    { const bb = bl.find((x) => x.b >= 3) || bl[0]; const w = stats(s.seg(bb.t + 0.03, bb.t + 0.15)).rms; const i = s.trace.findIndex((x) => x.load > 0.9 && x.gear >= 3 && Math.abs(x.rpm - s.rpmAt(bb.t + 0.1)) < 150); const ref = stats(s.seg(s.trace[i].t, s.trace[i].t + 0.1)).rms;
-      check('brems: mellomgassen ligger innen 8 dB av full gass ved samme turtall', dB(w / ref) > -8, f1(dB(w / ref)) + ' dB'); }
-    check('brems: stopper i 1. gir på tomgang', s.e.v < 0.5 && s.e.gear === 1 && s.e.rpm < 900, 'v ' + f1(s.e.v) + ' gir ' + s.e.gear + ' rpm ' + Math.round(s.e.rpm));
+    { const bb = bl.find((x) => x.b >= 3) || bl[0]; const w = stats(s.seg(bb.t + 0.03, bb.t + 0.15)).rms; const near = (g) => s.trace.findIndex((x) => x.load > 0.9 && x.gear >= g && Math.abs(x.rpm - s.rpmAt(bb.t + 0.1)) < 150); let i = near(3); if (i < 0) i = near(2); const ref = i < 0 ? 1 : stats(s.seg(s.trace[i].t, s.trace[i].t + 0.1)).rms;
+      check('brems: mellomgassen ligger innen 8 dB av full gass ved samme turtall', i >= 0 && dB(w / ref) > -8, i < 0 ? 'fant ikke full gass ved ' + Math.round(s.rpmAt(bb.t + 0.1)) : f1(dB(w / ref)) + ' dB'); }
+    check('brems: stopper i 1. gir på tomgang', s.e.v < 0.5 && s.e.gear === 1 && s.e.rpm < p.idle + 120, 'v ' + f1(s.e.v) + ' gir ' + s.e.gear + ' rpm ' + Math.round(s.e.rpm));
     check('brems: ingen NaN, peak < 0.9', stats(s.L).bad === 0 && stats(s.L).peak < 0.9, 'peak ' + stats(s.L).peak.toFixed(3));
   }
   // ---- 6. manuelle padleskift ----
@@ -298,7 +316,9 @@ if (require.main === module) {
     const t1 = s.t; s.shift(-1); s.run(0.03, 0); s.shift(-1); s.run(0.6, 0);
     check('padle ned x2 raskt: begge utføres', s.evs('blip', t1).length === 2 && s.e.gear === g - 3, 'gir ' + s.e.gear);
     // overturtallsvern
-    const s2 = new Sess({ auto: false }); s2.run(0.5, 0).run(1.3, 1); s2.shift(1); s2.run(1.8, 1); const gg = s2.e.gear; s2.shift(-1); s2.run(0.1, 1);
+    const s2 = new Sess({ auto: false }); s2.run(0.5, 0).run(1.3, 1); s2.shift(1); s2.run(1.8, 1);
+    while (s2.e.rpm * s2.e.ratios[1] / s2.e.ratios[2] < p.lim.deny + rr(150) && s2.t < 10) s2.run(0.05, 1); // høyt nok til at 1. gir gir overturtall
+    const gg = s2.e.gear; s2.shift(-1); s2.run(0.1, 1);
     check('padle ned nektes når det gir overturtall', s2.evs('deny').length === 1 && s2.e.gear === gg, 'rpm ' + Math.round(s2.e.rpm));
   }
   // ---- 7. turtallssperre ----
@@ -307,7 +327,7 @@ if (require.main === module) {
     const tr = s.trace.filter((x) => x.t > 3.5);
     const mx = Math.max(...tr.map((x) => x.rpm)), mn = Math.min(...tr.map((x) => x.rpm));
     const pops = s.evs('pop', 3.5).length;
-    check('sperre: holder 7000-7220 i 1. gir med flagring og smell', s.e.gear === 1 && mx <= 7220 && mn > 6950 && mx - mn > 60 && pops >= 5, 'rpm ' + Math.round(mn) + '-' + Math.round(mx) + ', smell/s ' + pops);
+    check('sperre: holder ' + (p.lim.on - 180) + '-' + (p.lim.max + 5) + ' i 1. gir med flagring og smell', s.e.gear === 1 && mx <= p.lim.max + 5 && mn > p.lim.on - 230 && mx - mn > 60 && pops >= 5, 'rpm ' + Math.round(mn) + '-' + Math.round(mx) + ', smell/s ' + pops);
     const seg = s.seg(3.5, 5), env = []; for (let i = 0; i + 240 < seg.length; i += 240) env.push(stats(seg.slice(i, i + 240)).rms);
     const eMax = Math.max(...env), eMin = Math.min(...env);
     check('sperre: hørbar av/på-flagring (> 6 dB modulasjon)', dB(eMax / eMin) > 6, f1(dB(eMax / eMin)) + ' dB');
@@ -317,7 +337,7 @@ if (require.main === module) {
     const s = new Sess(); s.run(0.5, 0).run(9, 0.3).run(2, 0.15);
     const g = s.e.gear, t0 = s.t; s.run(1.0, 1);
     const k = s.evs('kick', t0);
-    check('kickdown: hopper ned flere gir og havner på 4000-6400', k.length >= 1 && g - s.e.gear >= 2 && s.rpmAt(t0 + 0.5) > 4000 && s.rpmAt(t0 + 0.5) < 6500, 'gir ' + g + '>' + s.e.gear + ' rpm ' + Math.round(s.rpmAt(t0 + 0.5)));
+    check('kickdown: hopper ned flere gir og havner på ' + rr(4000) + '-' + rr(6400), k.length >= 1 && g - s.e.gear >= 2 && s.rpmAt(t0 + 0.5) > rr(4000) && s.rpmAt(t0 + 0.5) < rr(6500), 'gir ' + g + '>' + s.e.gear + ' rpm ' + Math.round(s.rpmAt(t0 + 0.5)));
   }
   // ---- 9. kjøremodus (ekstern fart) ----
   {
@@ -330,21 +350,21 @@ if (require.main === module) {
       s.t += dt;
     }
     const st = stats(s.L);
-    check('kjøremodus: skifter opp og ned av seg selv, ender på tomgang', s.evs('up').length >= 3 && s.evs('blip').length >= 2 && s.e.rpm < 900 && st.bad === 0 && st.peak < 0.9, 'opp ' + s.evs('up').length + ' ned ' + s.evs('blip').length + ' peak ' + st.peak.toFixed(2));
+    check('kjøremodus: skifter opp og ned av seg selv, ender på tomgang', s.evs('up').length >= 3 && s.evs('blip').length >= 2 && s.e.rpm < p.idle + 120 && st.bad === 0 && st.peak < 0.9, 'opp ' + s.evs('up').length + ' ned ' + s.evs('blip').length + ' peak ' + st.peak.toFixed(2));
   }
   // ---- 10. alle eksosmodi + tomgang av ----
   {
     const lv = [];
     for (const m of [0, 1, 2]) {
       const s = new Sess({ exMode: m }); s.run(0.5, 0).run(8, 1).run(2, 0).run(3, 0, 1);
-      const st = stats(s.L); const t = s.trace.find((x) => x.gear === 3 && x.rpm > 5500 && x.load > 0.9).t; const w = s.seg(t, t + 0.1);
+      const st = stats(s.L); const t = s.trace.find((x) => x.gear === 3 && x.rpm > rr(5500) && x.load > 0.9).t; const w = s.seg(t, t + 0.1);
       lv.push({ m, peak: st.peak, bad: st.bad, rms: stats(w).rms, hi: bandPct(spectrum(w, 4096))[2] });
     }
     check('eksosmodi: Komfort < Sport <= Bane i nivå og rasp, ingen klipping', lv.every((x) => x.bad === 0 && x.peak < 0.9) && lv[0].rms < lv[1].rms && lv[1].rms <= lv[2].rms * 1.05 && lv[0].hi < lv[2].hi,
       lv.map((x) => 'm' + x.m + ' rms ' + f1(dB(x.rms)) + ' dB, 2-5k ' + f1(x.hi) + ' %, peak ' + x.peak.toFixed(2)).join(' | '));
     { // klaff i Sport: lukket (~0.2) på tomgang, åpner raskt ved gass, lukker sakte
       const k = new Sess({ exMode: 1 }); k.run(2, 0); const fIdle = k.e.flap;
-      k.run(0.1, 1); const fOpen = k.e.flap;      check('klaff Sport: ~0.2 på tomgang, > 0.9 etter 0.1 s full gass', fIdle < 0.25 && fIdle > 0.15 && fOpen > 0.9, 'tomgang ' + fIdle.toFixed(2) + ', etter 0.1 s gass ' + fOpen.toFixed(2));
+      k.run(0.1, 1); const fOpen = k.e.flap;      check('klaff Sport: ~' + p.flap.s[5] + ' på tomgang, > 0.9 etter 0.1 s full gass', fIdle < p.flap.s[5] + 0.05 && fIdle > p.flap.s[5] - 0.05 && fOpen > 0.9, 'tomgang ' + fIdle.toFixed(2) + ', etter 0.1 s gass ' + fOpen.toFixed(2));
     }
     const s = new Sess({ idleOn: false }); s.run(2, 0);
     check('tomgang av: stille når bilen står', stats(s.seg(1.5, 2)).rms < 0.002);
@@ -374,13 +394,65 @@ if (require.main === module) {
   }
   // ---- 12. CPU ----
   {
-    const e = new EngineCore(SR); const a = new Float32Array(N), b = new Float32Array(N);
+    const e = new Sess().e; const a = new Float32Array(N), b = new Float32Array(N);
     e.msg({ k: 'in', thr: 1, brake: 0 });
     for (let i = 0; i < 2000; i++) e.render(a, b, N);
     const secs = 60, blocks = Math.round(secs * SR / N); const t0 = process.hrtime.bigint();
     for (let i = 0; i < blocks; i++) { if (i % 3000 === 0) e.msg({ k: 'in', thr: (i / 3000) % 2 ? 0 : 1, brake: 0 }); e.render(a, b, N); }
     const el = Number(process.hrtime.bigint() - t0) / 1e9;
     check('CPU: sanntidsfaktor < 0.05', el / secs < 0.05, (100 * el / secs).toFixed(2) + ' % av én kjerne (' + secs + ' s lyd på ' + el.toFixed(2) + ' s)');
+  }
+  return res;
+  }
+
+  const ids = process.argv.length > 2 ? process.argv.slice(2) : Object.keys(PROFS);
+  const all = {};
+  for (const id of ids) all[id] = suite(id);
+  Sess.prof = null;
+
+  // ---- 13. på tvers av biler: nivå, tomgangssus, bilbytte ----
+  const aW = (f) => { const f2 = f * f, r = 12194 ** 2 * f2 * f2 / ((f2 + 20.6 ** 2) * Math.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2)) * (f2 + 12194 ** 2)); return r * r * 1.585; };
+  const bandRel = (seg, lo, hi, w) => { const sp = spectrum(seg, 32768); let b = 0, t = 0; for (let i = 1; i < sp.mag.length; i++) { const f = i * sp.hz, m = sp.mag[i] * (w ? aW(f) : 1); t += m; if (f >= lo && f < hi) b += m; } return 10 * Math.log10(b / t + 1e-30); };
+  if (all.m4csl) {
+    for (const id of ids) {
+      if (id === 'm4csl') continue;
+      const a = all[id], m = all.m4csl, dW = dB(Math.pow(10, a.wot / 20)) - m.wot, dI = dB(a.idle / m.idle);
+      check0('[' + PROFS[id].short + '] nivå mot M4 innen ±6 dB (full gass og tomgang)', Math.abs(dW) < 6 && Math.abs(dI) < 6, 'full gass ' + f1(dW) + ' dB, tomgang ' + f1(dI) + ' dB');
+    }
+  }
+  {
+    const info = []; let ok = true;
+    for (const id of ids) {
+      Sess.prof = PROFS[id]; const s = new Sess(); s.run(4, 0);
+      const h = bandRel(s.seg(1.5, 4), 1500, 6000, true); info.push(PROFS[id].short + ' ' + f1(h) + ' dB');
+      if (id !== 'm4csl' && h > -15) ok = false;
+    }
+    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt)', ok, info.join(', '));
+  }
+  { // bytte bil midt i full gass: kort uttoning, ingen klikk, ny bil på tomgang i riktig gir
+    Sess.prof = null; const s = new Sess({ auto: false }); s.run(0.5, 0).run(1.2, 1);
+    const tS = s.t; s.e.msg({ k: 'profile', p: PROFS.f12 }); s.run(0.4, 0.2);
+    const seg = s.seg(tS, tS + 0.4); let dmax = 0; for (let i = 1; i < seg.length; i++) dmax = Math.max(dmax, Math.abs(seg[i] - seg[i - 1]));
+    const pre = s.seg(tS - 0.3, tS); let dpre = 0; for (let i = 1; i < pre.length; i++) dpre = Math.max(dpre, Math.abs(pre[i] - pre[i - 1]));
+    const mid = stats(s.seg(tS + 0.068, tS + 0.075)).rms;
+    check0('bilbytte: tones ut på ~70 ms, ingen sprang større enn under vanlig kjøring, F12 aktiv etterpå', mid < 0.01 && dmax <= dpre * 1.05 && s.e.pr.id === 'f12' && s.e.gear === 1,
+      'nivå midt i bytte ' + f1(dB(mid)) + ' dB, største sprang ' + dmax.toFixed(3) + ' (før: ' + dpre.toFixed(3) + '), rpm ' + Math.round(s.e.rpm));
+  }
+  { // utgangsprofil for i4 M50 Harman Kardon: topper under -3 dBFS, ren bunn, smalere stereo
+    const O = EngineCore.outputs().i4hk; Sess.out = O; let pk = 0; const info = [];
+    for (const id of ids) {
+      Sess.prof = PROFS[id];
+      const s = new Sess({ exMode: 2, burble: 1 }); s.run(0.5, 0).run(10, 1).run(2, 0).run(4, 0, 1);
+      const z = new Sess({ auto: false, exMode: 2, burble: 1 }); z.run(0.5, 0).run(4, 1);
+      const st = Math.max(stats(s.L).peak, stats(s.R).peak, stats(z.L).peak), bad = stats(s.L).bad;
+      const w = new Sess(); w.run(8, 0); const sub = bandRel(w.seg(2, 8), 0, 25), hf = bandRel(s.L.slice(48000, 480000), 16000, 24000);
+      let sd = 0, md = 0; for (let i = 48000; i < 480000; i++) { const a = s.L[i], b = s.R[i]; sd += (a - b) * (a - b); md += (a + b) * (a + b); }
+      pk = Math.max(pk, st);
+      info.push(PROFS[id].short + ': topp ' + f1(dB(st)) + ' dBFS, <25 Hz ' + f1(sub) + ' dB, >16 kHz ' + f1(hf) + ' dB, side/mid ' + f1(10 * Math.log10(sd / md)) + ' dB');
+      if (st > O.lim + 1e-6 || bad || sub > -25 || hf > -60 || 10 * Math.log10(sd / md) > -12) pk = 9;
+    }
+    check0('utgang i4 HK: topper <= -3 dBFS i verste fall (Bane, full burble, sperre), < 25 Hz under -25 dB, > 16 kHz under -60 dB, stereo mono-vennlig', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
+    Sess.out = null; Sess.prof = null;
   }
   console.log(results.join('\n'));
   console.log(fails ? '\n' + fails + ' FEIL' : '\nALT OK');
