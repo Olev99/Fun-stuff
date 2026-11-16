@@ -168,7 +168,10 @@ class EngineCore {
       if (g > 1 && rp < 950) this.startShift(g - 1, wr, false);
       return;
     }
-    const dnR = (sport ? 1350 : 1150) + thr * 1300;
+    // Stillstand/krypefart: alltid 1. gir (fartsfallet kan være for brått til at vanlig nedgiring rekker det)
+    if (g > 1 && this.v < 1.5) { this.gear = 1; this.holdDn = 0; this.holdUp = 0.5; return; }
+    // Slipp (gass 0): hold turtallet oppe, som en Sport-gearkasse som gir ned under rulling
+    const dnR = (sport ? 1350 : 1150) + thr * 1300 + (thr < 0.05 ? (sport ? 550 : 150) : 0);
     const tipR = 1500 + 1300 * thr;
     if (this.holdDn <= 0 && this.v > 1.5 && g > 1) {
       let tgt = g;
