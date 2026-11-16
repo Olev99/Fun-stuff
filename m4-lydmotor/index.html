@@ -203,11 +203,6 @@ class EngineCore {
     this.dsA = new Float32Array(N); this.dsB = new Float32Array(N);
     this.fi = 0; this.ph = 0;
     this.seed = 0x1234567;
-    // kupé-EQ: topp ved 105 Hz (+4 dB, Q 0.9)
-    {
-      const A = Math.pow(10, 4 / 40), w0 = 2 * Math.PI * 105 / sr, al = Math.sin(w0) / (2 * 0.9), c = Math.cos(w0), a0 = 1 + al / A;
-      this.cb0 = (1 + al * A) / a0; this.cb1 = -2 * c / a0; this.cb2 = (1 - al * A) / a0; this.ca1 = -2 * c / a0; this.ca2 = (1 - al / A) / a0;
-    }
     // dunk-resonator (drivlinje/karosseri): 62 Hz, ca. 45 ms
     { const r = Math.exp(-1 / (sr * 0.045)); this.tA1 = 2 * r * Math.cos(2 * Math.PI * 62 / sr); this.tA2 = r * r; }
     // per-blokk-parametre
@@ -216,8 +211,28 @@ class EngineCore {
     this.teleT = 0;
     this.tele = { rpm: 780, gear: 1, v: 0, load: 0, lim: false, shift: 0, boost: 0, flap: 0, ovr: 0, car: '', ev: [] };
     // bilbytte: tones ut, profil byttes, tones inn (ca. 70 + 70 ms)
-    this.xg = 1; this.nextP = null;
+    this.xg = 1; this.nextP = null; this.nextO = null;
+    this.setOut(EngineCore.outputs().std);
     this.setProfile(EngineCore.profiles().m4csl);
+  }
+
+  // ---------- utgangsprofiler (kupé-EQ, nivå, toppnivå, stereobredde) ----------
+  // hp: DC-sperre Hz; hp2: ekstra 1.-ordens høypass Hz (0 = av); eq: topp [Hz, dB, Q]; lp: diskantavrulling Hz;
+  // pre: nivå før begrenser; lim: begrenserens tak (lineært); side: skalering av stereobredden.
+  static outputs() {
+    return {
+      std: { id: 'std', name: 'Standard (liten høyttaler)', hp: 26, hp2: 0, eq: [105, 4, 0.9], lp: 7500, pre: 1, lim: 0.86, side: 1 },
+      // BMW i4 M50 med Harman Kardon (16 høyttalere, 464 W): ekte bass ned mot 25-30 Hz, bilens DSP oppmikser stereo.
+      // Ren bunn under 25 Hz (to høypass-ledd), vekt rundt 60 Hz, mer diskantrom, toppnivå ca. -3 dBFS, smalere stereo.
+      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, pre: 0.8, lim: 0.708, side: 0.6 }
+    };
+  }
+
+  setOut(o) {
+    const sr = this.sr; this.out = o;
+    const A = Math.pow(10, o.eq[1] / 40), w0 = 2 * Math.PI * o.eq[0] / sr, al = Math.sin(w0) / (2 * o.eq[2]), c = Math.cos(w0), a0 = 1 + al / A;
+    this.cb0 = (1 + al * A) / a0; this.cb1 = -2 * c / a0; this.cb2 = (1 - al * A) / a0; this.ca1 = -2 * c / a0; this.ca2 = (1 - al / A) / a0;
+    this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0; this.limEnv = 0;
   }
 
   // ---------- bilprofiler (rene data, JSON-kopierbare) ----------
@@ -226,7 +241,8 @@ class EngineCore {
     // girkart for M4 (brøker av 7200), gjenbrukes av de andre bilene
     const shiftM4 = { wot: 0.9833, over: 0.9722, kick: 0.875, kick2: 0.8333, kickBelow: 0.5972, tipMax: 0.7639, tip0: 0.2083, tipK: 0.1806,
       dnMax: 0.8333, dnC: 0.1597, dnS: 0.1875, dnK: 0.1806, brk0: 0.5, brkC: 0.375, brkS: 0.7222, brkT: 0.7917,
-      upC0: 0.2361, upCK: 0.625, upS0: 0.3194, upSK: 0.6667, liftC: 0.3194, liftS: 0.5, guard: 0.0347, manDn: 0.1319, hardDn: 0.3194, hardUp: 0.4444 };
+      upC0: 0.2361, upCK: 0.625, upS0: 0.3194, upSK: 0.6667, liftC: 0.3194, liftS: 0.5, guard: 0.0347, manDn: 0.1319, hardDn: 0.3194, hardUp: 0.4444,
+      liftDnC: 0.0208, liftDnS: 0.0764 };
     const m4 = {
       id: 'm4csl', name: 'BMW M4 CSL', short: 'M4 CSL',
       blurb: 'Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.',
@@ -240,7 +256,7 @@ class EngineCore {
       // ZF 8HP76 (M Steptronic), bakaksel 3.154, 285/30 R20
       gears: [0, 5.0, 3.2, 2.143, 1.72, 1.313, 1.0, 0.823, 0.64], fd: 3.154, wheel: 0.335, mass: 1750, grip: 10.2, vmax: 86,
       torque: [[1000, 300], [2750, 650], [5950, 650]], tMin: 150, acc100: 3.6,
-      box: { hardT: [0.145, 0.145, 0.105], softT: [0.24, 0.34], manual: 0.06, shuf: 1, slip: [2500, 2100, 900] },
+      box: { hardT: [0.145, 0.145, 0.105], softT: [0.24, 0.34], manual: 0.06, shuf: 1, slip: [2500, 2100, 900], stopV: 1.5 },
       turbo: true,
       fuelCut: 1250, idleLd: [1450, 500],
       ovr: { k0: 2400, kR: 2200, o0: 1900, oR: 1300, mode: [0.1, 0.8, 1.0], decay: [1.0, 1.0, 1.5], rate: 13 }, popK: 1,
@@ -249,9 +265,86 @@ class EngineCore {
       pipe: { DA: [4.2, 540], DB: [0.50, 470], SA: [0.55, 620], SB: [0.66, 620] },
       snd: { modeG: [0.85, 1.0, 1.1], motor: 0.045, cyc: [0.05, 0.13], dec: [46, 34], fc: [240, 2300, 0.07],
         rasp: [0.35, 0.65, 0.6, 1.0, 1.25, 0.2, 0.95, 2300], refl: [0.46, 0.14, 0.26, 0.24], muff: [260, 240],
-        intake: [0.10, 0.012, 185, 430, 0.6], mech: [0.012, 0.05, 0.25, 0.5], ex: 0.52, side: 0.07 }
+        intake: [0.10, 0.012, 185, 430, 0.6], mech: [0.012, 0.05, 0.25, 0.5], ex: 0.52, side: 0.07, dc: 22 }
     };
-    return { m4csl: m4 };
+    // snd: modeG = nivå per eksosmodus; motor = mekanisk grunnpuls; cyc = syklusvariasjon [fast, ved lav last];
+    // dec = pulsens forfall i veivgrader [min, + ved lav last]; fc = pulsens lysstyrke [Hz, + Hz ved full last, Hz per o/min];
+    // rasp = [klaff lukket, + åpen, Komfort, Sport, Bane, gulv, + ved last, resonans Hz]; refl = rørrefleksjoner [r1, +klaff, r2, +klaff];
+    // muff = dempertopp [Hz, + Hz ved åpen klaff]; intake = [nivå, gulv, resonator 1 Hz, resonator 2 Hz, andel 1];
+    // mech = [ventiltikk-nivå, + ved høyt turtall, støygulv, + ved høyt turtall]; ex = eksosnivå; side = stereobredde.
+    // De tre V12-ene: sugemotor (ingen turbo), lavt støygulv på tomgang, 12 tenninger per 720 grader.
+    const v12gain = [1.0, 0.99, 1.01, 0.995, 1.005, 0.985, 1.005, 0.995, 1.01, 0.99, 1.0, 0.985];
+    const v12run = [0.00030, 0.00024, 0.00027, 0.00033, 0.00026, 0.00029, 0.00031, 0.00025, 0.00028, 0.00032, 0.00027, 0.00030];
+    // Aston/BMW-nummerering: bank A = 1-6, bank B = 7-12; 1-7-5-11-3-9-6-12-2-8-4-10, veksler bank hver tenning
+    const amOrder = [1, 7, 5, 11, 3, 9, 6, 12, 2, 8, 4, 10], bankV = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
+    const even12 = [0, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660];
+    const vanq = {
+      id: 'vanqs', name: 'Aston Martin Vanquish S', short: 'Vanquish S',
+      blurb: 'V12 på 5,9 liter uten turbo, åttetrinns automat, lang og rund eksos. Kultivert grand tourer.',
+      tach: { max: 8000, red: 7000, warn: 6500 },
+      cyl: 12, fire: { order: amOrder, deg: even12 }, bank: bankV, gain: v12gain, runner: v12run,
+      idle: 700, redline: 7000,
+      lim: { max: 7015, on: 6985, off: 6920, deny: 6950, period: 0.07, cut: 0.032, dip: 90 },
+      shift: shiftM4,
+      // ZF 8HP70 (Touchtronic III); utvekslinger og bakaksel er anslått, ikke bekreftet
+      gears: [0, 4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667], fd: 2.73, wheel: 0.345, mass: 1830, grip: 9.4, vmax: 90,
+      torque: [[1000, 380], [3000, 540], [5500, 630], [7000, 605]], tMin: 200, acc100: 3.5,
+      box: { hardT: [0.16, 0.16, 0.125], softT: [0.26, 0.36], manual: 0.06, shuf: 0.8, slip: [2300, 1900, 850], stopV: 1.5 },
+      turbo: false,
+      fuelCut: 1150, idleLd: [1350, 500],
+      ovr: { k0: 2600, kR: 2200, o0: 2000, oR: 1300, mode: [0.05, 0.5, 0.8], decay: [0.8, 0.8, 1.2], rate: 9 }, popK: 0.75,
+      flap: { s: [0.5, 0.2, 4500, 700, 2, 0.15, 0.85], c: [0.35, 2.0, 2800, 1800, 0.06, 0.6] },
+      pipe: { DA: [4.8, 560], DB: [0.55, 470], SA: [0.42, 640], SB: [0.45, 640] },
+      snd: { modeG: [0.85, 1.0, 1.08], motor: 0.035, cyc: [0.02, 0.05], dec: [50, 30], fc: [300, 2600, 0.085],
+        rasp: [0.3, 0.5, 0.4, 0.75, 0.95, 0.06, 0.7, 2800], refl: [0.46, 0.14, 0.26, 0.24], muff: [220, 260],
+        intake: [0.20, 0.004, 165, 520, 0.7], mech: [0.004, 0.035, 0.06, 0.3], ex: 0.40, side: 0.10, dc: 35 }
+    };
+    const vant = {
+      id: 'v12vs', name: 'Aston Martin V12 Vantage S', short: 'V12 Vantage S',
+      blurb: 'Samme V12-familie i en kortere, rå bil: kort eksos, aggressive klaffer, robotisert sjutrinns og mye knitring.',
+      tach: { max: 8000, red: 7000, warn: 6500 },
+      cyl: 12, fire: { order: amOrder, deg: even12 }, bank: bankV,
+      gain: [1.0, 0.96, 1.04, 0.98, 1.03, 0.95, 1.02, 0.97, 1.04, 0.96, 1.01, 0.95], runner: v12run,
+      idle: 720, redline: 7000,
+      lim: { max: 7015, on: 6985, off: 6900, deny: 6950, period: 0.08, cut: 0.042, dip: 120 },
+      shift: shiftM4,
+      // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel er anslått
+      gears: [0, 3.08, 2.13, 1.62, 1.30, 1.08, 0.91, 0.78], fd: 3.46, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
+      torque: [[1000, 360], [3000, 500], [5750, 620], [6750, 596]], tMin: 200, acc100: 3.9,
+      box: { hardT: [0.13, 0.13, 0.095], softT: [0.34, 0.44], manual: 0.08, shuf: 1.5, slip: [2600, 2200, 1000], stopV: 1.5 },
+      turbo: false,
+      fuelCut: 1150, idleLd: [1400, 500],
+      ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 16 }, popK: 1.25,
+      flap: { s: [0.3, 0.2, 3000, 600, 4, 0.3, 0.7], c: [0.3, 2.2, 2400, 1600, 0.12, 0.7] },
+      pipe: { DA: [3.3, 560], DB: [0.40, 470], SA: [0.40, 640], SB: [0.47, 640] },
+      snd: { modeG: [0.9, 1.05, 1.15], motor: 0.04, cyc: [0.03, 0.07], dec: [44, 32], fc: [320, 2900, 0.09],
+        rasp: [0.35, 0.65, 0.4, 0.95, 1.35, 0.07, 0.9, 2600], refl: [0.5, 0.14, 0.3, 0.24], muff: [300, 300],
+        intake: [0.24, 0.004, 200, 560, 0.6], mech: [0.005, 0.04, 0.06, 0.3], ex: 0.32, side: 0.10, dc: 35 }
+    };
+    const f12 = {
+      id: 'f12', name: 'Ferrari F12berlinetta', short: 'F12berlinetta',
+      blurb: 'V12 på 6,3 liter uten turbo som drar til 8 700 o/min, sjutrinns dobbeltclutch med lynraske skift.',
+      tach: { max: 10000, red: 8700, warn: 8200 },
+      // 65 graders V: med felles veivtapper blir tenningen 65/55 grader (antatt, ikke bekreftet for F140)
+      cyl: 12, fire: { order: amOrder, deg: [0, 65, 120, 185, 240, 305, 360, 425, 480, 545, 600, 665] }, bank: bankV,
+      gain: v12gain, runner: v12run,
+      idle: 950, redline: 8700,
+      lim: { max: 8715, on: 8685, off: 8600, deny: 8650, period: 0.06, cut: 0.03, dip: 110 },
+      shift: shiftM4,
+      // Getrag 7DCL750: utvekslinger og bakaksel er anslått
+      gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.44, wheel: 0.36, mass: 1730, grip: 9.6, vmax: 94.4,
+      torque: [[1000, 380], [3000, 560], [6000, 690], [8250, 630]], tMin: 200, acc100: 3.1,
+      box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000], stopV: 1.5 },
+      turbo: false,
+      fuelCut: 1350, idleLd: [1600, 500],
+      ovr: { k0: 2800, kR: 2600, o0: 2200, oR: 1500, mode: [0.1, 0.7, 0.95], decay: [0.9, 0.9, 1.3], rate: 11 }, popK: 0.9,
+      flap: { s: [0.4, 0.2, 3500, 800, 3, 0.2, 0.8], c: [0.35, 2.0, 3000, 2000, 0.08, 0.7] },
+      pipe: { DA: [3.8, 580], DB: [0.45, 480], SA: [0.38, 660], SB: [0.40, 660] },
+      snd: { modeG: [0.85, 1.0, 1.12], motor: 0.04, cyc: [0.02, 0.05], dec: [52, 30], fc: [380, 3200, 0.1],
+        rasp: [0.3, 0.6, 0.45, 0.85, 1.05, 0.05, 0.75, 3300], refl: [0.44, 0.14, 0.26, 0.24], muff: [280, 300],
+        intake: [0.28, 0.004, 230, 640, 0.6], mech: [0.005, 0.04, 0.06, 0.3], ex: 0.38, side: 0.10, dc: 35 }
+    };
+    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12 };
   }
 
   setProfile(p) {
@@ -324,6 +417,7 @@ class EngineCore {
       case 'shift': this.manualShift(m.d); break;
       case 'start': this.startT = 0; this.rpm = 250; break;
       case 'profile': if (m.now) { this.nextP = null; this.setProfile(m.p); } else this.nextP = m.p; break;
+      case 'out': if (m.now) { this.nextO = null; this.setOut(m.o); } else this.nextO = m.o; break;
       case 'cfg':
         if (m.vol !== undefined) this.vol = m.vol;
         if (m.burble !== undefined) this.burble = m.burble;
@@ -411,7 +505,10 @@ class EngineCore {
       if (g > 1 && rp < K.manDn) this.startShift(g - 1, wr, false);
       return;
     }
-    const dnR = (sport ? K.dnS : K.dnC) + thr * K.dnK;
+    // Stillstand/krypefart: alltid 1. gir (fartsfallet kan være for brått til at vanlig nedgiring rekker det)
+    if (g > 1 && this.v < this.pr.box.stopV) { this.gear = 1; this.holdDn = 0; this.holdUp = 0.5; return; }
+    // Slipp (gass 0): hold turtallet oppe, som en Sport-gearkasse som gir ned under rulling
+    const dnR = (sport ? K.dnS : K.dnC) + thr * K.dnK + (thr < 0.05 ? (sport ? K.liftDnS : K.liftDnC) : 0);
     const tipR = K.tip0 + K.tipK * thr;
     if (this.holdDn <= 0 && this.v > 1.5 && g > 1) {
       let tgt = g;
@@ -437,7 +534,10 @@ class EngineCore {
 
   // ---------- styring, én gang per blokk ----------
   control(dt) {
-    if (this.nextP && this.xg <= 0) { const p = this.nextP; this.nextP = null; this.setProfile(p); }
+    if ((this.nextP || this.nextO) && this.xg <= 0) {
+      if (this.nextO) { const o = this.nextO; this.nextO = null; this.setOut(o); }
+      if (this.nextP) { const p = this.nextP; this.nextP = null; this.setProfile(p); }
+    }
     const TWO_PI = 6.283185307179586, r = this.ratios, m = this.exMode, s = this.sh, pr = this.pr, lim = this.lim;
     let thr = this.thrIn; if (!(thr > 0)) thr = 0; if (thr > 1) thr = 1;
     let brake = this.brakeIn; if (!(brake > 0)) brake = 0; if (brake > 1) brake = 1;
@@ -673,7 +773,7 @@ class EngineCore {
     const DA = this.DA, DB = this.DB, SA = this.SA, SB = this.SB;
     const dec = P.dec, kb = P.kb, gRasp = P.gRasp, r1 = P.r1, r2 = P.r2, km = P.km, rB = 0.22;
     const X = this.pr.snd;
-    const kdc = 1 - Math.exp(-6.283185307179586 * 22 / sr);
+    const kdc = 1 - Math.exp(-6.283185307179586 * X.dc / sr);
     const fR = 2 * Math.sin(Math.PI * X.rasp[7] / sr), qR = 1.1;
     const pdec = Math.exp(-1 / (sr * 0.0045));
     const kl = 1 - Math.exp(-6.283185307179586 * 1500 / sr), ks = 1 - Math.exp(-6.283185307179586 * 3800 / sr);
@@ -683,10 +783,11 @@ class EngineCore {
     const fW = P.fW, qW = 0.8, fB = 2 * Math.sin(Math.PI * 1700 / sr), qB = 1.2;
     const flap = this.flap, gInt = P.gInt, gMech = P.gMech, mFloor = P.mechFloor, gWhoosh = P.gWhoosh, gBov = P.gBov, gWh = P.gWh;
     const cw = P.cw, sw = P.sw, tA1 = this.tA1, tA2 = this.tA2, gTh = 0.3 * Math.sin(6.283185307179586 * 62 / sr);
-    const khp = 1 - Math.exp(-6.283185307179586 * 26 / sr), ktl = 1 - Math.exp(-6.283185307179586 * 7500 / sr);
+    const O = this.out, khp = 1 - Math.exp(-6.283185307179586 * O.hp / sr), ktl = 1 - Math.exp(-6.283185307179586 * O.lp / sr);
+    const khp2 = O.hp2 > 0 ? 1 - Math.exp(-6.283185307179586 * O.hp2 / sr) : 0, pre = O.pre;
     const cb0 = this.cb0, cb1 = this.cb1, cb2 = this.cb2, ca1 = this.ca1, ca2 = this.ca2;
-    const gEx = X.ex, gSide = X.side * (0.4 + 0.6 * flap), gPop = 1.1;
-    const lrel = Math.exp(-1 / (sr * 0.07)), LIM = 0.86;
+    const gEx = X.ex, gSide = X.side * (0.4 + 0.6 * flap) * O.side, gPop = 1.1;
+    const lrel = Math.exp(-1 / (sr * 0.07)), LIM = O.lim;
     const outG = this.vol * this.muteG;
     const stereo = Ro && Ro !== Lo;
 
@@ -694,7 +795,7 @@ class EngineCore {
     const fdiv = this.fdiv, nF = this.nF;
     let dph = this.rpmSPrev / fdiv / sr; const ddph = (this.rpmS / fdiv / sr - dph) / n;
     // bilbytte: lineær ut- og inntoning per sample
-    let xg = this.xg; const xT = this.nextP ? 0 : 1, xd = 1 / (0.07 * sr);
+    let xg = this.xg; const xT = this.nextP || this.nextO ? 0 : 1, xd = 1 / (0.07 * sr);
     let eA = this.eA, eB = this.eB, bA = this.bA, bB = this.bB, dcA = this.dcA, dcB = this.dcB;
     let rlA = this.rlA, rbA = this.rbA, rlB = this.rlB, rbB = this.rbB;
     let pA = this.pA, pB = this.pB, plA = this.plA, plB = this.plB, psA = this.psA, psB = this.psB;
@@ -703,7 +804,7 @@ class EngineCore {
     let mcl = this.mcl, mcb = this.mcb, mechEnv = this.mechEnv;
     let wl = this.wl, wb = this.wb, bl = this.bl, bb = this.bb, wc = this.wc, ws = this.ws;
     let th1 = this.th1, th2 = this.th2;
-    let hp = this.hp, cz1 = this.cz1, cz2 = this.cz2, tl = this.tl, limEnv = this.limEnv;
+    let hp = this.hp, hp2 = this.hp2, cz1 = this.cz1, cz2 = this.cz2, tl = this.tl, limEnv = this.limEnv;
     let thImp = this.thImp; this.thImp = 0;
 
     for (let i = 0; i < n; i++) {
@@ -775,13 +876,15 @@ class EngineCore {
       sig += th * gTh;
 
       // ---- kupé: DC-sperre, 105 Hz-topp, diskantavrulling ----
+      sig *= pre;
       hp += khp * (sig - hp); sig -= hp;
+      if (khp2 > 0) { hp2 += khp2 * (sig - hp2); sig -= hp2; }
       const cy = cb0 * sig + cz1; cz1 = cb1 * sig - ca1 * cy + cz2; cz2 = cb2 * sig - ca2 * cy;
       tl += ktl * (cy - tl);
 
       // ---- stereo + begrenser ----
       sdLP += ko * ((yA - yB) - sdLP);
-      const sd = sdLP * gSide;
+      const sd = sdLP * gSide * pre;
       let l = tl + sd, r = tl - sd;
       let pk = l < 0 ? -l : l; const pr = r < 0 ? -r : r; if (pr > pk) pk = pr;
       limEnv = pk > limEnv ? pk : limEnv * lrel;
@@ -804,7 +907,7 @@ class EngineCore {
     this.mcl = mcl; this.mcb = mcb; this.mechEnv = mechEnv;
     this.wl = wl; this.wb = wb; this.bl = bl; this.bb = bb; this.wc = wc; this.ws = ws;
     this.th1 = th1; this.th2 = th2;
-    this.hp = hp; this.cz1 = cz1; this.cz2 = cz2; this.tl = tl; this.limEnv = limEnv;
+    this.hp = hp; this.hp2 = hp2; this.cz1 = cz1; this.cz2 = cz2; this.tl = tl; this.limEnv = limEnv;
 
     this.teleT += dt;
     if (this.teleT >= 0.03) {

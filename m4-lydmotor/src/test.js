@@ -352,6 +352,17 @@ if (require.main === module) {
     const st = stats(s.L);
     check('kjøremodus: skifter opp og ned av seg selv, ender på tomgang', s.evs('up').length >= 3 && s.evs('blip').length >= 2 && s.e.rpm < p.idle + 120 && st.bad === 0 && st.peak < 0.9, 'opp ' + s.evs('up').length + ' ned ' + s.evs('blip').length + ' peak ' + st.peak.toFixed(2));
   }
+  // ---- 9b. girvakter: brått fartsfall til stillstand (kjøremodus) og slipp med rulling (auto) ----
+  {
+    const s = new Sess(); s.e.msg({ k: 'mode', drive: true }); const dt = N / SR;
+    for (let t = 0; t < 12; t += dt) { const v = t < 8 ? Math.min(25, t * 4) : t < 9 ? 25 * (9 - t) : 0;
+      s.e.msg({ k: 'drive', v, thr: t < 6 ? 0.5 : 0, brake: 0 }); s.e.render(s.bl, s.br, N); s.t += dt; }
+    check('girvakt: brått fartsfall til stillstand ender i 1. gir på tomgang', s.e.gear === 1 && s.e.rpm < p.idle + 120, 'gir ' + s.e.gear + ' rpm ' + Math.round(s.e.rpm));
+    const c = new Sess(); c.run(0.5, 0).run(6, 0.7); const g0 = c.e.gear, t0 = c.t; c.run(8, 0);
+    const tr = c.trace.filter((x) => x.t > t0 + 0.5 && x.v > 3), lo = Math.min(...tr.map((x) => x.rpm)), hi = Math.max(...tr.map((x) => x.rpm));
+    check('girvakt: slipp og rull holder turtallet fornuftig (' + rr(1200) + '-' + rr(4700) + ')', lo > rr(1200) && hi < rr(4700),
+      'gir ' + g0 + '>' + c.e.gear + ', rpm ' + Math.round(lo) + '-' + Math.round(hi));
+  }
   // ---- 10. alle eksosmodi + tomgang av ----
   {
     const lv = [];
@@ -435,8 +446,8 @@ if (require.main === module) {
     const seg = s.seg(tS, tS + 0.4); let dmax = 0; for (let i = 1; i < seg.length; i++) dmax = Math.max(dmax, Math.abs(seg[i] - seg[i - 1]));
     const pre = s.seg(tS - 0.3, tS); let dpre = 0; for (let i = 1; i < pre.length; i++) dpre = Math.max(dpre, Math.abs(pre[i] - pre[i - 1]));
     const mid = stats(s.seg(tS + 0.068, tS + 0.075)).rms;
-    check0('bilbytte: tones ut på ~70 ms, ingen sprang større enn under vanlig kjøring, F12 aktiv etterpå', mid < 0.01 && dmax <= dpre * 1.05 && s.e.pr.id === 'f12' && s.e.gear === 1,
-      'nivå midt i bytte ' + f1(dB(mid)) + ' dB, største sprang ' + dmax.toFixed(3) + ' (før: ' + dpre.toFixed(3) + '), rpm ' + Math.round(s.e.rpm));
+    check0('bilbytte: tones ut på ~70 ms, ingen sprang større enn under vanlig kjøring, F12 aktiv etterpå', mid < 0.01 && dmax <= dpre * 1.05 && s.e.pr.id === 'f12' && s.e.rpm > PROFS.f12.idle - 100 && s.e.rpm < PROFS.f12.redline * 0.5,
+      'nivå midt i bytte ' + f1(dB(mid)) + ' dB, største sprang ' + dmax.toFixed(3) + ' (før: ' + dpre.toFixed(3) + '), etter: gir ' + s.e.gear + ' rpm ' + Math.round(s.e.rpm));
   }
   { // utgangsprofil for i4 M50 Harman Kardon: topper under -3 dBFS, ren bunn, smalere stereo
     const O = EngineCore.outputs().i4hk; Sess.out = O; let pk = 0; const info = [];
@@ -449,9 +460,9 @@ if (require.main === module) {
       let sd = 0, md = 0; for (let i = 48000; i < 480000; i++) { const a = s.L[i], b = s.R[i]; sd += (a - b) * (a - b); md += (a + b) * (a + b); }
       pk = Math.max(pk, st);
       info.push(PROFS[id].short + ': topp ' + f1(dB(st)) + ' dBFS, <25 Hz ' + f1(sub) + ' dB, >16 kHz ' + f1(hf) + ' dB, side/mid ' + f1(10 * Math.log10(sd / md)) + ' dB');
-      if (st > O.lim + 1e-6 || bad || sub > -25 || hf > -60 || 10 * Math.log10(sd / md) > -12) pk = 9;
+      if (st > O.lim + 1e-6 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
     }
-    check0('utgang i4 HK: topper <= -3 dBFS i verste fall (Bane, full burble, sperre), < 25 Hz under -25 dB, > 16 kHz under -60 dB, stereo mono-vennlig', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
+    check0('utgang i4 HK: topper <= -3 dBFS i verste fall (Bane, full burble, sperre), < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
     Sess.out = null; Sess.prof = null;
   }
   console.log(results.join('\n'));

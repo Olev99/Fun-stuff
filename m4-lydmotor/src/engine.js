@@ -56,7 +56,8 @@ class EngineCore {
     // girkart for M4 (brøker av 7200), gjenbrukes av de andre bilene
     const shiftM4 = { wot: 0.9833, over: 0.9722, kick: 0.875, kick2: 0.8333, kickBelow: 0.5972, tipMax: 0.7639, tip0: 0.2083, tipK: 0.1806,
       dnMax: 0.8333, dnC: 0.1597, dnS: 0.1875, dnK: 0.1806, brk0: 0.5, brkC: 0.375, brkS: 0.7222, brkT: 0.7917,
-      upC0: 0.2361, upCK: 0.625, upS0: 0.3194, upSK: 0.6667, liftC: 0.3194, liftS: 0.5, guard: 0.0347, manDn: 0.1319, hardDn: 0.3194, hardUp: 0.4444 };
+      upC0: 0.2361, upCK: 0.625, upS0: 0.3194, upSK: 0.6667, liftC: 0.3194, liftS: 0.5, guard: 0.0347, manDn: 0.1319, hardDn: 0.3194, hardUp: 0.4444,
+      liftDnC: 0.0208, liftDnS: 0.0764 };
     const m4 = {
       id: 'm4csl', name: 'BMW M4 CSL', short: 'M4 CSL',
       blurb: 'Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.',
@@ -70,7 +71,7 @@ class EngineCore {
       // ZF 8HP76 (M Steptronic), bakaksel 3.154, 285/30 R20
       gears: [0, 5.0, 3.2, 2.143, 1.72, 1.313, 1.0, 0.823, 0.64], fd: 3.154, wheel: 0.335, mass: 1750, grip: 10.2, vmax: 86,
       torque: [[1000, 300], [2750, 650], [5950, 650]], tMin: 150, acc100: 3.6,
-      box: { hardT: [0.145, 0.145, 0.105], softT: [0.24, 0.34], manual: 0.06, shuf: 1, slip: [2500, 2100, 900] },
+      box: { hardT: [0.145, 0.145, 0.105], softT: [0.24, 0.34], manual: 0.06, shuf: 1, slip: [2500, 2100, 900], stopV: 1.5 },
       turbo: true,
       fuelCut: 1250, idleLd: [1450, 500],
       ovr: { k0: 2400, kR: 2200, o0: 1900, oR: 1300, mode: [0.1, 0.8, 1.0], decay: [1.0, 1.0, 1.5], rate: 13 }, popK: 1,
@@ -103,7 +104,7 @@ class EngineCore {
       // ZF 8HP70 (Touchtronic III); utvekslinger og bakaksel er anslått, ikke bekreftet
       gears: [0, 4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667], fd: 2.73, wheel: 0.345, mass: 1830, grip: 9.4, vmax: 90,
       torque: [[1000, 380], [3000, 540], [5500, 630], [7000, 605]], tMin: 200, acc100: 3.5,
-      box: { hardT: [0.16, 0.16, 0.125], softT: [0.26, 0.36], manual: 0.06, shuf: 0.8, slip: [2300, 1900, 850] },
+      box: { hardT: [0.16, 0.16, 0.125], softT: [0.26, 0.36], manual: 0.06, shuf: 0.8, slip: [2300, 1900, 850], stopV: 1.5 },
       turbo: false,
       fuelCut: 1150, idleLd: [1350, 500],
       ovr: { k0: 2600, kR: 2200, o0: 2000, oR: 1300, mode: [0.05, 0.5, 0.8], decay: [0.8, 0.8, 1.2], rate: 9 }, popK: 0.75,
@@ -125,7 +126,7 @@ class EngineCore {
       // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel er anslått
       gears: [0, 3.08, 2.13, 1.62, 1.30, 1.08, 0.91, 0.78], fd: 3.46, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
       torque: [[1000, 360], [3000, 500], [5750, 620], [6750, 596]], tMin: 200, acc100: 3.9,
-      box: { hardT: [0.13, 0.13, 0.095], softT: [0.34, 0.44], manual: 0.08, shuf: 1.5, slip: [2600, 2200, 1000] },
+      box: { hardT: [0.13, 0.13, 0.095], softT: [0.34, 0.44], manual: 0.08, shuf: 1.5, slip: [2600, 2200, 1000], stopV: 1.5 },
       turbo: false,
       fuelCut: 1150, idleLd: [1400, 500],
       ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 16 }, popK: 1.25,
@@ -148,7 +149,7 @@ class EngineCore {
       // Getrag 7DCL750: utvekslinger og bakaksel er anslått
       gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.44, wheel: 0.36, mass: 1730, grip: 9.6, vmax: 94.4,
       torque: [[1000, 380], [3000, 560], [6000, 690], [8250, 630]], tMin: 200, acc100: 3.1,
-      box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000] },
+      box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000], stopV: 1.5 },
       turbo: false,
       fuelCut: 1350, idleLd: [1600, 500],
       ovr: { k0: 2800, kR: 2600, o0: 2200, oR: 1500, mode: [0.1, 0.7, 0.95], decay: [0.9, 0.9, 1.3], rate: 11 }, popK: 0.9,
@@ -319,7 +320,10 @@ class EngineCore {
       if (g > 1 && rp < K.manDn) this.startShift(g - 1, wr, false);
       return;
     }
-    const dnR = (sport ? K.dnS : K.dnC) + thr * K.dnK;
+    // Stillstand/krypefart: alltid 1. gir (fartsfallet kan være for brått til at vanlig nedgiring rekker det)
+    if (g > 1 && this.v < this.pr.box.stopV) { this.gear = 1; this.holdDn = 0; this.holdUp = 0.5; return; }
+    // Slipp (gass 0): hold turtallet oppe, som en Sport-gearkasse som gir ned under rulling
+    const dnR = (sport ? K.dnS : K.dnC) + thr * K.dnK + (thr < 0.05 ? (sport ? K.liftDnS : K.liftDnC) : 0);
     const tipR = K.tip0 + K.tipK * thr;
     if (this.holdDn <= 0 && this.v > 1.5 && g > 1) {
       let tgt = g;
