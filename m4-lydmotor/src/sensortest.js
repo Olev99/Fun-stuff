@@ -51,6 +51,112 @@ async function sim(page) {
   }, PROFILE);
 }
 
+// ---- revers: syntetiske turer med fortegnet fart. Segment: [varighet s, akselerasjon langs bilen m/s², valg] ----
+// valg: wob = ekte akselerasjon svinger (m/s², sees av både sensor og GPS), jolt = telefonen rykkes, lat = sideveis (svinger)
+const CAL = [[2, 0], [6, 2], [5, 0], [6, -2], [3, 0]]; // første tur lærer "fremover", ender i ro
+const PARK = [[2, 1, { lat: 1 }], [1, 0], [2, -1], [2, 0], [1.5, -1, { lat: 1 }], [1, 0, { lat: 1 }], [1.5, 1], [2, 0],
+  [1.5, 1, { lat: 1 }], [1, 0], [1.5, -1], [2, 0], [1.5, -1, { lat: 1 }], [1.5, 1], [2, 0], [2, 1.5], [2, 0]];
+const QUEUE = []; for (let i = 0; i < 8; i++) QUEUE.push([2.5, 2, { wob: 0.6 }], [1, 0], [2.5, -2], [1.5, 0, i === 3 ? { jolt: 1 } : null]);
+const REV = [
+  { name: 'fremover fra stillstand', segs: CAL.concat([[5, 2], [5, 0]]) },
+  { name: 'revers fra stillstand', segs: CAL.concat([[2, -1.2], [4, 0], [2, 1.2], [3, 0]]) },
+  { name: 'stopp og kjør med retningsskifte', segs: CAL.concat([[4, 1.5], [3, 0], [4, -1.5], [2, 0], [2, -1], [3, 0], [2, 1], [2, 0], [4, 2], [3, 0]]) },
+  { name: 'fremover i fart, støyete akselerasjon', segs: CAL.concat([[4, 2.5], [30, 0, { wob: 1.5 }], [10, 0, { wob: 2.5 }], [1, 0, { jolt: 1 }], [10, 0, { wob: 2 }]]) },
+  { name: 'slipp, brems, kort stopp, rullende nesten-stopp', segs: CAL.concat([[5, 3], [4, -0.8], [3, -4], [1.5, 0], [4, 3], [2, -2], [1, 0.5], [3, 2], [5, -3], [0.8, 0], [3, 2.5]]) },
+  { name: 'parkering frem-stopp-revers-stopp-frem', segs: CAL.concat(PARK) },
+  { name: 'kø: stopp og gå fremover, rykk i ro', segs: CAL.concat(QUEUE) },
+  // robusthet: GPS-forsinkelsen er ikke målt på iPhone (koden antar 1,0 s), skjevheten kan være større
+  { name: 'parkering, GPS 0,5 s forsinket', segs: CAL.concat(PARK), lag: 500 },
+  { name: 'parkering, GPS 1,6 s forsinket', segs: CAL.concat(PARK), lag: 1600 },
+  { name: 'kø, skjevhet 0,6 m/s², annet frø', segs: CAL.concat(QUEUE), bias: 0.6, seed: 4242 },
+  { name: 'revers fra stillstand, skjevhet 0,6, GPS 1,4 s', segs: CAL.concat([[2, -1.2], [4, 0], [2, 1.2], [3, 0]]), bias: 0.6, lag: 1400, seed: 99 },
+  { name: 'revers før kalibrering', segs: [[2, 0], [2, -1.5], [3, 0], [2, 1.5], [2, 0]].concat(CAL, [[5, 2], [3, 0]]), noCal: true }
+];
+
+async function simRev(page, sc) {
+  return page.evaluate(([segs, LAG, BIAS, seed]) => {
+    const M = window.__m4, S = M.S, st = M.st;
+    let rs = seed; const rnd = () => { rs = (rs * 1103515245 + 12345) % 2147483648; return rs / 2147483648; };
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+    let sent = null; st.core = { msg: (m) => { sent = m; } }; st.mode = 'drive'; // fang det motoren får
+    // Telefonen står skrått i holderen: bilens fremover er en blanding av -z og x. y = opp.
+    const f = [0.3, 0, -0.954], lat = [0.954, 0, 0.3];
+    let T = 0, v = 0, nextFix = 1000, wob = 0, latA = 0, last = null; const truth = [], out = [];
+    for (let si = 0; si < segs.length; si++) {
+      const [dur, acc, o] = segs[si], op = o || {};
+      const sd = v !== 0 ? Math.sign(v) : Math.sign(acc); // innen et segment skifter bilen aldri retning
+      for (let k = 0; k < Math.round(dur * 60); k++) {
+        T += 1000 / 60; window.__T = T;
+        wob += (gauss() * (op.wob || 0) - wob) * 0.05; // langsom, ekte svingning i akselerasjonen
+        let a = acc + (op.wob ? wob * 3 : 0), nv = v + a / 60;
+        if (nv * sd < 0 || (Math.abs(nv) < 1e-6 && acc === 0)) nv = 0;
+        a = (nv - v) * 60; v = nv;
+        latA += ((Math.abs(v) > 0.3 && op.lat ? gauss() * 3 : 0) - latA) * 0.05;
+        truth.push({ t: T, v });
+        const lin = [0, 0, 0];
+        for (let i = 0; i < 3; i++) lin[i] = (a + BIAS) * f[i] + latA * lat[i] + gauss() * 0.25; // 0.2 m/s² skjevhet
+        let rot = { alpha: gauss() * 2, beta: gauss() * 2, gamma: gauss() * 2 };
+        if (op.jolt && k < 30) { for (let i = 0; i < 3; i++) lin[i] += (rnd() - 0.5) * 14; rot = { alpha: 150, beta: -120, gamma: 90 }; }
+        M.onMotion({ acceleration: { x: lin[0], y: lin[1], z: lin[2] },
+          accelerationIncludingGravity: { x: lin[0], y: lin[1] + 9.81, z: lin[2] }, rotationRate: rot });
+        if (T >= nextFix) { // GPS: fart uten fortegn, LAG ms gammel; i ro gir iPhone 0 eller -1 (ugyldig)
+          nextFix += 1000;
+          const old = (truth.find((x) => x.t >= T - LAG) || truth[0]).v, sp = Math.abs(old);
+          const speed = sp < 0.3 ? (rnd() < 0.7 ? 0 : -1) : Math.max(0, sp + gauss() * (sp < 2 ? 0.2 : 0.1));
+          M.onGps({ timestamp: T - LAG, coords: { speed: speed, accuracy: 6, heading: null, latitude: 59.9, longitude: 10.7 } });
+        }
+        out.push({ t: T / 1000, v, dir: S.dir, est: S.vEst, sv: sent ? sent.v : 0, sthr: sent ? sent.thr : 0,
+          fwdOk: S.fwd ? S.fwd[0] * f[0] + S.fwd[2] * f[2] : null, dec: S.rvLast !== last ? (last = S.rvLast) : null });
+      }
+    }
+    return out;
+  }, [sc.segs, sc.lag || 1000, sc.bias == null ? 0.2 : sc.bias, sc.seed || 777]);
+}
+
+function revReport(rv) {
+  let eps = 0, hit = 0, fp = 0, fpT = 0, epsCal = 0, hitCal = 0, mF = 9, mR = -9; const lat = [];
+  console.log('\nREVERS (GPS-fart uten fortegn, forsinket, telefonen skrått i holderen):');
+  for (const r of rv) {
+    const o = r.o; let e = 0, h = 0, f = 0, maxSv = 0, maxThr = 0; const L = [];
+    for (let i = 0; i < o.length; i++) {
+      const x = o[i];
+      if (x.dir === 'R' && x.v > 0.05) f++;
+      if (x.dec) { // avgjørelse ved start: u/v er +1 fremover og -1 bakover; terskel -0,5
+        const back = o.slice(Math.max(0, i - 240), i).some((y) => y.v < 0) && x.v <= 0, q = x.dec.u / x.dec.v;
+        if (back) mR = Math.max(mR, q); else mF = Math.min(mF, q);
+        if (process.env.DBG) console.log('  [' + r.name + '] dec t=' + x.t.toFixed(1) + (back ? ' bak' : ' frem') + ' u=' + x.dec.u.toFixed(2) + ' v=' + x.dec.v.toFixed(2) + ' T=' + x.dec.T.toFixed(1));
+      }
+      if (x.dir === 'R') { maxSv = Math.max(maxSv, x.sv); maxThr = Math.max(maxThr, x.sthr); }
+      if (x.v < 0 && (i === 0 || o[i - 1].v >= 0)) { // ny revers-episode
+        e++; let j = i, found = null;
+        while (j < o.length && o[j].v <= 0 && !(o[j].v === 0 && j > i)) { if (o[j].dir === 'R' && !found) found = o[j]; j++; }
+        if (found) { h++; L.push(found.t - x.t); }
+      }
+    }
+    eps += e; hit += h; if (!r.sc.noCal) { epsCal += e; hitCal += h; } fp += f; fpT += f / 60; lat.push(...L);
+    console.log('INFO ' + r.name + ': revers-episoder ' + e + ', oppdaget ' + h + (L.length ? ' (etter ' + L.map((x) => x.toFixed(1)).join(', ') + ' s)' : '') +
+      ', falsk revers fremover ' + (f / 60).toFixed(2) + ' s' + (h ? ', til motoren i R: fart maks ' + maxSv.toFixed(1) + ' m/s, gass maks ' + maxThr.toFixed(2) : ''));
+    check('revers: ' + r.name + ': aldri "Rygger" mens bilen kjører fremover', f === 0, f + ' prøver');
+    if (r.sc.noCal) { const last = o[o.length - 1]; check('revers: rygging før kalibrering lærer ikke fremover feil vei', last.fwdOk > 0.9, 'fwd·sann ' + (last.fwdOk == null ? '–' : last.fwdOk.toFixed(2))); }
+    if (h) check('revers: ' + r.name + ': motoren får lav fart og dempet gass i R', maxSv <= 3.41 && maxThr <= 0.5);
+  }
+  const mean = lat.length ? lat.reduce((a, b) => a + b, 0) / lat.length : NaN;
+  console.log('INFO revers totalt: ' + hit + ' av ' + eps + ' episoder oppdaget, ventetid snitt ' + mean.toFixed(1) + ' s (maks ' + Math.max(...lat).toFixed(1) + ' s), falsk revers fremover ' + fpT.toFixed(2) + ' s');
+  console.log('INFO revers margin: u/v ved start fremover minst ' + mF.toFixed(2) + ', bakover høyst ' + mR.toFixed(2) + ' (terskel -0.5)');
+  check('revers: minst 70 % av rygge-episodene oppdages (etter kalibrering; korte rygg med lang GPS-forsinkelse kan glippe)', hitCal >= 0.7 * epsCal, hitCal + '/' + epsCal);
+  // Motoren i R: 1. gir, lavt turtall, også i Sport og Sport+
+  const EngineCore = require('./engine.js');
+  for (const ex of [0, 1, 2]) {
+    const e = new EngineCore(48000), L = new Float32Array(128), R = new Float32Array(128); let gmax = 1, rmax = 0;
+    e.msg({ k: 'cfg', vol: 1, burble: 0.7, exMode: ex, auto: true });
+    for (let b = 0; b < 48000 * 6 / 128; b++) {
+      const t = b * 128 / 48000; e.msg({ k: 'drive', v: Math.min(t * 0.8, 3.4), thr: 0.5, brake: 0 }); e.render(L, R, 128);
+      gmax = Math.max(gmax, e.gear); rmax = Math.max(rmax, e.rpmS);
+    }
+    check('revers: motoren blir i 1. gir under 2200 o/min (modus ' + ex + ')', gmax === 1 && rmax < 2200, 'gir ' + gmax + ', maks ' + Math.round(rmax) + ' o/min');
+  }
+}
+
 (async () => {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = 'http://localhost:' + server.address().port + '/';
@@ -65,6 +171,8 @@ async function sim(page) {
     const a = await p.evaluate(() => ({ state: window.__m4.st.ctx && window.__m4.st.ctx.state, sys: document.querySelector('#stSys').textContent }));
     await p.click('#mDrive'); await p.waitForTimeout(800);
     const b = await p.evaluate(() => ({ on: window.__m4.S.on, btn: document.querySelector('#sensBtn').hidden, sys: document.querySelector('#stSys').textContent }));
+    const c = await p.evaluate(() => { const M = window.__m4; M.S.dir = 'R'; M.sysTick(); const t = document.querySelector('#stSys').textContent; M.S.dir = 'F'; M.sysTick(); return t; });
+    check('side: statuslinjen viser "Rygger" i revers', /Rygger/.test(c), c);
     await p.click('summary'); await p.click('#calReset');
     check('side: testmodus starter, statuslinje vises', !!a.sys, 'lyd ' + a.state + ' | ' + a.sys);
     check('side: bytte til Kjør slår på sensorer uten eget trykk', b.on && b.btn, b.sys);
@@ -76,7 +184,18 @@ async function sim(page) {
   await page.goto(url);
   const o = await sim(page);
   check('ingen konsollfeil', errs.length === 0, errs.slice(0, 3).join(' | '));
+  // 3) Revers: hver kjøretur på en fersk side (ingen lagret kalibrering)
+  const rv = [];
+  for (const sc of REV) {
+    const pg = await ctx.newPage(); watch(pg);
+    await pg.addInitScript(() => { window.__T = 0; performance.now = () => window.__T; try { localStorage.clear(); } catch (e) {} });
+    await pg.goto(url);
+    rv.push({ name: sc.name, o: await simRev(pg, sc), sc: sc });
+    await pg.close();
+  }
+  check('revers: ingen konsollfeil', errs.length === 0, errs.slice(0, 3).join(' | '));
   await browser.close(); server.close();
+  revReport(rv);
 
   const segs = {}; o.forEach((x) => (segs[x.seg] = segs[x.seg] || []).push(x));
   const tail = (si, sec) => { const a = segs[si]; return a.slice(Math.max(0, a.length - sec * 60)); };
