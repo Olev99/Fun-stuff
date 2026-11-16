@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>M4 CSL Lydmotor</title>
+<title>Lydmotor</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -103,6 +103,10 @@ summary { padding: 12px 0; cursor: pointer; font-weight: 600; letter-spacing: .0
 body[data-mode="drive"] .drivepanel { min-height: 0; }
 .drivepanel .warn { color: var(--ink); }
 .opts .chk span { flex: 1; }
+.opts select { width: 100%; min-height: 44px; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
+h1 .car { color: var(--accent); display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header h1 { min-width: 0; }
+header .seg { flex-shrink: 0; }
 .startbtns { display: grid; gap: 14px; width: min(320px, 100%); }
 #start button.sec { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
 #start small { color: var(--dim); max-width: 36ch; text-wrap: pretty; }
@@ -111,7 +115,7 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
 <body data-mode="test">
 <div class="app">
   <header>
-    <h1>M4 CSL LYDMOTOR</h1>
+    <h1><span class="car" id="carTag">M4 CSL</span>LYDMOTOR</h1>
     <div class="seg" role="group" aria-label="Modus">
       <button type="button" id="mTest" aria-pressed="true">Test</button>
       <button type="button" id="mDrive" aria-pressed="false">Kjør</button>
@@ -156,6 +160,8 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
   <details>
     <summary>Innstillinger</summary>
     <div class="opts">
+      <label for="car">Bil <select id="car"></select></label>
+      <label for="outp">Lydanlegg <select id="outp"></select></label>
       <label for="vol">Volum <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
       <label for="bur">Burble <input id="bur" type="range" min="0" max="1" step="0.01" value="0.7"></label>
       <label for="tunAmt">Tunnelklang <input id="tunAmt" type="range" min="0" max="1.5" step="0.01" value="1"></label>
@@ -164,6 +170,7 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
       <label class="chk" for="tunMap"><input id="tunMap" type="checkbox"> <span>Slå opp tunneler i kart (OpenStreetMap)</span></label>
       <button type="button" class="btn" id="calReset">Nullstill kalibrering</button>
       <p class="hint">Appen husker hvilken vei som er fremover for telefonen i holderen. Flytter du holderen, trykk Nullstill og gi gass rett frem en gang. Flyttes telefonen tydelig, lærer den på nytt av seg selv.</p>
+      <p class="hint">Bil: lyden er laget fra bunnen av (syntese, ingen opptak). Byttet skjer med en kort uttoning, og motoren starter på tomgang i girer som passer farten. Lydanlegg: «BMW i4 M50 Harman Kardon» gir full bass ned mot 25-30 Hz, mer diskant, mer luft til toppene og smalere stereo fordi bilen selv fordeler lyden på alle høyttalerne. «Standard» passer små høyttalere.</p>
       <p class="hint">Eksos: Komfort har lukkede klaffer og nesten ingen smell. Sport åpner klaffene i lave gir, ved mye gass og høyt turtall, og gir burble når du slipper gassen. Bane er høyest, med raskest skift.</p>
       <p class="hint">Tunnel: Knappen virker alltid. GPS-bortfall oppdager en tunnel først to til tre sekunder etter at signalet forsvinner, og kan slå feil under bruer og i parkeringshus. Kartoppslag vet om tunnelen før du kjører inn, men trenger mobilnett og sender posisjonen din til en åpen OpenStreetMap-tjener (overpass-api.de). Det er derfor av til du slår det på.</p>
       <p class="hint">Kjøremodus trenger GPS og bevegelsessensor. Det virker bare når siden ligger på sin egen https-adresse og er åpnet i Safari, ikke inne i Claude-appen. Skjermen må være på hele turen.</p>
@@ -173,8 +180,8 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
 </div>
 
 <div id="start">
-  <h1>M4 CSL LYDMOTOR</h1>
-  <p>Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble. Skru opp lyden før du starter.</p>
+  <h1>LYDMOTOR</h1>
+  <p><b id="startCar">BMW M4 CSL</b>: <span id="startBlurb">Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.</span> Skru opp lyden før du starter. Bil velges under Innstillinger.</p>
   <div class="startbtns">
     <button type="button" id="startDrive">KJØR MED SENSORER</button>
     <button type="button" id="startTest" class="sec">TEST MED PEDALER</button>

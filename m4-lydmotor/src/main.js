@@ -12,10 +12,13 @@
     evText: '', evT: 0, tunManual: false, tunGps: false, tunMap: false, tunOn: false, wake: null, wakeT: -1e9,
     resT: -1e9, resN: 0, drawT: 0, sys: '' };
 
+  // ---------- bilprofiler og lydanlegg ----------
+  const PROFS = EngineCore.profiles(), OUTS = EngineCore.outputs();
+  const prof = () => PROFS[st.car];
   // ---------- lagrede innstillinger ----------
   const store = {
-    get() { try { return JSON.parse(localStorage.getItem('m4csl') || '{}') || {}; } catch (e) { return {}; } },
-    set(o) { try { localStorage.setItem('m4csl', JSON.stringify(o)); } catch (e) {} }
+    get() { try { return JSON.parse(localStorage.getItem('lydmotor') || localStorage.getItem('m4csl') || '{}') || {}; } catch (e) { return {}; } },
+    set(o) { try { localStorage.setItem('lydmotor', JSON.stringify(o)); localStorage.removeItem('m4csl'); } catch (e) {} }
   };
   (function loadCfg() {
     const c = store.get();
@@ -26,10 +29,12 @@
     if (c.tunGps != null) $('#tunGps').checked = !!c.tunGps;
     if (c.tunMap != null) $('#tunMap').checked = !!c.tunMap;
     if (c.ex != null) st.exMode = clamp(c.ex | 0, 0, 2);
+    st.car = PROFS[c.car] ? c.car : 'm4csl';
+    st.outId = OUTS[c.out] ? c.out : 'i4hk';
   })();
   function saveCfg() {
     store.set({ vol: +$('#vol').value, bur: +$('#bur').value, tunAmt: +$('#tunAmt').value, idle: $('#idle').checked,
-      tunGps: $('#tunGps').checked, tunMap: $('#tunMap').checked, ex: st.exMode });
+      tunGps: $('#tunGps').checked, tunMap: $('#tunMap').checked, ex: st.exMode, car: st.car, out: st.outId });
   }
 
   function send(m) {
@@ -160,6 +165,7 @@ registerProcessor('m4-engine', M4Proc);`;
       st.core = core; st.sp = sp; path = 'ScriptProcessor';
     }
     st.path = path;
+    send({ k: 'out', o: OUTS[st.outId], now: true }); send({ k: 'profile', p: prof(), now: true });
     pushCfg(); send({ k: 'start' });
     setMode(mode);
     applyTunnel();
@@ -198,6 +204,15 @@ registerProcessor('m4-engine', M4Proc);`;
   }
   document.querySelectorAll('[data-ex]').forEach((b) => b.addEventListener('click', () => setEx(+b.dataset.ex)));
   setEx(st.exMode);
+  // velgere for bil og lydanlegg; bytte underveis tones ut og inn i motoren (ca. 150 ms)
+  function showCar() {
+    const p = prof(); $('#carTag').textContent = p.short.toUpperCase(); $('#startCar').textContent = p.name; $('#startBlurb').textContent = p.blurb;
+  }
+  for (const k in PROFS) $('#car').add(new Option(PROFS[k].name, k));
+  for (const k in OUTS) $('#outp').add(new Option(OUTS[k].name, k));
+  $('#car').value = st.car; $('#outp').value = st.outId; showCar();
+  $('#car').addEventListener('change', () => { st.car = $('#car').value; showCar(); saveCfg(); if (st.started) send({ k: 'profile', p: prof() }); });
+  $('#outp').addEventListener('change', () => { st.outId = $('#outp').value; saveCfg(); if (st.started) send({ k: 'out', o: OUTS[st.outId] }); });
 
   // ---------- tunnel ----------
   function applyTunnel() {
@@ -628,17 +643,17 @@ registerProcessor('m4-engine', M4Proc);`;
     if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) { cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr); }
     const g = cvs.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
     const cx = w / 2, cy = h / 2 + 2, R = Math.max(20, Math.min(w, h) / 2 - 14);
-    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, MAX = 8000, ang = (r) => a0 + (a1 - a0) * r / MAX;
+    const tc = prof().tach, MAX = tc.max, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (r) => a0 + (a1 - a0) * r / MAX;
     g.lineWidth = R * 0.085; g.lineCap = 'butt';
     const arc = (r0, r1, col) => { g.beginPath(); g.arc(cx, cy, R, ang(r0), ang(r1)); g.strokeStyle = col; g.stroke(); };
-    arc(0, 7200, COL.line); arc(7200, 8000, 'rgba(255,77,61,.35)');
+    arc(0, tc.red, COL.line); arc(tc.red, MAX, 'rgba(255,77,61,.35)');
     const rp = clamp(st.rpmD, 0, MAX);
-    arc(0, Math.min(rp, 6600), COL.accent);
-    if (rp > 6600) arc(6600, rp, COL.hot);
+    arc(0, Math.min(rp, tc.warn), COL.accent);
+    if (rp > tc.warn) arc(tc.warn, rp, COL.hot);
     g.fillStyle = COL.dim; g.font = '600 ' + Math.max(12, R * 0.09) + 'px ' + COL.disp; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i <= 8; i++) { const aa = ang(i * 1000), rr = R - R * 0.17; g.fillText(String(i), cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr); }
+    for (let i = 0; i <= MAX / 1000; i++) { const aa = ang(i * 1000), rr = R - R * 0.17; g.fillText(String(i), cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr); }
     const na = ang(rp);
-    g.strokeStyle = rp > 6600 ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
+    g.strokeStyle = rp > tc.warn ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
     g.beginPath(); g.moveTo(cx + Math.cos(na) * R * 0.52, cy + Math.sin(na) * R * 0.52); g.lineTo(cx + Math.cos(na) * R * 0.72, cy + Math.sin(na) * R * 0.72); g.stroke();
     g.fillStyle = t.shift ? COL.accent : t.lim ? COL.hot : COL.ink; g.font = '700 ' + R * 0.42 + 'px ' + COL.disp;
     g.fillText(String(t.gear), cx, cy - R * 0.02);

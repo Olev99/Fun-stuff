@@ -454,15 +454,16 @@ if (require.main === module) {
     for (const id of ids) {
       Sess.prof = PROFS[id];
       const s = new Sess({ exMode: 2, burble: 1 }); s.run(0.5, 0).run(10, 1).run(2, 0).run(4, 0, 1);
+      const tu = new Sess({ exMode: 2, burble: 1 }); tu.inTunnel = 1; tu.run(0.5, 0).run(8, 1).run(2, 0).run(3, 0, 1); const to = applyTunnel(tu, 1), tp = Math.max(stats(to.L).peak, stats(to.R).peak), tc = to.clipFrac;
       const z = new Sess({ auto: false, exMode: 2, burble: 1 }); z.run(0.5, 0).run(4, 1);
       const st = Math.max(stats(s.L).peak, stats(s.R).peak, stats(z.L).peak), bad = stats(s.L).bad;
       const w = new Sess(); w.run(8, 0); const sub = bandRel(w.seg(2, 8), 0, 25), hf = bandRel(s.L.slice(48000, 480000), 16000, 24000);
       let sd = 0, md = 0; for (let i = 48000; i < 480000; i++) { const a = s.L[i], b = s.R[i]; sd += (a - b) * (a - b); md += (a + b) * (a + b); }
       pk = Math.max(pk, st);
-      info.push(PROFS[id].short + ': topp ' + f1(dB(st)) + ' dBFS, <25 Hz ' + f1(sub) + ' dB, >16 kHz ' + f1(hf) + ' dB, side/mid ' + f1(10 * Math.log10(sd / md)) + ' dB');
-      if (st > O.lim + 1e-6 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
+      info.push(PROFS[id].short + ': topp ' + f1(dB(st)) + ' dBFS (i tunnel ' + f1(dB(tp)) + ', mykklipp ' + (tc * 100).toFixed(2) + ' %), <25 Hz ' + f1(sub) + ' dB, >16 kHz ' + f1(hf) + ' dB, side/mid ' + f1(10 * Math.log10(sd / md)) + ' dB');
+      if (st > O.lim + 1e-6 || tp > 0.95 || tc > 0.005 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
     }
-    check0('utgang i4 HK: topper <= -3 dBFS i verste fall (Bane, full burble, sperre), < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
+    check0('utgang i4 HK: topper <= -3 dBFS i verste fall uten tunnel (Bane, full burble, sperre), i tunnel < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
     Sess.out = null; Sess.prof = null;
   }
   console.log(results.join('\n'));

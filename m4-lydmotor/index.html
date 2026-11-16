@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>M4 CSL Lydmotor</title>
+<title>Lydmotor</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -103,6 +103,10 @@ summary { padding: 12px 0; cursor: pointer; font-weight: 600; letter-spacing: .0
 body[data-mode="drive"] .drivepanel { min-height: 0; }
 .drivepanel .warn { color: var(--ink); }
 .opts .chk span { flex: 1; }
+.opts select { width: 100%; min-height: 44px; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
+h1 .car { color: var(--accent); display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header h1 { min-width: 0; }
+header .seg { flex-shrink: 0; }
 .startbtns { display: grid; gap: 14px; width: min(320px, 100%); }
 #start button.sec { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
 #start small { color: var(--dim); max-width: 36ch; text-wrap: pretty; }
@@ -111,7 +115,7 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
 <body data-mode="test">
 <div class="app">
   <header>
-    <h1>M4 CSL LYDMOTOR</h1>
+    <h1><span class="car" id="carTag">M4 CSL</span>LYDMOTOR</h1>
     <div class="seg" role="group" aria-label="Modus">
       <button type="button" id="mTest" aria-pressed="true">Test</button>
       <button type="button" id="mDrive" aria-pressed="false">Kjør</button>
@@ -156,6 +160,8 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
   <details>
     <summary>Innstillinger</summary>
     <div class="opts">
+      <label for="car">Bil <select id="car"></select></label>
+      <label for="outp">Lydanlegg <select id="outp"></select></label>
       <label for="vol">Volum <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
       <label for="bur">Burble <input id="bur" type="range" min="0" max="1" step="0.01" value="0.7"></label>
       <label for="tunAmt">Tunnelklang <input id="tunAmt" type="range" min="0" max="1.5" step="0.01" value="1"></label>
@@ -164,6 +170,7 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
       <label class="chk" for="tunMap"><input id="tunMap" type="checkbox"> <span>Slå opp tunneler i kart (OpenStreetMap)</span></label>
       <button type="button" class="btn" id="calReset">Nullstill kalibrering</button>
       <p class="hint">Appen husker hvilken vei som er fremover for telefonen i holderen. Flytter du holderen, trykk Nullstill og gi gass rett frem en gang. Flyttes telefonen tydelig, lærer den på nytt av seg selv.</p>
+      <p class="hint">Bil: lyden er laget fra bunnen av (syntese, ingen opptak). Byttet skjer med en kort uttoning, og motoren starter på tomgang i girer som passer farten. Lydanlegg: «BMW i4 M50 Harman Kardon» gir full bass ned mot 25-30 Hz, mer diskant, mer luft til toppene og smalere stereo fordi bilen selv fordeler lyden på alle høyttalerne. «Standard» passer små høyttalere.</p>
       <p class="hint">Eksos: Komfort har lukkede klaffer og nesten ingen smell. Sport åpner klaffene i lave gir, ved mye gass og høyt turtall, og gir burble når du slipper gassen. Bane er høyest, med raskest skift.</p>
       <p class="hint">Tunnel: Knappen virker alltid. GPS-bortfall oppdager en tunnel først to til tre sekunder etter at signalet forsvinner, og kan slå feil under bruer og i parkeringshus. Kartoppslag vet om tunnelen før du kjører inn, men trenger mobilnett og sender posisjonen din til en åpen OpenStreetMap-tjener (overpass-api.de). Det er derfor av til du slår det på.</p>
       <p class="hint">Kjøremodus trenger GPS og bevegelsessensor. Det virker bare når siden ligger på sin egen https-adresse og er åpnet i Safari, ikke inne i Claude-appen. Skjermen må være på hele turen.</p>
@@ -173,8 +180,8 @@ body[data-mode="drive"] .drivepanel { min-height: 0; }
 </div>
 
 <div id="start">
-  <h1>M4 CSL LYDMOTOR</h1>
-  <p>Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble. Skru opp lyden før du starter.</p>
+  <h1>LYDMOTOR</h1>
+  <p><b id="startCar">BMW M4 CSL</b>: <span id="startBlurb">Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.</span> Skru opp lyden før du starter. Bil velges under Innstillinger.</p>
   <div class="startbtns">
     <button type="button" id="startDrive">KJØR MED SENSORER</button>
     <button type="button" id="startTest" class="sec">TEST MED PEDALER</button>
@@ -223,8 +230,9 @@ class EngineCore {
     return {
       std: { id: 'std', name: 'Standard (liten høyttaler)', hp: 26, hp2: 0, eq: [105, 4, 0.9], lp: 7500, pre: 1, lim: 0.86, side: 1 },
       // BMW i4 M50 med Harman Kardon (16 høyttalere, 464 W): ekte bass ned mot 25-30 Hz, bilens DSP oppmikser stereo.
-      // Ren bunn under 25 Hz (to høypass-ledd), vekt rundt 60 Hz, mer diskantrom, toppnivå ca. -3 dBFS, smalere stereo.
-      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, pre: 0.8, lim: 0.708, side: 0.6 }
+      // Ren bunn under 25 Hz (to høypass-ledd), vekt rundt 60 Hz, mer diskantrom, smalere stereo. Taket -5.5 dBFS gir
+      // rom for tunnelklangen (ca. +2.5 dB) slik at toppene også i tunnel holder seg under -3 dBFS.
+      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, pre: 0.6, lim: 0.53, side: 0.6 }
     };
   }
 
@@ -976,10 +984,13 @@ class EngineCore {
     evText: '', evT: 0, tunManual: false, tunGps: false, tunMap: false, tunOn: false, wake: null, wakeT: -1e9,
     resT: -1e9, resN: 0, drawT: 0, sys: '' };
 
+  // ---------- bilprofiler og lydanlegg ----------
+  const PROFS = EngineCore.profiles(), OUTS = EngineCore.outputs();
+  const prof = () => PROFS[st.car];
   // ---------- lagrede innstillinger ----------
   const store = {
-    get() { try { return JSON.parse(localStorage.getItem('m4csl') || '{}') || {}; } catch (e) { return {}; } },
-    set(o) { try { localStorage.setItem('m4csl', JSON.stringify(o)); } catch (e) {} }
+    get() { try { return JSON.parse(localStorage.getItem('lydmotor') || localStorage.getItem('m4csl') || '{}') || {}; } catch (e) { return {}; } },
+    set(o) { try { localStorage.setItem('lydmotor', JSON.stringify(o)); localStorage.removeItem('m4csl'); } catch (e) {} }
   };
   (function loadCfg() {
     const c = store.get();
@@ -990,10 +1001,12 @@ class EngineCore {
     if (c.tunGps != null) $('#tunGps').checked = !!c.tunGps;
     if (c.tunMap != null) $('#tunMap').checked = !!c.tunMap;
     if (c.ex != null) st.exMode = clamp(c.ex | 0, 0, 2);
+    st.car = PROFS[c.car] ? c.car : 'm4csl';
+    st.outId = OUTS[c.out] ? c.out : 'i4hk';
   })();
   function saveCfg() {
     store.set({ vol: +$('#vol').value, bur: +$('#bur').value, tunAmt: +$('#tunAmt').value, idle: $('#idle').checked,
-      tunGps: $('#tunGps').checked, tunMap: $('#tunMap').checked, ex: st.exMode });
+      tunGps: $('#tunGps').checked, tunMap: $('#tunMap').checked, ex: st.exMode, car: st.car, out: st.outId });
   }
 
   function send(m) {
@@ -1124,6 +1137,7 @@ registerProcessor('m4-engine', M4Proc);`;
       st.core = core; st.sp = sp; path = 'ScriptProcessor';
     }
     st.path = path;
+    send({ k: 'out', o: OUTS[st.outId], now: true }); send({ k: 'profile', p: prof(), now: true });
     pushCfg(); send({ k: 'start' });
     setMode(mode);
     applyTunnel();
@@ -1162,6 +1176,15 @@ registerProcessor('m4-engine', M4Proc);`;
   }
   document.querySelectorAll('[data-ex]').forEach((b) => b.addEventListener('click', () => setEx(+b.dataset.ex)));
   setEx(st.exMode);
+  // velgere for bil og lydanlegg; bytte underveis tones ut og inn i motoren (ca. 150 ms)
+  function showCar() {
+    const p = prof(); $('#carTag').textContent = p.short.toUpperCase(); $('#startCar').textContent = p.name; $('#startBlurb').textContent = p.blurb;
+  }
+  for (const k in PROFS) $('#car').add(new Option(PROFS[k].name, k));
+  for (const k in OUTS) $('#outp').add(new Option(OUTS[k].name, k));
+  $('#car').value = st.car; $('#outp').value = st.outId; showCar();
+  $('#car').addEventListener('change', () => { st.car = $('#car').value; showCar(); saveCfg(); if (st.started) send({ k: 'profile', p: prof() }); });
+  $('#outp').addEventListener('change', () => { st.outId = $('#outp').value; saveCfg(); if (st.started) send({ k: 'out', o: OUTS[st.outId] }); });
 
   // ---------- tunnel ----------
   function applyTunnel() {
@@ -1592,17 +1615,17 @@ registerProcessor('m4-engine', M4Proc);`;
     if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) { cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr); }
     const g = cvs.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
     const cx = w / 2, cy = h / 2 + 2, R = Math.max(20, Math.min(w, h) / 2 - 14);
-    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, MAX = 8000, ang = (r) => a0 + (a1 - a0) * r / MAX;
+    const tc = prof().tach, MAX = tc.max, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (r) => a0 + (a1 - a0) * r / MAX;
     g.lineWidth = R * 0.085; g.lineCap = 'butt';
     const arc = (r0, r1, col) => { g.beginPath(); g.arc(cx, cy, R, ang(r0), ang(r1)); g.strokeStyle = col; g.stroke(); };
-    arc(0, 7200, COL.line); arc(7200, 8000, 'rgba(255,77,61,.35)');
+    arc(0, tc.red, COL.line); arc(tc.red, MAX, 'rgba(255,77,61,.35)');
     const rp = clamp(st.rpmD, 0, MAX);
-    arc(0, Math.min(rp, 6600), COL.accent);
-    if (rp > 6600) arc(6600, rp, COL.hot);
+    arc(0, Math.min(rp, tc.warn), COL.accent);
+    if (rp > tc.warn) arc(tc.warn, rp, COL.hot);
     g.fillStyle = COL.dim; g.font = '600 ' + Math.max(12, R * 0.09) + 'px ' + COL.disp; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i <= 8; i++) { const aa = ang(i * 1000), rr = R - R * 0.17; g.fillText(String(i), cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr); }
+    for (let i = 0; i <= MAX / 1000; i++) { const aa = ang(i * 1000), rr = R - R * 0.17; g.fillText(String(i), cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr); }
     const na = ang(rp);
-    g.strokeStyle = rp > 6600 ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
+    g.strokeStyle = rp > tc.warn ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
     g.beginPath(); g.moveTo(cx + Math.cos(na) * R * 0.52, cy + Math.sin(na) * R * 0.52); g.lineTo(cx + Math.cos(na) * R * 0.72, cy + Math.sin(na) * R * 0.72); g.stroke();
     g.fillStyle = t.shift ? COL.accent : t.lim ? COL.hot : COL.ink; g.font = '700 ' + R * 0.42 + 'px ' + COL.disp;
     g.fillText(String(t.gear), cx, cy - R * 0.02);
