@@ -177,6 +177,20 @@ function revReport(rv) {
     check('side: testmodus starter, statuslinje vises', !!a.sys, 'lyd ' + a.state + ' | ' + a.sys);
     check('side: bytte til Kjør slår på sensorer uten eget trykk', b.on && b.btn, b.sys);
     await ctx.close();
+    // bilvelgeren: alle profiler listes, og bytte til hver bil mens lyden går når motoren (telemetrien sier hvilken bil som kjører)
+    const c2 = await browser.newContext({ viewport: { width: 393, height: 852 } }); const q = await c2.newPage(); watch(q);
+    await q.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+    await q.goto(url); await q.click('#startTest'); await q.waitForTimeout(800);
+    await q.click('summary'); await q.locator('#car').scrollIntoViewIfNeeded();
+    const opts = await q.$$eval('#car option', (o) => o.map((x) => x.value));
+    const want = await q.evaluate(() => Object.keys(EngineCore.profiles()));
+    check('side: bilvelgeren lister alle bilene', want.every((k) => opts.includes(k)) && opts.length === want.length, opts.join(', '));
+    const got = [];
+    for (const k of want.slice(1).concat(want[0])) { await q.selectOption('#car', k); await q.waitForTimeout(500); got.push(k + '=' + (await q.evaluate(() => window.__m4.st.tele.car + ' ' + document.querySelector('#carTag').textContent))); }
+    check('side: bytte bil mens lyden går (motoren melder ny bil og navnet øverst skifter)', got.every((g) => { const [k, rest] = g.split('='); return rest.startsWith(k + ' '); }), got.join(' | '));
+    await q.selectOption('#car', 'gt3'); await q.waitForTimeout(400);
+    if (process.env.SHOT) await q.screenshot({ path: process.env.SHOT });
+    await c2.close();
   }
   // 2) Syntetisk kjøretur med falsk klokke
   const ctx = await browser.newContext(); const page = await ctx.newPage(); watch(page);

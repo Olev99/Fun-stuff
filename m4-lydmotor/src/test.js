@@ -367,10 +367,41 @@ if (require.main === module) {
       minR = Math.min(minR, mn); info.push((auto ? 'auto' : 'man') + (inst ? ' brått' : ' rampe') + ' ' + Math.round(mn));
     }
     check('girvakt: turtallet under fartsfall til stillstand holder seg over ' + Math.round(p.idle * 0.95), minR >= p.idle * 0.95, info.join(', '));
-    const c = new Sess(); c.run(0.5, 0).run(6, 0.7); const g0 = c.e.gear, t0 = c.t; c.run(8, 0);
+    const c = new Sess(); c.run(0.5, 0).run(6, 0.7); const g0 = c.e.gear, t0 = c.t, rL = c.e.rpm; c.run(8, 0);
     const tr = c.trace.filter((x) => x.t > t0 + 0.5 && x.v > 3), lo = Math.min(...tr.map((x) => x.rpm)), hi = Math.max(...tr.map((x) => x.rpm));
-    check('girvakt: slipp og rull holder turtallet fornuftig (' + rr(1200) + '-' + rr(4700) + ')', lo > rr(1200) && hi < rr(4700),
-      'gir ' + g0 + '>' + c.e.gear + ', rpm ' + Math.round(lo) + '-' + Math.round(hi));
+    // korte gir (GT3) kan stå høyere enn rr(4700) når føreren slipper; da skal turtallet bare ikke stige etter slippet
+    check('girvakt: slipp og rull holder turtallet fornuftig (' + rr(1200) + '-' + rr(4700) + ', eller under slipp-turtallet)', lo > rr(1200) && hi < Math.max(rr(4700), rL + 50),
+      'gir ' + g0 + '>' + c.e.gear + ', slipp ved ' + Math.round(rL) + ', rpm ' + Math.round(lo) + '-' + Math.round(hi));
+  }
+  // ---- 9c. full gass gjennom alle gir, rulling ned fra toppfart, støyete fart i kjøremodus ----
+  {
+    const s = new Sess(); s.run(1, 0);
+    // toppgiret: første gir der toppfarten gir lavere turtall enn oppgirpunktet (overgir brukes ikke på full gass)
+    const k = 60 / (2 * Math.PI * s.e.wheelR) * s.e.finalDrive; let gTop = 1; while (gTop < s.e.nG && p.vmax * k * s.e.ratios[gTop] > s.e.K.wot) gTop++;
+    while (s.e.gear < gTop && s.t < 60) s.run(0.5, 1);
+    s.run(3, 1);
+    const ups = s.evs('up'), rs = ups.map((u) => Math.round(s.rpmAt(u.t - 0.01)));
+    check('alle gir: full gass fra stillstand gjennom alle gir til ' + gTop + '. (toppfart), hvert oppgir > ' + rr(6800) + ', ingen nedgir',
+      s.e.gear === gTop && ups.length === gTop - 1 && ups.every((u, i) => u.a === i + 1 && u.b === i + 2) && rs.every((r) => r > rr(6800)) && s.evs('kick').length + s.evs('blip').length === 0,
+      ups.map((u, i) => u.a + '>' + u.b + '@' + rs[i] + ' (' + f1(u.t) + ' s)').join(', ') + '; topp ' + Math.round(s.e.v * 3.6) + ' km/t, ' + Math.round(s.e.rpm) + ' o/min');
+    // slipp ved toppfart og rull lenge (rullenedgir), så brems (bremsenedgir) til stillstand
+    const t0 = s.t; s.run(100, 0); const t1 = s.t; s.run(12, 0, 0.6);
+    const dn = s.evs('blip', t0).concat(s.evs('kick', t0)), dnC = dn.filter((x) => x.t < t1), tr = s.trace.filter((x) => x.t > t0 + 0.3 && x.v > 3);
+    const lo = Math.min(...tr.map((x) => x.rpm)), hi = Math.max(...tr.map((x) => x.rpm));
+    check('rulling fra toppfart og brems: nedgir ett og ett med mellomgass (>= 2 under ren rulling), turtall ' + (p.idle - 50) + '-' + p.redline + ', stopper i 1. gir',
+      dnC.length >= 2 && dn.every((x) => x.k === 'blip' && x.b === x.a - 1) && lo > p.idle - 50 && hi < p.redline && s.e.gear === 1 && s.e.v < 0.5,
+      'nedgir ' + dn.map((x) => x.a + '>' + x.b + '@' + f1(x.t - t0)).join(' ') + ' (brems fra ' + f1(t1 - t0) + ' s, ' + Math.round(s.trace[Math.round(t1 * SR / N) - 1].v * 3.6) + ' km/t); rpm ' + Math.round(lo) + '-' + Math.round(hi) + '; slutt gir ' + s.e.gear);
+    // GPS-lignende fart: trinn hvert sekund + støy, jevn lett gass i 20 m/s
+    const d = new Sess(); d.e.msg({ k: 'mode', drive: true }); const dt = N / SR; let seed = 99, vG = 0, nx = 0;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 - 0.5; };
+    for (let t = 0; t < 40; t += dt) {
+      const vT = Math.min(20, t * 2.5); if (t >= nx) { nx += 1; vG = Math.max(0, vT + rnd() * 1.2); }
+      d.e.msg({ k: 'drive', v: Math.max(0, vG + rnd() * 0.4), thr: t < 8 ? 0.4 : 0.15 + rnd() * 0.1, brake: 0 }); d.e.render(d.bl, d.br, N); d.t += dt;
+      for (let i = 0; i < N; i++) d.L.push(d.bl[i]);
+    }
+    const late = d.ev.filter((x) => x.t > 15 && (x.k === 'up' || x.k === 'blip' || x.k === 'kick')), st = stats(d.L);
+    check('støyete fart (GPS-trinn ±0.6 m/s + støy): ingen girjakt i jevn fart (<= 1 skift etter 15 s), ingen NaN/klipping', late.length <= 1 && st.bad === 0 && st.peak < 0.9,
+      'skift etter 15 s: ' + late.length + ', gir ' + d.e.gear + ', rpm ' + Math.round(d.e.rpm) + ', peak ' + st.peak.toFixed(2));
   }
   // ---- 10. alle eksosmodi + tomgang av ----
   {
@@ -446,17 +477,29 @@ if (require.main === module) {
       Sess.prof = PROFS[id]; const s = new Sess(); s.run(4, 0);
       const h = bandRel(s.seg(1.5, 4), 1500, 6000, true); info.push(PROFS[id].short + ' ' + f1(h) + ' dB');
       if (id !== 'm4csl' && h > -15) ok = false;
+      if (id === 'gt3' && h > -23.9) ok = false; // GT3: ventiltikk, men ikke mer sus enn den roligste V12-en (Vanquish S)
     }
-    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt)', ok, info.join(', '));
+    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB', ok, info.join(', '));
   }
-  { // bytte bil midt i full gass: kort uttoning, ingen klikk, ny bil på tomgang i riktig gir
+  for (const to of ids.filter((x) => x !== 'm4csl')) { // bytte bil midt i full gass: kort uttoning, ingen klikk, ny bil på tomgang i riktig gir
     Sess.prof = null; const s = new Sess({ auto: false }); s.run(0.5, 0).run(1.2, 1);
-    const tS = s.t; s.e.msg({ k: 'profile', p: PROFS.f12 }); s.run(0.4, 0.2);
+    const tS = s.t, P2 = PROFS[to]; s.e.msg({ k: 'profile', p: P2 }); s.run(0.4, 0.2);
     const seg = s.seg(tS, tS + 0.4); let dmax = 0; for (let i = 1; i < seg.length; i++) dmax = Math.max(dmax, Math.abs(seg[i] - seg[i - 1]));
     const pre = s.seg(tS - 0.3, tS); let dpre = 0; for (let i = 1; i < pre.length; i++) dpre = Math.max(dpre, Math.abs(pre[i] - pre[i - 1]));
     const mid = stats(s.seg(tS + 0.068, tS + 0.075)).rms;
-    check0('bilbytte: tones ut på ~70 ms, ingen sprang større enn under vanlig kjøring, F12 aktiv etterpå', mid < 0.01 && dmax <= dpre * 1.05 && s.e.pr.id === 'f12' && s.e.rpm > PROFS.f12.idle - 100 && s.e.rpm < PROFS.f12.redline * 0.5,
+    check0('bilbytte M4 -> ' + P2.short + ': tones ut på ~70 ms, ingen sprang større enn under vanlig kjøring, ny bil aktiv etterpå', mid < 0.01 && dmax <= dpre * 1.05 && s.e.pr.id === to && s.e.rpm > P2.idle - 100 && s.e.rpm < P2.redline * 0.5,
       'nivå midt i bytte ' + f1(dB(mid)) + ' dB, største sprang ' + dmax.toFixed(3) + ' (før: ' + dpre.toFixed(3) + '), etter: gir ' + s.e.gear + ' rpm ' + Math.round(s.e.rpm));
+    // kjøremodus i 25 m/s: bytt til den nye bilen og tilbake; giret skal passe farten og lyden holde seg ren
+    const d = new Sess(); d.e.msg({ k: 'mode', drive: true }); const dt = N / SR; let info = '', ok = true;
+    for (let t = 0, step = 0; t < 9; t += dt) {
+      if (step === 0 && t >= 3) { d.e.msg({ k: 'profile', p: P2 }); step = 1; }
+      if (step === 1 && t >= 4) { const r = d.e.rpm; info += P2.short + ' gir ' + d.e.gear + ' ' + Math.round(r) + ' o/min; '; if (d.e.pr.id !== to || r < P2.idle || r > P2.redline * 0.6) ok = false; step = 2; }
+      if (step === 2 && t >= 6) { d.e.msg({ k: 'profile', p: PROFS.m4csl }); step = 3; }
+      d.e.msg({ k: 'drive', v: Math.min(25, t * 5), thr: 0.25, brake: 0 }); d.e.render(d.bl, d.br, N); d.t += dt;
+      for (let i = 0; i < N; i++) d.L.push(d.bl[i]);
+    }
+    const st = stats(d.L); info += 'M4 gir ' + d.e.gear + ' ' + Math.round(d.e.rpm) + ' o/min, peak ' + st.peak.toFixed(2);
+    check0('bilbytte i kjøremodus (25 m/s) M4 -> ' + P2.short + ' -> M4: gir passer farten, ingen NaN/klipping', ok && d.e.pr.id === 'm4csl' && d.e.rpm < 7200 * 0.6 && st.bad === 0 && st.peak < 0.9, info);
   }
   { // utgangsprofil for i4 M50 Harman Kardon: topper under -3 dBFS, ren bunn, smalere stereo
     const O = EngineCore.outputs().i4hk; Sess.out = O; let pk = 0; const info = [];
