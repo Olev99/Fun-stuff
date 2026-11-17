@@ -127,14 +127,14 @@ class EngineCore {
       // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel fra Car and Driver 2017 (én kilde; et forum oppgir 7. gir 0,675)
       gears: [0, 3.29, 2.16, 1.61, 1.27, 1.03, 0.85, 0.70], fd: 3.73, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
       torque: [[1000, 360], [3000, 500], [5750, 620], [6750, 596]], tMin: 200, acc100: 3.9,
-      box: { hardT: [0.13, 0.13, 0.095], softT: [0.34, 0.44], manual: 0.08, shuf: 1.5, slip: [2600, 2200, 1000], stopV: 1.5 },
+      box: { hardT: [0.22, 0.18, 0.14], softT: [0.45, 0.55], manual: 0.08, shuf: 1.8, slip: [2600, 2200, 1000], stopV: 1.5 },
       turbo: false,
       fuelCut: 1150, idleLd: [1400, 500],
       ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 16 }, popK: 1.4,
       flap: { s: [0.3, 0.2, 3000, 600, 4, 0.3, 0.7], c: [0.3, 2.2, 2400, 1600, 0.12, 0.7] },
       pipe: { DA: [3.3, 560], DB: [0.40, 470], SA: [0.40, 640], SB: [0.47, 640] },
-      snd: { modeG: [0.9, 1.05, 1.06], motor: 0.04, cyc: [0.03, 0.07], dec: [44, 32], fc: [320, 2900, 0.09],
-        rasp: [0.35, 0.65, 0.4, 0.95, 1.8, 0.07, 0.9, 2600], refl: [0.5, 0.14, 0.3, 0.24], muff: [300, 300],
+      snd: { modeG: [0.9, 1.05, 1.04], motor: 0.04, cyc: [0.03, 0.07], dec: [44, 32], fc: [320, 2900, 0.09],
+        rasp: [0.35, 0.65, 0.4, 0.95, 2.0, 0.07, 0.9, 2600], refl: [0.5, 0.14, 0.3, 0.24], muff: [300, 300],
         intake: [0.24, 0.004, 200, 560, 0.6], mech: [0.005, 0.04, 0.06, 0.3], ex: 0.32, side: 0.10, dc: 35 }
     };
     const f12 = {
@@ -297,7 +297,8 @@ class EngineCore {
         s.Tb = tb; s.T = tb + 0.08;
         this.ev('blip', from, to);
       } else {
-        s.Tb = 0; s.T = 0.2 + 0.035 * (from - to); if (s.T > 0.36) s.T = 0.36;
+        // kickdown-tid følger girkassen (Sport-oppgirtiden mot M4s 0,145 s): dobbeltclutch raskere, AMT tregere
+        s.Tb = 0; s.T = Math.min(0.2 + 0.035 * (from - to), 0.36) * (bx.hardT[1] / 0.145);
         this.ev('kick', from, to);
       }
     }
