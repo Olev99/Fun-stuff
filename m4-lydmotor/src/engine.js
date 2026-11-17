@@ -123,32 +123,33 @@ class EngineCore {
       gain: [1.0, 0.96, 1.04, 0.98, 1.03, 0.95, 1.02, 0.97, 1.04, 0.96, 1.01, 0.95], runner: v12run,
       idle: 720, redline: 7000,
       lim: { max: 7015, on: 6985, off: 6900, deny: 6950, period: 0.08, cut: 0.042, dip: 120 },
-      shift: shiftM4,
-      // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel er anslått
-      gears: [0, 3.08, 2.13, 1.62, 1.30, 1.08, 0.91, 0.78], fd: 3.46, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
+      shift: Object.assign({}, shiftM4, { upSK: 0.48 }), // kortere gir: deltgass skifter tidligere enn M4-kartet
+      // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel fra Car and Driver 2017 (én kilde; et forum oppgir 7. gir 0,675)
+      gears: [0, 3.29, 2.16, 1.61, 1.27, 1.03, 0.85, 0.70], fd: 3.73, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
       torque: [[1000, 360], [3000, 500], [5750, 620], [6750, 596]], tMin: 200, acc100: 3.9,
-      box: { hardT: [0.13, 0.13, 0.095], softT: [0.34, 0.44], manual: 0.08, shuf: 1.5, slip: [2600, 2200, 1000], stopV: 1.5 },
+      box: { hardT: [0.22, 0.18, 0.14], softT: [0.45, 0.55], manual: 0.08, shuf: 1.8, slip: [2600, 2200, 1000], stopV: 1.5 },
       turbo: false,
       fuelCut: 1150, idleLd: [1400, 500],
-      ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 16 }, popK: 1.25,
+      ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 16 }, popK: 1.4,
       flap: { s: [0.3, 0.2, 3000, 600, 4, 0.3, 0.7], c: [0.3, 2.2, 2400, 1600, 0.12, 0.7] },
       pipe: { DA: [3.3, 560], DB: [0.40, 470], SA: [0.40, 640], SB: [0.47, 640] },
-      snd: { modeG: [0.9, 1.05, 1.15], motor: 0.04, cyc: [0.03, 0.07], dec: [44, 32], fc: [320, 2900, 0.09],
-        rasp: [0.35, 0.65, 0.4, 0.95, 1.35, 0.07, 0.9, 2600], refl: [0.5, 0.14, 0.3, 0.24], muff: [300, 300],
+      snd: { modeG: [0.9, 1.05, 1.04], motor: 0.04, cyc: [0.03, 0.07], dec: [44, 32], fc: [320, 2900, 0.09],
+        rasp: [0.35, 0.65, 0.4, 0.95, 2.0, 0.07, 0.9, 2600], refl: [0.5, 0.14, 0.3, 0.24], muff: [300, 300],
         intake: [0.24, 0.004, 200, 560, 0.6], mech: [0.005, 0.04, 0.06, 0.3], ex: 0.32, side: 0.10, dc: 35 }
     };
     const f12 = {
       id: 'f12', name: 'Ferrari F12berlinetta', short: 'F12berlinetta',
       blurb: 'V12 på 6,3 liter uten turbo som drar til 8 700 o/min, sjutrinns dobbeltclutch med lynraske skift.',
       tach: { max: 10000, red: 8700, warn: 8200 },
-      // 65 graders V: med felles veivtapper blir tenningen 65/55 grader (antatt, ikke bekreftet for F140)
-      cyl: 12, fire: { order: amOrder, deg: [0, 65, 120, 185, 240, 305, 360, 425, 480, 545, 600, 665] }, bank: bankV,
+      // 65 graders V med felles veivtapper: tenning hver 65./55. grad (EngineLabs, Hagerty). Ferraris rekkefølge for 65-graders V12
+      // (FerrariLife) i Ferraris U-nummerering: 1-6 høyre bank forfra, 7 venstre bak ... 12 venstre foran. Samme som amOrder omnummerert.
+      cyl: 12, fire: { order: [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9], deg: [0, 65, 120, 185, 240, 305, 360, 425, 480, 545, 600, 665] }, bank: bankV,
       gain: v12gain, runner: v12run,
       idle: 950, redline: 8700,
       lim: { max: 8715, on: 8685, off: 8600, deny: 8650, period: 0.06, cut: 0.03, dip: 110 },
       shift: shiftM4,
-      // Getrag 7DCL750: utvekslinger og bakaksel er anslått
-      gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.44, wheel: 0.36, mass: 1730, grip: 9.6, vmax: 94.4,
+      // Getrag 7DCL750: utvekslinger og bakaksel 4,375 fra publiserte data (Car and Driver, supercars.net); 315/35 R20 bak
+      gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.38, wheel: 0.355, mass: 1705, grip: 9.6, vmax: 94.4,
       torque: [[1000, 380], [3000, 560], [6000, 690], [8250, 630]], tMin: 200, acc100: 3.1,
       box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000], stopV: 1.5 },
       turbo: false,
@@ -218,6 +219,8 @@ class EngineCore {
     this.fi = 0; this.ph = 0;
     const wr = this.v / (6.283185307179586 * this.wheelR) * 60 * this.finalDrive;
     this.gear = 1; while (this.gear < this.nG && wr * this.ratios[this.gear] > this.redline * 0.45) this.gear++;
+    // bilbytte i fart: start på hjulturtallet og hold giret litt, ellers sveiper et straks-oppskift fra tomgang
+    if (this.v > 0) { this.rpm = this.rpmS = this.rpmSPrev = Math.max(this.idle, wr * this.ratios[this.gear]); this.holdUp = 1; }
     if (this.impA) for (const b of [this.impA, this.impB, this.popA, this.popB, this.dlA, this.dlB, this.dsA, this.dsB]) b.fill(0);
     this.eA = 0; this.eB = 0; this.bA = 0; this.bB = 0; this.dcA = 0; this.dcB = 0;
     this.rlA = 0; this.rbA = 0; this.rlB = 0; this.rbB = 0;
@@ -319,7 +322,8 @@ class EngineCore {
         s.Tb = tb; s.T = tb + 0.08;
         this.ev('blip', from, to);
       } else {
-        s.Tb = 0; s.T = 0.2 + 0.035 * (from - to); if (s.T > 0.36) s.T = 0.36;
+        // kickdown-tid følger girkassen (Sport-oppgirtiden mot M4s 0,145 s): dobbeltclutch raskere, AMT tregere
+        s.Tb = 0; s.T = Math.min(0.2 + 0.035 * (from - to), 0.36) * (bx.hardT[1] / 0.145);
         this.ev('kick', from, to);
       }
     }
@@ -434,12 +438,12 @@ class EngineCore {
       } else if (s.coast) {
         if (s.t < s.Tb) {
           const p = s.t / s.Tb, q = p * p * (3 - 2 * p);
-          this.rpm = s.rpm0 + (geared * 1.028 - s.rpm0) * q;
+          this.rpm = s.rpm0 + (Math.max(geared, this.idle) * 1.028 - s.rpm0) * q;
           loadOv = s.hard ? (0.8 + 0.1 * m) * Math.min(1, p * 4) : 0.15;
           this.blipK = s.hard ? 1 : 0;
         } else {
           let p = (s.t - s.Tb) / 0.08; if (p > 1) p = 1; const q = p * p * (3 - 2 * p);
-          this.rpm = geared * (1 + 0.028 * (1 - q));
+          this.rpm = Math.max(geared, this.idle) * (1 + 0.028 * (1 - q));
           loadOv = s.hard ? (0.8 + 0.1 * m) * (1 - p) * (1 - p) : 0;
           if (!s.banged) {
             s.banged = true;
@@ -453,7 +457,7 @@ class EngineCore {
         }
       } else {
         let p = s.t / s.T; if (p > 1) p = 1; const q = p * p * (3 - 2 * p);
-        this.rpm = s.rpm0 + (geared - s.rpm0) * q;
+        this.rpm = s.rpm0 + (Math.max(geared, this.idle) - s.rpm0) * q; // tomgangsgulv: brått fartsfall midt i skiftet
         loadMul = 0.7;
       }
       if (s.t >= s.T) this.finishShift();

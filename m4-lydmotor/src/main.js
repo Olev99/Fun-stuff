@@ -376,7 +376,8 @@ registerProcessor('m4-engine', M4Proc);`;
     let t;
     if (v < 0.5) t = clamp(S.aF / 4, 0, 1);
     else if (aEff < -0.35) t = 0; // elbil: regenerering ved slipp = motorbrems
-    else t = Math.pow(clamp(1.3 * (aEff + aDrag) / aAvail, 0, 1), 0.8);
+    // +0.04: jevn fart (gass ~0.04-0.05) skal ligge godt over motorens slipp-terskel 0.05, ellers girjakt 2<->3 med sensorstøy
+    else t = Math.pow(clamp(1.3 * (aEff + aDrag) / aAvail + 0.04, 0, 1), 0.8);
     const b = v > 0.5 ? clamp((-S.aF - 2.0) / 5, 0, 1) : 0; // hardere enn vanlig regen regnes som brems
     if (!held) {
       S.thr += (t - S.thr) * Math.min(1, dt / (t > S.thr ? 0.03 : 0.08));
