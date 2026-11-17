@@ -386,6 +386,8 @@ class EngineCore {
     this.fi = 0; this.ph = 0;
     const wr = this.v / (6.283185307179586 * this.wheelR) * 60 * this.finalDrive;
     this.gear = 1; while (this.gear < this.nG && wr * this.ratios[this.gear] > this.redline * 0.45) this.gear++;
+    // bilbytte i fart: start på hjulturtallet og hold giret litt, ellers sveiper et straks-oppskift fra tomgang
+    if (this.v > 0) { this.rpm = this.rpmS = this.rpmSPrev = Math.max(this.idle, wr * this.ratios[this.gear]); this.holdUp = 1; }
     if (this.impA) for (const b of [this.impA, this.impB, this.popA, this.popB, this.dlA, this.dlB, this.dsA, this.dsB]) b.fill(0);
     this.eA = 0; this.eB = 0; this.bA = 0; this.bB = 0; this.dcA = 0; this.dcB = 0;
     this.rlA = 0; this.rbA = 0; this.rlB = 0; this.rbB = 0;
