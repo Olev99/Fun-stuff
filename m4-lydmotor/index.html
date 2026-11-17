@@ -602,12 +602,12 @@ class EngineCore {
       } else if (s.coast) {
         if (s.t < s.Tb) {
           const p = s.t / s.Tb, q = p * p * (3 - 2 * p);
-          this.rpm = s.rpm0 + (geared * 1.028 - s.rpm0) * q;
+          this.rpm = s.rpm0 + (Math.max(geared, this.idle) * 1.028 - s.rpm0) * q;
           loadOv = s.hard ? (0.8 + 0.1 * m) * Math.min(1, p * 4) : 0.15;
           this.blipK = s.hard ? 1 : 0;
         } else {
           let p = (s.t - s.Tb) / 0.08; if (p > 1) p = 1; const q = p * p * (3 - 2 * p);
-          this.rpm = geared * (1 + 0.028 * (1 - q));
+          this.rpm = Math.max(geared, this.idle) * (1 + 0.028 * (1 - q));
           loadOv = s.hard ? (0.8 + 0.1 * m) * (1 - p) * (1 - p) : 0;
           if (!s.banged) {
             s.banged = true;
@@ -621,7 +621,7 @@ class EngineCore {
         }
       } else {
         let p = s.t / s.T; if (p > 1) p = 1; const q = p * p * (3 - 2 * p);
-        this.rpm = s.rpm0 + (geared - s.rpm0) * q;
+        this.rpm = s.rpm0 + (Math.max(geared, this.idle) - s.rpm0) * q; // tomgangsgulv: brått fartsfall midt i skiftet
         loadMul = 0.7;
       }
       if (s.t >= s.T) this.finishShift();
