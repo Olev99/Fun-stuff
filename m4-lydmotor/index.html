@@ -352,7 +352,31 @@ class EngineCore {
         rasp: [0.3, 0.6, 0.45, 0.85, 1.05, 0.05, 0.75, 3300], refl: [0.44, 0.14, 0.26, 0.24], muff: [280, 300],
         intake: [0.28, 0.004, 230, 640, 0.6], mech: [0.005, 0.04, 0.06, 0.3], ex: 0.38, side: 0.10, dc: 35 }
     };
-    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12 };
+    // Porsche 991.2 GT3: boksersekser uten turbo, 1-6-2-4-3-5 hver 120. grad; bank A = 1-3, bank B = 4-6 (veksler bank hver tenning,
+    // hver bank får jevne 240 grader i sitt eget eksosløp). Motoren sitter bak, så rørene er korte og innsuget ligger nær kupeen.
+    const gt3 = {
+      id: 'gt3', name: 'Porsche 911 GT3 (991.2)', short: 'GT3',
+      blurb: 'Boksersekser på 4,0 liter uten turbo som skriker til 9 000 o/min, sjutrinns PDK med lynraske skift, hardt innsug og mekanisk knurr.',
+      tach: { max: 10000, red: 9000, warn: 8500 },
+      cyl: 6, fire: { order: [1, 6, 2, 4, 3, 5], deg: [0, 120, 240, 360, 480, 600] }, bank: [0, 0, 0, 1, 1, 1],
+      gain: [1.0, 0.985, 1.015, 0.99, 1.01, 0.985], runner: [0.00028, 0.00025, 0.00030, 0.00027, 0.00029, 0.00026],
+      idle: 750, redline: 9000,
+      lim: { max: 9015, on: 8985, off: 8900, deny: 8950, period: 0.055, cut: 0.028, dip: 110 },
+      shift: shiftM4,
+      // PDK (7 trinn): utvekslinger og bakaksel fra Porsches pressedata for 991.1 GT3 (antatt like for 991.2), 305/30 ZR 20 bak
+      gears: [0, 3.75, 2.38, 1.72, 1.34, 1.11, 0.96, 0.84], fd: 3.97, wheel: 0.338, mass: 1430, grip: 9.0, vmax: 88.3,
+      torque: [[1000, 250], [3000, 390], [6000, 460], [8250, 426]], tMin: 150, acc100: 3.4,
+      box: { hardT: [0.08, 0.065, 0.045], softT: [0.15, 0.22], manual: 0.03, shuf: 0.5, slip: [3200, 2400, 1000], stopV: 1.5 },
+      turbo: false,
+      fuelCut: 1300, idleLd: [1450, 500],
+      ovr: { k0: 3000, kR: 2800, o0: 2400, oR: 1600, mode: [0.05, 0.55, 0.8], decay: [0.7, 0.75, 1.0], rate: 10 }, popK: 0.6,
+      flap: { s: [0.5, 0.2, 5000, 900, 3, 0.2, 0.8], c: [0.4, 2.0, 3500, 2000, 0.06, 0.6] },
+      pipe: { DA: [1.6, 560], DB: [0.35, 480], SA: [0.30, 660], SB: [0.30, 660] },
+      snd: { modeG: [0.85, 1.0, 1.12], motor: 0.045, cyc: [0.02, 0.05], dec: [48, 30], fc: [400, 3400, 0.11],
+        rasp: [0.35, 0.65, 0.45, 1.0, 1.2, 0.05, 1.1, 3600], refl: [0.42, 0.14, 0.24, 0.24], muff: [300, 340],
+        intake: [0.36, 0.004, 260, 720, 0.55], mech: [0.007, 0.04, 0.01, 0.3], ex: 0.42, side: 0.10, dc: 30 }
+    };
+    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12, gt3: gt3 };
   }
 
   setProfile(p) {
