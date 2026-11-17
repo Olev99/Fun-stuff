@@ -358,6 +358,15 @@ if (require.main === module) {
     for (let t = 0; t < 12; t += dt) { const v = t < 8 ? Math.min(25, t * 4) : t < 9 ? 25 * (9 - t) : 0;
       s.e.msg({ k: 'drive', v, thr: t < 6 ? 0.5 : 0, brake: 0 }); s.e.render(s.bl, s.br, N); s.t += dt; }
     check('girvakt: brått fartsfall til stillstand ender i 1. gir på tomgang', s.e.gear === 1 && s.e.rpm < p.idle + 120, 'gir ' + s.e.gear + ' rpm ' + Math.round(s.e.rpm));
+    // turtallet skal aldri dykke under tomgang mens motoren går: rampe ned på 1 s og fall rett til 0, auto og manuell
+    let minR = 1e9; const info = [];
+    for (const auto of [true, false]) for (const inst of [false, true]) {
+      const z = new Sess({ auto }); z.e.msg({ k: 'mode', drive: true }); let mn = 1e9;
+      for (let t = 0; t < 12; t += dt) { const v = t < 8 ? Math.min(25, t * 4) : inst || t >= 9 ? 0 : 25 * (9 - t);
+        z.e.msg({ k: 'drive', v, thr: t < 6 ? 0.5 : 0, brake: 0 }); z.e.render(z.bl, z.br, N); if (t > 1) mn = Math.min(mn, z.e.rpm); }
+      minR = Math.min(minR, mn); info.push((auto ? 'auto' : 'man') + (inst ? ' brått' : ' rampe') + ' ' + Math.round(mn));
+    }
+    check('girvakt: turtallet under fartsfall til stillstand holder seg over ' + Math.round(p.idle * 0.95), minR >= p.idle * 0.95, info.join(', '));
     const c = new Sess(); c.run(0.5, 0).run(6, 0.7); const g0 = c.e.gear, t0 = c.t; c.run(8, 0);
     const tr = c.trace.filter((x) => x.t > t0 + 0.5 && x.v > 3), lo = Math.min(...tr.map((x) => x.rpm)), hi = Math.max(...tr.map((x) => x.rpm));
     check('girvakt: slipp og rull holder turtallet fornuftig (' + rr(1200) + '-' + rr(4700) + ')', lo > rr(1200) && hi < rr(4700),
