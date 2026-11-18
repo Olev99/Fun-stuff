@@ -188,7 +188,7 @@ function revReport(rv) {
     const got = [];
     for (const k of want.slice(1).concat(want[0])) { await q.selectOption('#car', k); await q.waitForTimeout(500); got.push(k + '=' + (await q.evaluate(() => window.__m4.st.tele.car + ' ' + document.querySelector('#carTag').textContent))); }
     check('side: bytte bil mens lyden går (motoren melder ny bil og navnet øverst skifter)', got.every((g) => { const [k, rest] = g.split('='); return rest.startsWith(k + ' '); }), got.join(' | '));
-    await q.selectOption('#car', 'gt3'); await q.waitForTimeout(400);
+    await q.selectOption('#car', process.env.SHOT_CAR || 'gt3'); await q.waitForTimeout(400);
     if (process.env.SHOT) await q.screenshot({ path: process.env.SHOT });
     await c2.close();
   }

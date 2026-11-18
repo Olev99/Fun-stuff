@@ -403,6 +403,38 @@ if (require.main === module) {
     check('støyete fart (GPS-trinn ±0.6 m/s + støy): ingen girjakt i jevn fart (<= 1 skift etter 15 s), ingen NaN/klipping', late.length <= 1 && st.bad === 0 && st.peak < 0.9,
       'skift etter 15 s: ' + late.length + ', gir ' + d.e.gear + ', rpm ' + Math.round(d.e.rpm) + ', peak ' + st.peak.toFixed(2));
   }
+  // ---- 9d. jevn fart med gassestimatet fra main.js (gassgulv +0.04, akselerasjonsstøy): ingen girjakt i noen modus ----
+  {
+    const dt = N / SR; let worst = 0; const info = [];
+    for (const m of [0, 1, 2]) for (const kmh of [30, 50, 70, 90, 110]) {
+      let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const gauss = () => { let q = 0; for (let i = 0; i < 6; i++) q += rnd(); return (q - 3) / 0.707; };
+      const v = kmh / 3.6, aDrag = 0.12 + 0.00026 * v * v, aAvail = Math.min(9.5, 344000 / (1750 * Math.max(v, 4)));
+      const est = (a) => Math.pow(Math.min(1, Math.max(0, 1.3 * (aDrag + a) / aAvail + 0.04)), 0.8); // som main.js
+      const s = new Sess({ exMode: m }); s.e.msg({ k: 'mode', drive: true });
+      let thr = 0.5, a = 0;
+      for (let t = 0; t < 45; t += dt) {
+        let tt = 0.5; if (t > v / 3) { a += (gauss() * 0.5 - a) * 0.3; tt = a < -0.35 ? 0 : est(a); }
+        thr += (tt - thr) * Math.min(1, dt / (tt > thr ? 0.03 : 0.08));
+        s.e.msg({ k: 'drive', v: Math.min(v, t * 3), thr, brake: 0 }); s.e.render(s.bl, s.br, N);
+      }
+      const n = s.ev.filter((x) => x.t > 15 && (x.k === 'up' || x.k === 'blip' || x.k === 'kick')).length;
+      worst = Math.max(worst, n); if (n) info.push('KSB'[m] + kmh + ': ' + n);
+    }
+    check('jevn fart 30-110 km/t med gassgulvet fra main.js og støy, alle modi: ingen girjakt (0 skift på 30 s)', worst === 0, info.join(', ') || '0 skift');
+  }
+  // ---- 9e. fritt turtall (kobling slurer på stillestående bil): stigning og fall følger profilens svinghjul ----
+  {
+    const s = new Sess(); s.run(1, 0); const r0 = s.e.rpm, t0 = s.t; let tUp = -1;
+    while (s.t < t0 + 1.5) { s.run(N / SR, 1, 1); if (tUp < 0 && s.e.rpm >= r0 + 1500) tUp = s.t - t0; }
+    const top = s.e.rpm, t1 = s.t; let tDn = -1;
+    while (s.t < t1 + 2) { s.run(N / SR, 0); if (tDn < 0 && s.e.rpm <= top - 1500) tDn = s.t - t1; }
+    const up = 1500 / tUp, dn = 1500 / tDn, rv = p.rev || [2500, 7500, 2600], eUp = 0.9 * (rv[0] + rv[1]), eDn = 0.9 * rv[2];
+    const toRed = (p.redline - p.idle) / up;
+    check('fritt turtall: stiger ca. ' + Math.round(eUp) + ' o/min/s og faller ca. ' + Math.round(eDn) + ' o/min/s (±25 %)' + (p.rev ? ', tomgang -> rødsone på <= 0,7 s' : ''),
+      Math.abs(up / eUp - 1) < 0.25 && Math.abs(dn / eDn - 1) < 0.25 && (!p.rev || toRed <= 0.7),
+      'stiger ' + Math.round(up) + ', faller ' + Math.round(dn) + ' o/min/s, tomgang -> rødsone tilsvarer ' + toRed.toFixed(2) + ' s');
+  }
   // ---- 10. alle eksosmodi + tomgang av ----
   {
     const lv = [];
@@ -478,8 +510,22 @@ if (require.main === module) {
       const h = bandRel(s.seg(1.5, 4), 1500, 6000, true); info.push(PROFS[id].short + ' ' + f1(h) + ' dB');
       if (id !== 'm4csl' && h > -15) ok = false;
       if (id === 'gt3' && h > -23.9) ok = false; // GT3: ventiltikk, men ikke mer sus enn den roligste V12-en (Vanquish S)
+      if ((id === 'lfa' || id === 'cgt') && h > -19) ok = false; // V10-ene: samme krav som V12 Vantage S
     }
-    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB', ok, info.join(', '));
+    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB, V10-ene under -19 dB', ok, info.join(', '));
+  }
+  if (all.lfa && all.cgt) { // V10-ene: Carrera GT (68/76 grader) skal ha tydelig mer 2,5. orden (bankrytme) enn den jevne LFA-en; LFA løfter 2. og 3. orden
+    const ord = (id) => {
+      Sess.prof = PROFS[id]; const s = new Sess({ auto: false }); s.run(0.5, 0).run(1.3, 1); s.shift(1); s.run(1.5, 1); s.shift(1); s.run(0.4, 0.2); s.shift(1); s.run(0.5, 0.2); s.run(8, 1);
+      const i = s.trace.findIndex((x) => x.gear === 4 && x.load > 0.9 && Math.abs(x.rpm - 6000) < 30), t = s.trace[i].t, rpm = s.trace[i].rpm;
+      const a = Math.round((t - 0.06) * SR), mid = s.L.slice(a, a + Math.round(0.12 * SR)).map((x, k) => x + s.R[a + k]); // midt (L+R): sidekanalen bærer bankforskjellen
+      const sp = spectrum(mid, 8192), o = (k) => linePow(sp, k * rpm / 60, Math.max(6, k * rpm / 60 * 0.03)), F = o(5);
+      return { o2: 10 * Math.log10(o(2) / F), o25: 10 * Math.log10(o(2.5) / F), o3: 10 * Math.log10(o(3) / F), o75: 10 * Math.log10(o(7.5) / F) };
+    };
+    const L = ord('lfa'), C = ord('cgt'), fm = (x) => '2.: ' + f1(x.o2) + ', 2,5.: ' + f1(x.o25) + ', 3.: ' + f1(x.o3) + ', 7,5.: ' + f1(x.o75) + ' dB';
+    check0('V10: ved 6 000 o/min (L+R) har Carrera GT >= 6 dB mer 2,5. orden enn LFA, og LFA har 2. og 3. orden innen 12 dB av tenningslinjen',
+      C.o25 - L.o25 >= 6 && L.o2 > -12 && L.o3 > -12, 'LFA ' + fm(L) + ' | Carrera GT ' + fm(C) + ' (mot tenningslinjen, 5. orden)');
+    Sess.prof = null;
   }
   for (const to of ids.filter((x) => x !== 'm4csl')) { // bytte bil midt i full gass: kort uttoning, ingen klikk, ny bil på tomgang i riktig gir
     Sess.prof = null; const s = new Sess({ auto: false }); s.run(0.5, 0).run(1.2, 1);

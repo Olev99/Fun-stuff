@@ -377,7 +377,63 @@ class EngineCore {
         rasp: [0.35, 0.65, 0.45, 1.0, 1.2, 0.05, 1.1, 3600], refl: [0.42, 0.14, 0.24, 0.24], muff: [300, 340],
         intake: [0.36, 0.004, 260, 720, 0.55], mech: [0.007, 0.04, 0.01, 0.3], ex: 0.42, side: 0.10, dc: 30 }
     };
-    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12, gt3: gt3 };
+    // V10-ene: rekkefølge 1-6-5-10-2-7-3-8-4-9 (vanlig V10-rekkefølge, ikke bekreftet for disse motorene), bank A = 1-5, bank B = 6-10,
+    // veksler bank hver tenning; 1/6, 5/10, 2/7, 3/8, 4/9 er par på samme rad. rev = [o/min/s fri turtallsøkning, + ved full gass, fall]
+    // (valgfritt; uten rev brukes 2500/7500/2600): svært lett svinghjul, tomgang -> rødsone på ca. 0,6 s.
+    const v10order = [1, 6, 5, 10, 2, 7, 3, 8, 4, 9], bank10 = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+    // Lexus LFA: 72 graders V10 med jevn tenning hver 72. grad. Gain følger tenningsplassen med periode 360 grader (fem tenninger), så
+    // 2. og 3. motororden løftes slik et kupéopptak viser (Yamahas lydkanaler fra innsuget, her innsugsresonatorer på 240 og 380 Hz);
+    // se CLAUDE.md.
+    const lfa = {
+      id: 'lfa', name: 'Lexus LFA', short: 'LFA',
+      blurb: 'V10 på 4,8 liter uten turbo, finslipt sammen med Yamaha, hyler rent til 9 000 o/min. Sekstrinns robotisert girkasse (ASG) og knivskarp gassrespons.',
+      tach: { max: 10000, red: 9000, warn: 8500 },
+      cyl: 10, fire: { order: v10order, deg: [0, 72, 144, 216, 288, 360, 432, 504, 576, 648] }, bank: bank10,
+      gain: [1.38, 0.69, 0.69, 1.12, 1.12, 0.69, 1.38, 1.12, 0.69, 1.12],
+      runner: [0.00028, 0.00026, 0.00029, 0.00027, 0.00028, 0.00027, 0.00029, 0.00026, 0.00028, 0.00027],
+      idle: 1000, redline: 9000,
+      // rødsone 9 000, drivstoffkutt 9 500 (Wikipedia, autoevolution)
+      lim: { max: 9515, on: 9485, off: 9400, deny: 9450, period: 0.05, cut: 0.025, dip: 120 },
+      shift: shiftM4, rev: [4000, 11500, 7000],
+      // ASG (Aisin SA6, én clutch): 3.231/2.188/1.609/1.233/0.970/0.795, bakaksel 3.417 x frontmellomgir 1.259 (Lexus); 305/30 ZR20 bak
+      gears: [0, 3.231, 2.188, 1.609, 1.233, 0.970, 0.795], fd: 4.302, wheel: 0.337, mass: 1480, grip: 9.0, vmax: 90.3,
+      torque: [[1000, 250], [3000, 370], [6800, 480], [8700, 452]], tMin: 150, acc100: 3.7,
+      box: { hardT: [0.2, 0.15, 0.15], softT: [0.4, 0.5], manual: 0.06, shuf: 1.4, slip: [3000, 2400, 1000], stopV: 1.5 },
+      turbo: false,
+      fuelCut: 1400, idleLd: [1750, 500],
+      ovr: { k0: 3000, kR: 2800, o0: 2400, oR: 1600, mode: [0.05, 0.9, 1.0], decay: [0.6, 0.75, 0.95], rate: 10 }, popK: 0.85,
+      flap: { s: [0.5, 0.2, 5000, 900, 3, 0.2, 0.8], c: [0.4, 2.0, 3500, 2000, 0.06, 0.6] },
+      pipe: { DA: [3.2, 560], DB: [0.40, 480], SA: [0.36, 660], SB: [0.36, 660] },
+      snd: { modeG: [0.85, 1.0, 1.04], motor: 0.065, cyc: [0.015, 0.04], dec: [50, 30], fc: [420, 3600, 0.1],
+        rasp: [0.3, 0.5, 0.3, 0.8, 1.5, 0.04, 0.8, 3200], refl: [0.42, 0.14, 0.24, 0.24], muff: [300, 320],
+        intake: [0.30, 0.004, 240, 380, 1.2], mech: [0.004, 0.035, 0.01, 0.25], ex: 0.40, side: 0.10, dc: 30 }
+    };
+    // Porsche Carrera GT: 68 graders V10 med felles veivtapper, tenning vekselvis 68/76 grader (autozine). Rått og mekanisk:
+    // mer syklusvariasjon og ulikhet mellom sylindrene, kort eksos (midtmotor), hard slipp, ingen ASG-utjevning.
+    const cgt = {
+      id: 'cgt', name: 'Porsche Carrera GT', short: 'Carrera GT',
+      blurb: 'V10 på 5,7 liter uten turbo med røtter i Le Mans, river til 8 400 o/min. Sekstrinns manuell med keramisk clutch (appen skifter selv): rått, metallisk hyl.',
+      tach: { max: 10000, red: 8400, warn: 7900 },
+      cyl: 10, fire: { order: v10order, deg: [0, 68, 144, 212, 288, 356, 432, 500, 576, 644] }, bank: bank10,
+      gain: [1.0, 0.95, 1.05, 0.97, 1.04, 0.96, 1.03, 0.94, 1.05, 0.98],
+      runner: [0.00030, 0.00024, 0.00033, 0.00026, 0.00031, 0.00025, 0.00032, 0.00027, 0.00029, 0.00034],
+      idle: 900, redline: 8400,
+      lim: { max: 8415, on: 8385, off: 8300, deny: 8350, period: 0.055, cut: 0.03, dip: 130 },
+      shift: shiftM4, rev: [3200, 9500, 6000],
+      // sekstrinns manuell: 3.20/1.87/1.36/1.07/0.90/0.75, bakaksel 4.44 (Porsches spesifikasjonsark); 335/30 ZR20 bak
+      gears: [0, 3.20, 1.87, 1.36, 1.07, 0.90, 0.75], fd: 4.44, wheel: 0.345, mass: 1380, grip: 8.5, vmax: 91.7,
+      torque: [[1000, 330], [3000, 480], [5750, 590], [8000, 537]], tMin: 180, acc100: 3.9,
+      box: { hardT: [0.2, 0.17, 0.15], softT: [0.36, 0.42], manual: 0.05, shuf: 1.6, slip: [3200, 2600, 1100], stopV: 1.5 },
+      turbo: false,
+      fuelCut: 1300, idleLd: [1600, 500],
+      ovr: { k0: 2600, kR: 2400, o0: 2000, oR: 1400, mode: [0.1, 0.85, 1.0], decay: [0.8, 0.9, 1.2], rate: 11 }, popK: 0.7,
+      flap: { s: [0.3, 0.2, 3000, 600, 6, 0.35, 0.65], c: [0.4, 2.0, 3500, 2000, 0.08, 0.6] },
+      pipe: { DA: [1.8, 560], DB: [0.50, 480], SA: [0.34, 660], SB: [0.38, 660] },
+      snd: { modeG: [0.8, 1.0, 1.05], motor: 0.045, cyc: [0.035, 0.07], dec: [44, 30], fc: [360, 3200, 0.1],
+        rasp: [0.4, 0.6, 0.3, 1.0, 2.2, 0.025, 0.9, 2900], refl: [0.32, 0.14, 0.26, 0.24], muff: [280, 300],
+        intake: [0.20, 0.004, 210, 560, 0.6], mech: [0.004, 0.035, 0.01, 0.3], ex: 0.42, side: 0.10, dc: 30 }
+    };
+    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12, gt3: gt3, lfa: lfa, cgt: cgt };
   }
 
   setProfile(p) {
@@ -662,7 +718,7 @@ class EngineCore {
         this.rpm += (geared - this.rpm) * (1 - Math.exp(-dt / 0.02));
       } else {
         this.locked = false;
-        const up = (2500 + 7500 * thr) * dt, dn = 2600 * dt;
+        const rv = pr.rev, up = (rv ? rv[0] + rv[1] * thr : 2500 + 7500 * thr) * dt, dn = (rv ? rv[2] : 2600) * dt;
         let d = tgt - this.rpm;
         if (d > up) d = up; else if (d < -dn) d = -dn;
         this.rpm += d * 0.9;
