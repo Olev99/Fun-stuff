@@ -259,7 +259,10 @@ if (require.main === module) {
     const tz = z.t; z.run(1, 0);
     const zd = dB(stats(z.seg(tz + 0.25, tz + 0.6)).rms / stats(z.seg(tz - 0.2, tz)).rms);
     check('slipp: grunnlyden (uten burble) faller > 12 dB', zd < -12, f1(zd) + ' dB');
-    check('slipp: med burble ligger overrun 4-16 dB under full gass', dB(a.rms / pre.rms) < -4 && dB(a.rms / pre.rms) > -16, f1(dB(a.rms / pre.rms)) + ' dB');
+    // V12-ene og GT3: opptak av seriebilene gir nesten ingen smell ved slipp, så de har svake smell (lav popK) og et roligere overrun
+    // (nedre grense -20 dB i stedet for -16); for alle biler må burble fortsatt løfte overrun minst 8 dB over overrun uten burble
+    const ovLo = ['vanqs', 'v12vs', 'f12', 'gt3'].includes(pid) ? -20 : -16, ovD = dB(a.rms / pre.rms);
+    check('slipp: med burble ligger overrun 4-' + (-ovLo) + ' dB under full gass, minst 8 dB over overrun uten burble', ovD < -4 && ovD > ovLo && ovD - zd >= 8, f1(ovD) + ' dB (uten burble ' + f1(zd) + ' dB)');
     // forventet antall følger bilens burble-mengde i Sport (M4 = 5)
     const minP = Math.max(2, Math.round(5 * Math.min(1, p.ovr.mode[1] * p.ovr.rate * p.popK / (0.8 * 13))));
     check('slipp: burble samlet tidlig (>=' + minP + ' smell første 1.5 s, færre senere)', p01 >= minP && p23 < p01 * 0.6, 'første 1.5 s: ' + p01 + ', 2.5-4 s: ' + p23);
