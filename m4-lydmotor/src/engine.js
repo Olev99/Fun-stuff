@@ -143,7 +143,9 @@ class EngineCore {
       tach: { max: 10000, red: 8700, warn: 8200 },
       // 65 graders V med felles veivtapper: tenning hver 65./55. grad (EngineLabs, Hagerty). Ferraris rekkefølge for 65-graders V12
       // (FerrariLife) i Ferraris U-nummerering: 1-6 høyre bank forfra, 7 venstre bak ... 12 venstre foran. Samme som amOrder omnummerert.
-      cyl: 12, fire: { order: [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9], deg: [0, 65, 120, 185, 240, 305, 360, 425, 480, 545, 600, 665] }, bank: bankV,
+      // Modellen bruker 62/58 i stedet for 65/55: med 65/55 lå 3. orden (halve tenningsfrekvensen) bare 6-12 dB under tenningslinjen,
+      // mens F12-opptak viser 13-20 dB (eksossamlerne jevner ut ujevnheten); 62/58 gir 14-20 dB.
+      cyl: 12, fire: { order: [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9], deg: [0, 62, 120, 182, 240, 302, 360, 422, 480, 542, 600, 662] }, bank: bankV,
       gain: v12gain, runner: v12run,
       idle: 950, redline: 8700,
       lim: { max: 8715, on: 8685, off: 8600, deny: 8650, period: 0.06, cut: 0.03, dip: 110 },
