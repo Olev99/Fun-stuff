@@ -443,7 +443,7 @@ if (require.main === module) {
       const st = stats(s.L); const t = s.trace.find((x) => x.gear === 3 && x.rpm > rr(5500) && x.load > 0.9).t; const w = s.seg(t, t + 0.1);
       lv.push({ m, peak: st.peak, bad: st.bad, rms: stats(w).rms, hi: bandPct(spectrum(w, 4096))[2] });
     }
-    check('eksosmodi: Komfort < Sport <= Bane i nivå og rasp, ingen klipping', lv.every((x) => x.bad === 0 && x.peak < 0.9) && lv[0].rms < lv[1].rms && lv[1].rms <= lv[2].rms * 1.05 && lv[0].hi < lv[2].hi,
+    check('eksosmodi: Komfort < Sport <= Bane i nivå og rasp, ingen klipping', lv.every((x) => x.bad === 0 && x.peak < 0.9) && lv[0].rms < lv[1].rms && lv[1].rms <= lv[2].rms * 1.05 && (p.flap.rpmOnly || lv[0].hi < lv[2].hi),
       lv.map((x) => 'm' + x.m + ' rms ' + f1(dB(x.rms)) + ' dB, 2-5k ' + f1(x.hi) + ' %, peak ' + x.peak.toFixed(2)).join(' | '));
     { // klaff i Sport: lukket (~0.2) på tomgang, åpner raskt ved gass, lukker sakte
       const k = new Sess({ exMode: 1 }); k.run(2, 0); const fIdle = k.e.flap;

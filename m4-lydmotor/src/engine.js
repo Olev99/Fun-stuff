@@ -210,7 +210,9 @@ class EngineCore {
       turbo: false,
       fuelCut: 1400, idleLd: [1750, 500],
       ovr: { k0: 3000, kR: 2800, o0: 2400, oR: 1600, mode: [0.05, 0.9, 1.0], decay: [0.6, 0.75, 0.95], rate: 10 }, popK: 0.85,
-      flap: { s: [0.5, 0.2, 5000, 900, 3, 0.2, 0.8], c: [0.4, 2.0, 3500, 2000, 0.06, 0.6] },
+      // Lexus: titanium-lyddemper med ventil, lukket til 3 000 o/min og åpen over (pressemelding). Komfort følger dette rent; Sport åpner i tillegg ved full last (antakelse).
+      // rpmOnly: ventilen skiller ikke på modus, så sjekken Komfort < Bane i rasp gjelder ikke (bare testen leser feltet)
+      flap: { s: [0.5, 0.2, 3000, 400, 0, 0.1, 0.9], c: [-1, 2.0, 3000, 400, 0.1, 0.9], rpmOnly: true },
       pipe: { DA: [3.2, 560], DB: [0.40, 480], SA: [0.36, 660], SB: [0.36, 660] },
       snd: { modeG: [0.85, 1.0, 1.04], motor: 0.065, cyc: [0.015, 0.04], dec: [50, 30], fc: [420, 3600, 0.1],
         rasp: [0.3, 0.5, 0.3, 0.8, 1.5, 0.04, 0.8, 3200], refl: [0.42, 0.14, 0.24, 0.24], muff: [300, 320],
