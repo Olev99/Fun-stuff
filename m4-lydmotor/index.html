@@ -281,8 +281,12 @@ class EngineCore {
     // muff = dempertopp [Hz, + Hz ved åpen klaff]; intake = [nivå, gulv, resonator 1 Hz, resonator 2 Hz, andel 1];
     // mech = [ventiltikk-nivå, + ved høyt turtall, støygulv, + ved høyt turtall]; ex = eksosnivå; side = stereobredde.
     // De tre V12-ene: sugemotor (ingen turbo), lavt støygulv på tomgang, 12 tenninger per 720 grader.
-    const v12gain = [1.0, 0.99, 1.01, 0.995, 1.005, 0.985, 1.005, 0.995, 1.01, 0.99, 1.0, 0.985];
-    const v12run = [0.00030, 0.00024, 0.00027, 0.00033, 0.00026, 0.00029, 0.00031, 0.00025, 0.00028, 0.00032, 0.00027, 0.00030];
+    // Gain per sylinder følger tenningsplassen j: 1 + 0,03 cos(2π·2j/12) + 0,05 cos(2π·4j/12 + 1), altså ±6,5 % uten bankledd (den ville
+    // løftet 3. orden). Det løfter 1., 2., 4. og 5. orden til ca. -15 til -30 dB av tenningslinjen, som i V12-opptak (før -30 til -45).
+    // Runner-spredningen er doblet (±0,09 ms). Brukes av F12 (samme mønster fordi Ferraris rekkefølge er Astons omnummerert); Vanquish S
+    // og V12 Vantage S har egne varianter av samme formel.
+    const v12gain = [1.057, 1.008, 0.935, 0.935, 1.008, 1.057, 0.965, 0.997, 1.038, 1.038, 0.997, 0.965];
+    const v12run = [0.000315, 0.000195, 0.000255, 0.000375, 0.000235, 0.000295, 0.000335, 0.000215, 0.000275, 0.000355, 0.000255, 0.000315];
     // Aston/BMW-nummerering: bank A = 1-6, bank B = 7-12; 1-7-5-11-3-9-6-12-2-8-4-10, veksler bank hver tenning
     const amOrder = [1, 7, 5, 11, 3, 9, 6, 12, 2, 8, 4, 10], bankV = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
     const even12 = [0, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660];
@@ -290,7 +294,9 @@ class EngineCore {
       id: 'vanqs', name: 'Aston Martin Vanquish S', short: 'Vanquish S',
       blurb: 'V12 på 5,9 liter uten turbo, åttetrinns automat, lang og rund eksos. Kultivert grand tourer.',
       tach: { max: 8000, red: 7000, warn: 6500 },
-      cyl: 12, fire: { order: amOrder, deg: even12 }, bank: bankV, gain: v12gain, runner: v12run,
+      // 0,035/0,03: mindre 2. orden enn v12gain, ellers havner den (23 Hz ved 700 o/min) under 25 Hz på tomgang
+      cyl: 12, fire: { order: amOrder, deg: even12 }, bank: bankV,
+      gain: [1.051, 0.996, 0.953, 0.953, 0.996, 1.051, 0.988, 0.981, 1.031, 1.031, 0.981, 0.988], runner: v12run,
       idle: 700, redline: 7000,
       lim: { max: 7015, on: 6985, off: 6920, deny: 6950, period: 0.07, cut: 0.032, dip: 90 },
       shift: shiftM4,
@@ -312,7 +318,8 @@ class EngineCore {
       blurb: 'Samme V12-familie i en kortere, rå bil: kort eksos, aggressive klaffer, robotisert sjutrinns og mye knitring.',
       tach: { max: 8000, red: 7000, warn: 6500 },
       cyl: 12, fire: { order: amOrder, deg: even12 }, bank: bankV,
-      gain: [1.0, 0.96, 1.04, 0.98, 1.03, 0.95, 1.02, 0.97, 1.04, 0.96, 1.01, 0.95], runner: v12run,
+      // samme formel, mer 1./5. orden (0,045/0,04, fase 0,5): ±8 %
+      gain: [1.08, 0.977, 0.943, 0.943, 0.977, 1.08, 0.988, 0.99, 1.022, 1.022, 0.99, 0.988], runner: v12run,
       idle: 720, redline: 7000,
       lim: { max: 7015, on: 6985, off: 6900, deny: 6950, period: 0.08, cut: 0.042, dip: 120 },
       shift: Object.assign({}, shiftM4, { upSK: 0.48 }), // kortere gir: deltgass skifter tidligere enn M4-kartet
