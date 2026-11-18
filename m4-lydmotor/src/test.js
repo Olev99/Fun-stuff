@@ -197,13 +197,16 @@ if (require.main === module) {
     const kmh100 = s.trace.find((x) => x.v * 3.6 >= 100), kmh200 = s.trace.find((x) => x.v * 3.6 >= 200);
     check('WOT: 0-100 km/t ' + f1(p.acc100 - 0.4) + '-' + f1(p.acc100 + 1) + ' s', kmh100 && kmh100.t - 1 > p.acc100 - 0.4 && kmh100.t - 1 < p.acc100 + 1, kmh100 ? f1(kmh100.t - 1) + ' s; 0-200: ' + (kmh200 ? f1(kmh200.t - 1) + ' s' : '-') : 'nådde ikke');
     // oppgir-turtall og fall
-    let okTraj = true; const info = [];
+    // forventet = neste girs turtall ved samme fart som målingen (bilen akselererer videre når skiftet ikke kutter helt, box.cut);
+    // landetid 200 ms, eller lenger når girkassen med vilje glir sakte (Sport-oppgirtid > 0,21 s, Vanquish S sin ZF)
+    let okTraj = true; const info = [], tLand = Math.max(0.2, p.box.hardT[1] * 0.85 + 0.02);
+    const vAt = (t) => s.trace[Math.min(s.trace.length - 1, Math.max(0, Math.round(t * SR / N)))].v;
     for (const u of ups.slice(0, 5)) {
-      const r0 = s.rpmAt(u.t - 0.01), r1 = s.rpmAt(u.t + 0.2), exp = r0 * s.e.ratios[u.b] / s.e.ratios[u.a];
+      const r0 = s.rpmAt(u.t - 0.01), r1 = s.rpmAt(u.t + tLand), exp = r0 * s.e.ratios[u.b] / s.e.ratios[u.a] * vAt(u.t + tLand) / vAt(u.t - 0.01);
       info.push(Math.round(r0) + '>' + Math.round(r1) + ' (forv. ' + Math.round(exp) + ')');
       if (r0 < rr(6800) || Math.abs(r1 - exp) > rr(260)) okTraj = false;
     }
-    check('WOT-oppgir: skifter > ' + rr(6800) + ' og lander på neste girs turtall innen 200 ms', okTraj, info.join('; '));
+    check('WOT-oppgir: skifter > ' + rr(6800) + ' og lander på neste girs turtall innen ' + Math.round(tLand * 1000) + ' ms', okTraj, info.join('; '));
     // smell i skiftevinduet
     const popsShift = ups.slice(0, 5).map((u) => s.evs('pop', u.t, u.t + 0.25).length);
     check('WOT-oppgir: 1-4 smell per skift', popsShift.every((c) => c >= 1 && c <= 4), popsShift.join(','));
@@ -259,7 +262,10 @@ if (require.main === module) {
     const tz = z.t; z.run(1, 0);
     const zd = dB(stats(z.seg(tz + 0.25, tz + 0.6)).rms / stats(z.seg(tz - 0.2, tz)).rms);
     check('slipp: grunnlyden (uten burble) faller > 12 dB', zd < -12, f1(zd) + ' dB');
-    check('slipp: med burble ligger overrun 4-16 dB under full gass', dB(a.rms / pre.rms) < -4 && dB(a.rms / pre.rms) > -16, f1(dB(a.rms / pre.rms)) + ' dB');
+    // V12-ene og GT3: opptak av seriebilene gir nesten ingen smell ved slipp, så de har svake smell (lav popK) og et roligere overrun
+    // (nedre grense -20 dB i stedet for -16); for alle biler må burble fortsatt løfte overrun minst 8 dB over overrun uten burble
+    const ovLo = ['vanqs', 'v12vs', 'f12', 'gt3'].includes(pid) ? -20 : -16, ovD = dB(a.rms / pre.rms);
+    check('slipp: med burble ligger overrun 4-' + (-ovLo) + ' dB under full gass, minst 8 dB over overrun uten burble', ovD < -4 && ovD > ovLo && ovD - zd >= 8, f1(ovD) + ' dB (uten burble ' + f1(zd) + ' dB)');
     // forventet antall følger bilens burble-mengde i Sport (M4 = 5)
     const minP = Math.max(2, Math.round(5 * Math.min(1, p.ovr.mode[1] * p.ovr.rate * p.popK / (0.8 * 13))));
     check('slipp: burble samlet tidlig (>=' + minP + ' smell første 1.5 s, færre senere)', p01 >= minP && p23 < p01 * 0.6, 'første 1.5 s: ' + p01 + ', 2.5-4 s: ' + p23);
@@ -327,7 +333,9 @@ if (require.main === module) {
     const tr = s.trace.filter((x) => x.t > 3.5);
     const mx = Math.max(...tr.map((x) => x.rpm)), mn = Math.min(...tr.map((x) => x.rpm));
     const pops = s.evs('pop', 3.5).length;
-    check('sperre: holder ' + (p.lim.on - 180) + '-' + (p.lim.max + 5) + ' i 1. gir med flagring og smell', s.e.gear === 1 && mx <= p.lim.max + 5 && mn > p.lim.on - 230 && mx - mn > 60 && pops >= 5, 'rpm ' + Math.round(mn) + '-' + Math.round(mx) + ', smell/s ' + pops);
+    // lim.pop (myk sperre med færre smell, V12-ene og GT3): med vilje færre smell, så kravet er >= 2 i stedet for >= 5
+    const minLimP = p.lim.pop === undefined ? 5 : 2;
+    check('sperre: holder ' + (p.lim.on - 180) + '-' + (p.lim.max + 5) + ' i 1. gir med flagring og >= ' + minLimP + ' smell', s.e.gear === 1 && mx <= p.lim.max + 5 && mn > p.lim.on - 230 && mx - mn > 60 && pops >= minLimP, 'rpm ' + Math.round(mn) + '-' + Math.round(mx) + ', smell på 1,5 s ' + pops);
     const seg = s.seg(3.5, 5), env = []; for (let i = 0; i + 240 < seg.length; i += 240) env.push(stats(seg.slice(i, i + 240)).rms);
     const eMax = Math.max(...env), eMin = Math.min(...env);
     check('sperre: hørbar av/på-flagring (> 6 dB modulasjon)', dB(eMax / eMin) > 6, f1(dB(eMax / eMin)) + ' dB');
@@ -443,7 +451,7 @@ if (require.main === module) {
       const st = stats(s.L); const t = s.trace.find((x) => x.gear === 3 && x.rpm > rr(5500) && x.load > 0.9).t; const w = s.seg(t, t + 0.1);
       lv.push({ m, peak: st.peak, bad: st.bad, rms: stats(w).rms, hi: bandPct(spectrum(w, 4096))[2] });
     }
-    check('eksosmodi: Komfort < Sport <= Bane i nivå og rasp, ingen klipping', lv.every((x) => x.bad === 0 && x.peak < 0.9) && lv[0].rms < lv[1].rms && lv[1].rms <= lv[2].rms * 1.05 && lv[0].hi < lv[2].hi,
+    check('eksosmodi: Komfort < Sport <= Bane i nivå og rasp, ingen klipping', lv.every((x) => x.bad === 0 && x.peak < 0.9) && lv[0].rms < lv[1].rms && lv[1].rms <= lv[2].rms * 1.05 && (p.flap.rpmOnly || lv[0].hi < lv[2].hi),
       lv.map((x) => 'm' + x.m + ' rms ' + f1(dB(x.rms)) + ' dB, 2-5k ' + f1(x.hi) + ' %, peak ' + x.peak.toFixed(2)).join(' | '));
     { // klaff i Sport: lukket (~0.2) på tomgang, åpner raskt ved gass, lukker sakte
       const k = new Sess({ exMode: 1 }); k.run(2, 0); const fIdle = k.e.flap;
