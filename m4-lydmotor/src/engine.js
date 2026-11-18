@@ -162,7 +162,7 @@ class EngineCore {
       // Getrag 7DCL750: utvekslinger og bakaksel 4,375 fra publiserte data (Car and Driver, supercars.net); 315/35 R20 bak
       gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.38, wheel: 0.355, mass: 1705, grip: 9.6, vmax: 94.4,
       torque: [[1000, 380], [3000, 560], [6000, 690], [8250, 630]], tMin: 200, acc100: 3.1,
-      box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000], stopV: 1.5 },
+      box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000], stopV: 1.5, cut: 0.5 },
       turbo: false,
       fuelCut: 1350, idleLd: [1600, 500],
       ovr: { k0: 2800, kR: 2600, o0: 2200, oR: 1500, mode: [0.1, 0.8, 0.95], decay: [0.9, 0.9, 1.3], rate: 8 }, popK: 0.4,
@@ -186,7 +186,7 @@ class EngineCore {
       // PDK (7 trinn): utvekslinger og bakaksel fra Porsches pressedata for 991.1 GT3 (antatt like for 991.2), 305/30 ZR 20 bak
       gears: [0, 3.75, 2.38, 1.72, 1.34, 1.11, 0.96, 0.84], fd: 3.97, wheel: 0.338, mass: 1430, grip: 9.0, vmax: 88.3,
       torque: [[1000, 250], [3000, 390], [6000, 460], [8250, 426]], tMin: 150, acc100: 3.4,
-      box: { hardT: [0.08, 0.065, 0.045], softT: [0.15, 0.22], manual: 0.03, shuf: 0.5, slip: [3200, 2400, 1000], stopV: 1.5 },
+      box: { hardT: [0.08, 0.065, 0.045], softT: [0.15, 0.22], manual: 0.03, shuf: 0.5, slip: [3200, 2400, 1000], stopV: 1.5, cut: 0.4 },
       turbo: false,
       fuelCut: 1300, idleLd: [1450, 500],
       ovr: { k0: 3000, kR: 2800, o0: 2400, oR: 1600, mode: [0.05, 0.7, 0.8], decay: [0.7, 0.75, 1.0], rate: 7 }, popK: 0.3,
@@ -499,7 +499,9 @@ class EngineCore {
         const Ts = s.T * 0.85; let p = s.t / Ts; if (p > 1) p = 1; const q = p * p * (3 - 2 * p);
         this.rpm = s.rpm0 + (Math.max(geared, this.idle) - s.rpm0) * q;
         if (s.hard) {
-          loadOv = 0;
+          // box.cut: hvor dypt tenningskuttet er (1 = helt kutt, som uten feltet); 0,4 lar 60 % av lasten stå (momentreduksjon)
+          const bc = pr.box.cut;
+          loadOv = bc === undefined ? 0 : (1 - bc) * s.thr0;
           if (!s.banged && s.t >= s.T - 0.012) { s.banged = true; if (this.burble > 0.05) this.addPop(0.45 + 0.45 * this.burble * (m === 2 ? 1 : 0.8), 0); }
         } else loadMul = 1 - (s.thr0 > 0.5 ? 0.75 : 0.55) * Math.sin(Math.PI * Math.min(1, s.t / s.T));
       } else if (s.coast) {

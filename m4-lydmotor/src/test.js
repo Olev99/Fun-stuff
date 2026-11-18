@@ -197,13 +197,16 @@ if (require.main === module) {
     const kmh100 = s.trace.find((x) => x.v * 3.6 >= 100), kmh200 = s.trace.find((x) => x.v * 3.6 >= 200);
     check('WOT: 0-100 km/t ' + f1(p.acc100 - 0.4) + '-' + f1(p.acc100 + 1) + ' s', kmh100 && kmh100.t - 1 > p.acc100 - 0.4 && kmh100.t - 1 < p.acc100 + 1, kmh100 ? f1(kmh100.t - 1) + ' s; 0-200: ' + (kmh200 ? f1(kmh200.t - 1) + ' s' : '-') : 'nådde ikke');
     // oppgir-turtall og fall
-    let okTraj = true; const info = [];
+    // forventet = neste girs turtall ved samme fart som målingen (bilen akselererer videre når skiftet ikke kutter helt, box.cut);
+    // landetid 200 ms, eller lenger når girkassen med vilje glir sakte (Sport-oppgirtid > 0,21 s, Vanquish S sin ZF)
+    let okTraj = true; const info = [], tLand = Math.max(0.2, p.box.hardT[1] * 0.85 + 0.02);
+    const vAt = (t) => s.trace[Math.min(s.trace.length - 1, Math.max(0, Math.round(t * SR / N)))].v;
     for (const u of ups.slice(0, 5)) {
-      const r0 = s.rpmAt(u.t - 0.01), r1 = s.rpmAt(u.t + 0.2), exp = r0 * s.e.ratios[u.b] / s.e.ratios[u.a];
+      const r0 = s.rpmAt(u.t - 0.01), r1 = s.rpmAt(u.t + tLand), exp = r0 * s.e.ratios[u.b] / s.e.ratios[u.a] * vAt(u.t + tLand) / vAt(u.t - 0.01);
       info.push(Math.round(r0) + '>' + Math.round(r1) + ' (forv. ' + Math.round(exp) + ')');
       if (r0 < rr(6800) || Math.abs(r1 - exp) > rr(260)) okTraj = false;
     }
-    check('WOT-oppgir: skifter > ' + rr(6800) + ' og lander på neste girs turtall innen 200 ms', okTraj, info.join('; '));
+    check('WOT-oppgir: skifter > ' + rr(6800) + ' og lander på neste girs turtall innen ' + Math.round(tLand * 1000) + ' ms', okTraj, info.join('; '));
     // smell i skiftevinduet
     const popsShift = ups.slice(0, 5).map((u) => s.evs('pop', u.t, u.t + 0.25).length);
     check('WOT-oppgir: 1-4 smell per skift', popsShift.every((c) => c >= 1 && c <= 4), popsShift.join(','));
