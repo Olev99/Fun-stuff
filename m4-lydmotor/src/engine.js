@@ -154,7 +154,7 @@ class EngineCore {
       // mens F12-opptak viser 13-20 dB (eksossamlerne jevner ut ujevnheten); 62/58 gir 14-20 dB.
       cyl: 12, fire: { order: [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9], deg: [0, 62, 120, 182, 240, 302, 360, 422, 480, 542, 600, 662] }, bank: bankV,
       gain: v12gain, runner: v12run,
-      idle: 950, redline: 8700,
+      idle: 1010, redline: 8700, // tomgang: to F12-opptak viser 1 010-1 050 o/min
       lim: { max: 8715, on: 8685, off: 8600, deny: 8650, period: 0.06, cut: 0.03, dip: 110 },
       shift: shiftM4,
       // Getrag 7DCL750: utvekslinger og bakaksel 4,375 fra publiserte data (Car and Driver, supercars.net); 315/35 R20 bak
