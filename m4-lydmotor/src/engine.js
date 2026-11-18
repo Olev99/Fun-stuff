@@ -111,9 +111,11 @@ class EngineCore {
       lim: { max: 7015, on: 6985, off: 6920, deny: 6950, period: 0.07, cut: 0.032, dip: 90 },
       shift: shiftM4,
       // ZF 8HP70 (Touchtronic III); utvekslinger og bakaksel er anslått, ikke bekreftet
-      gears: [0, 4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667], fd: 2.73, wheel: 0.345, mass: 1830, grip: 9.4, vmax: 90,
+      gears: [0, 4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667], fd: 2.73, wheel: 0.345, mass: 1830, grip: 8.5, vmax: 90,
       torque: [[1000, 380], [3000, 540], [5500, 630], [7000, 605]], tMin: 200, acc100: 3.5,
-      box: { hardT: [0.16, 0.16, 0.125], softT: [0.26, 0.36], manual: 0.06, shuf: 0.8, slip: [2300, 1900, 850], stopV: 1.5 },
+      // ZF-oppgir under last: ingen tenningskutt (cut 0), turtallet glir ned over ca. 0,3 s som i opptak (300-600 ms, nesten ingen
+      // nivådipp); kickdown like raskt som før (kick 0,16)
+      box: { hardT: [0.38, 0.38, 0.32], softT: [0.26, 0.36], manual: 0.06, shuf: 0.8, slip: [2300, 1900, 850], stopV: 1.5, cut: 0, kick: 0.16 },
       turbo: false,
       fuelCut: 1150, idleLd: [1350, 500],
       ovr: { k0: 2600, kR: 2200, o0: 2000, oR: 1300, mode: [0.05, 0.7, 0.8], decay: [0.8, 0.8, 1.2], rate: 6 }, popK: 0.3,
@@ -390,7 +392,8 @@ class EngineCore {
         this.ev('blip', from, to);
       } else {
         // kickdown-tid følger girkassen (Sport-oppgirtiden mot M4s 0,145 s): dobbeltclutch raskere, AMT tregere
-        s.Tb = 0; s.T = Math.min(0.2 + 0.035 * (from - to), 0.36) * (bx.hardT[1] / 0.145);
+        // box.kick (valgfri) erstatter Sport-oppgirtiden her, for en girkasse som glir sakte opp men girer raskt ned (Vanquish S)
+        s.Tb = 0; s.T = Math.min(0.2 + 0.035 * (from - to), 0.36) * ((bx.kick || bx.hardT[1]) / 0.145);
         this.ev('kick', from, to);
       }
     }
