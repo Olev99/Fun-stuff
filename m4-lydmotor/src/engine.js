@@ -108,7 +108,7 @@ class EngineCore {
       cyl: 12, fire: { order: amOrder, deg: even12 }, bank: bankV,
       gain: [1.051, 0.996, 0.953, 0.953, 0.996, 1.051, 0.988, 0.981, 1.031, 1.031, 0.981, 0.988], runner: v12run,
       idle: 700, redline: 7000,
-      lim: { max: 7015, on: 6985, off: 6920, deny: 6950, period: 0.07, cut: 0.032, dip: 90 },
+      lim: { max: 7015, on: 6985, off: 6920, deny: 6950, period: 0.07, cut: 0.032, dip: 90, pop: 0.25, keep: 0.4 },
       shift: shiftM4,
       // ZF 8HP70 (Touchtronic III); utvekslinger og bakaksel er anslått, ikke bekreftet
       gears: [0, 4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667], fd: 2.73, wheel: 0.345, mass: 1830, grip: 8.5, vmax: 90,
@@ -133,7 +133,7 @@ class EngineCore {
       // samme formel, mer 1./5. orden (0,045/0,04, fase 0,5): ±8 %
       gain: [1.08, 0.977, 0.943, 0.943, 0.977, 1.08, 0.988, 0.99, 1.022, 1.022, 0.99, 0.988], runner: v12run,
       idle: 720, redline: 7000,
-      lim: { max: 7015, on: 6985, off: 6900, deny: 6950, period: 0.08, cut: 0.042, dip: 120 },
+      lim: { max: 7015, on: 6985, off: 6900, deny: 6950, period: 0.08, cut: 0.042, dip: 120, pop: 0.3, keep: 0.4 },
       shift: Object.assign({}, shiftM4, { upSK: 0.48 }), // kortere gir: deltgass skifter tidligere enn M4-kartet
       // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel fra Car and Driver 2017 (én kilde; et forum oppgir 7. gir 0,675)
       gears: [0, 3.29, 2.16, 1.61, 1.27, 1.03, 0.85, 0.70], fd: 3.73, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
@@ -159,7 +159,7 @@ class EngineCore {
       cyl: 12, fire: { order: [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9], deg: [0, 62, 120, 182, 240, 302, 360, 422, 480, 542, 600, 662] }, bank: bankV,
       gain: v12gain, runner: v12run,
       idle: 1010, redline: 8700, // tomgang: to F12-opptak viser 1 010-1 050 o/min
-      lim: { max: 8715, on: 8685, off: 8600, deny: 8650, period: 0.06, cut: 0.03, dip: 110 },
+      lim: { max: 8715, on: 8685, off: 8600, deny: 8650, period: 0.06, cut: 0.03, dip: 110, pop: 0.2, keep: 0.4 },
       shift: shiftM4,
       // Getrag 7DCL750: utvekslinger og bakaksel 4,375 fra publiserte data (Car and Driver, supercars.net); 315/35 R20 bak
       gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.38, wheel: 0.355, mass: 1705, grip: 9.6, vmax: 94.4,
@@ -183,7 +183,7 @@ class EngineCore {
       cyl: 6, fire: { order: [1, 6, 2, 4, 3, 5], deg: [0, 120, 240, 360, 480, 600] }, bank: [0, 0, 0, 1, 1, 1],
       gain: [1.0, 0.985, 1.015, 0.99, 1.01, 0.985], runner: [0.00028, 0.00025, 0.00030, 0.00027, 0.00029, 0.00026],
       idle: 750, redline: 9000,
-      lim: { max: 9015, on: 8985, off: 8900, deny: 8950, period: 0.055, cut: 0.028, dip: 110 },
+      lim: { max: 9015, on: 8985, off: 8900, deny: 8950, period: 0.055, cut: 0.028, dip: 110, pop: 0.15, keep: 0.5 },
       shift: shiftM4,
       // PDK (7 trinn): utvekslinger og bakaksel fra Porsches pressedata for 991.1 GT3 (antatt like for 991.2), 305/30 ZR 20 bak
       gears: [0, 3.75, 2.38, 1.72, 1.34, 1.11, 0.96, 0.84], fd: 3.97, wheel: 0.338, mass: 1430, grip: 9.0, vmax: 88.3,
@@ -558,7 +558,8 @@ class EngineCore {
     if (this.limOn) {
       const ph = this.limT % lim.period;
       const cut = ph < lim.cut;
-      if (cut && !this.limCut && this.burble > 0.05 && m > 0) this.addPop(0.25 + 0.35 * this.burble * this.rnd(), 0.02);
+      // lim.pop (valgfri): sjanse for smell per kutt (uten feltet: hvert kutt, som før)
+      if (cut && !this.limCut && this.burble > 0.05 && m > 0 && (lim.pop === undefined || this.rnd() < lim.pop)) this.addPop(0.25 + 0.35 * this.burble * this.rnd(), 0.02);
       this.limCut = cut;
       this.limT += dt;
       if (!wantLim && this.rpm < lim.off) { this.limOn = false; this.limCut = false; }
@@ -573,7 +574,7 @@ class EngineCore {
     let L = fuelCut ? 0 : Math.max(this.thrS, idleLoad);
     if (loadOv >= 0) L = loadOv; else L *= loadMul;
     if (this.surgeT < 0.12) L *= 1.12;
-    if (this.limCut) L = 0;
+    if (this.limCut) L = lim.keep === undefined ? 0 : L * lim.keep; // lim.keep (valgfri): andel last som står igjen i kuttet (mykere sperre)
     this.load += (L - this.load) * (1 - Math.exp(-dt / 0.009));
     // nylig last (for overrun-styrke)
     this.recent += (this.load - this.recent) * (1 - Math.exp(-dt / (this.load > this.recent ? 0.12 : 0.6)));

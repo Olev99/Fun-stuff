@@ -333,7 +333,9 @@ if (require.main === module) {
     const tr = s.trace.filter((x) => x.t > 3.5);
     const mx = Math.max(...tr.map((x) => x.rpm)), mn = Math.min(...tr.map((x) => x.rpm));
     const pops = s.evs('pop', 3.5).length;
-    check('sperre: holder ' + (p.lim.on - 180) + '-' + (p.lim.max + 5) + ' i 1. gir med flagring og smell', s.e.gear === 1 && mx <= p.lim.max + 5 && mn > p.lim.on - 230 && mx - mn > 60 && pops >= 5, 'rpm ' + Math.round(mn) + '-' + Math.round(mx) + ', smell/s ' + pops);
+    // lim.pop (myk sperre med færre smell, V12-ene og GT3): med vilje færre smell, så kravet er >= 2 i stedet for >= 5
+    const minLimP = p.lim.pop === undefined ? 5 : 2;
+    check('sperre: holder ' + (p.lim.on - 180) + '-' + (p.lim.max + 5) + ' i 1. gir med flagring og >= ' + minLimP + ' smell', s.e.gear === 1 && mx <= p.lim.max + 5 && mn > p.lim.on - 230 && mx - mn > 60 && pops >= minLimP, 'rpm ' + Math.round(mn) + '-' + Math.round(mx) + ', smell på 1,5 s ' + pops);
     const seg = s.seg(3.5, 5), env = []; for (let i = 0; i + 240 < seg.length; i += 240) env.push(stats(seg.slice(i, i + 240)).rms);
     const eMax = Math.max(...env), eMin = Math.min(...env);
     check('sperre: hørbar av/på-flagring (> 6 dB modulasjon)', dB(eMax / eMin) > 6, f1(dB(eMax / eMin)) + ' dB');
