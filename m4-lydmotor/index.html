@@ -4,118 +4,303 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Lydmotor</title>
-<link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#07080a">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lydmotor">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
 <style>
+/* Designsystem «karbon og signal»: nesten svart karbon, hårfine kanter, én aksentfarge per bil (--acc, settes fra main.js).
+   Turtallssperre og varsler er alltid rød. Ingen eksterne skrifter: systemskrift, kursiv versaler for titler, tabelltall. */
 :root {
-  /* Layout: instrument cluster. Gauge on top, pedals below, paddles under that. */
-  --bg: #0a0c0f;
-  --panel: #12161b;
-  --line: #242c35;
-  --ink: #e9eef2;
-  --dim: #8794a0;
-  --accent: #47b4ff;
-  --hot: #ff4d3d;
-  --f-display: 'Oxanium', system-ui, sans-serif;
-  --f-body: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --bg: #07080a;
+  --panel: #111318;
+  --panel2: #0b0d10;
+  --line: rgba(255, 255, 255, .085);
+  --line2: rgba(255, 255, 255, .16);
+  --ink: #eef2f6;
+  --dim: #98a3b1;
+  --acc: #29b6ff;
+  --acc2: #8fd8ff;
+  --amber: #ffb020;
+  --red: #ff2d2d;
+  --ok: #34d17a;
+  --on-acc: #05070a;
+  --f-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --f-num: ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "Roboto Mono", Consolas, monospace;
+  --r: 10px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body {
-  height: 100%; margin: 0; background: var(--bg); color: var(--ink);
-  font-family: var(--f-body); font-size: 17px; overscroll-behavior: none;
+  min-height: 100%; margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--f-ui); font-size: 16px; overscroll-behavior: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+html { height: 100%; }
+body { height: 100%; overflow-x: hidden; }
+/* karbonvev + vignett, ett fast lag (tegnes én gang, ingen animasjon) */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--acc) 9%, transparent), transparent 60%),
+    radial-gradient(140% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, .75) 100%),
+    linear-gradient(27deg, #0c0d10 5px, transparent 5px) 0 5px,
+    linear-gradient(207deg, #0c0d10 5px, transparent 5px) 10px 0,
+    linear-gradient(27deg, #101216 5px, transparent 5px) 0 10px,
+    linear-gradient(207deg, #101216 5px, transparent 5px) 10px 5px,
+    linear-gradient(90deg, #0a0b0e 10px, transparent 10px),
+    linear-gradient(#0b0c0f 25%, #090a0c 25%, #090a0c 50%, transparent 50%, transparent 75%, #0d0e11 75%, #0d0e11),
+    var(--bg);
+  background-size: auto, auto, 20px 20px, 20px 20px, 20px 20px, 20px 20px, 20px 20px, 20px 20px, auto;
 }
 .app {
-  height: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px;
-  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  min-height: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
 }
+.ital { font-style: italic; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+
+/* ---------- topp ---------- */
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-h1 { font: 700 20px/1 var(--f-display); letter-spacing: .04em; margin: 0; text-wrap: balance; }
-.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand .mark { width: 38px; height: 38px; flex: none; }
+.mark .ma, .mark .mq { fill: var(--acc); }
+.mark .mw { fill: var(--amber); }
+.mark .mr { fill: var(--red); }
+.mark .md { fill: var(--red); opacity: .25; }
+.mark .mn { fill: #fff; }
+h1 { margin: 0; min-width: 0; font: italic 800 21px/1 var(--f-ui); letter-spacing: .08em; }
+h1 .car { display: block; color: var(--acc); font-size: 13px; letter-spacing: .14em; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* segmenterte «racing»-brytere */
+.seg {
+  display: flex; padding: 3px; gap: 3px; border-radius: var(--r); flex-shrink: 0;
+  background: linear-gradient(#07080a, #0d0f13); border: 1px solid var(--line);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .6);
+}
 .seg button {
-  font: 600 16px/1 var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--dim);
-  background: none; border: 0; padding: 10px 16px; min-height: 40px; cursor: pointer;
+  position: relative; font: italic 800 14px/1 var(--f-ui); letter-spacing: .1em; text-transform: uppercase; color: var(--dim);
+  background: none; border: 0; border-radius: 7px; padding: 0 14px; min-height: 44px; min-width: 44px; cursor: pointer;
+  transition: color .1s, background-color .1s;
 }
-.seg button[aria-pressed="true"] { color: var(--bg); background: var(--accent); }
-.gaugebox { flex: 1 1 auto; min-height: 190px; position: relative; }
+.seg button[aria-pressed="true"] {
+  color: var(--ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 26%, #15181d), color-mix(in srgb, var(--acc) 10%, #0f1115));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 0 1px color-mix(in srgb, var(--acc) 45%, transparent);
+}
+.seg button[aria-pressed="true"]::after, .btn.toggle[aria-pressed="true"]::after {
+  content: ""; position: absolute; left: 22%; right: 22%; bottom: 4px; height: 3px; border-radius: 2px;
+  background: var(--acc); box-shadow: 0 0 10px 1px var(--acc);
+}
+
+/* ---------- turteller ---------- */
+.gaugebox { flex: 1 1 auto; min-height: 230px; position: relative; }
 .gaugebox canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.status { font-size: 15px; white-space: nowrap; overflow: hidden; color: var(--dim); display: flex; justify-content: space-between; gap: 10px; min-height: 20px; }
-.status b { color: var(--ink); font-weight: 600; }
-.sys { font: 600 18px/1.2 var(--f-body); letter-spacing: .02em; color: var(--ink); min-height: 22px; }
-.sys .bad { color: var(--hot); }
-.pedals { display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px; height: clamp(150px, 28vh, 240px); }
+.status { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 18px; white-space: nowrap; overflow: hidden; }
+#stLat { font: 500 12px/1 var(--f-num); color: var(--dim); letter-spacing: .02em; }
+#stLat b { color: var(--ink); font-weight: 600; }
+.evt { color: var(--acc); font: italic 800 13px/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
+.sys { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 13px;
+  font: 600 12.5px/1 var(--f-ui); letter-spacing: .02em; color: var(--ink); white-space: nowrap;
+  background: rgba(255, 255, 255, .045); border: 1px solid var(--line);
+}
+.chip svg { width: 8px; height: 8px; flex: none; }
+.chip.ok svg { fill: var(--ok); filter: drop-shadow(0 0 3px var(--ok)); }
+.chip.warn svg { fill: var(--amber); filter: drop-shadow(0 0 3px var(--amber)); }
+.chip.bad { color: #ff8a8a; border-color: rgba(255, 45, 45, .35); background: rgba(255, 45, 45, .08); }
+.chip.bad svg { fill: var(--red); filter: drop-shadow(0 0 3px var(--red)); }
+
+/* ---------- flater og knapper ---------- */
+.pedal, .btn, .drivepanel, details {
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: linear-gradient(180deg, #16191f 0%, #0e1014 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 8px 20px rgba(0, 0, 0, .45);
+}
+.pedals { display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; height: clamp(130px, 22vh, 220px); }
 .pedal {
-  position: relative; border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
-  overflow: hidden; touch-action: none; display: flex; align-items: flex-end; justify-content: center; padding: 14px;
+  position: relative; overflow: hidden; touch-action: none; display: flex; align-items: flex-end; justify-content: center; padding: 12px;
+  transition: transform .1s ease-out, border-color .1s;
 }
-.pedal .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(to top, #1d6fa8, var(--accent)); opacity: .85; }
-.pedal.brake .fill { height: 0%; background: var(--hot); }
+/* skala på gasspedalen */
+.pedal.gas::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to top, transparent 0, transparent calc(25% - 1px), rgba(255, 255, 255, .06) calc(25% - 1px), rgba(255, 255, 255, .06) 25%);
+}
+.pedal .fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--acc) 28%, #000), var(--acc) 88%, var(--acc2));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55), 0 -6px 18px color-mix(in srgb, var(--acc) 45%, transparent);
+}
+.pedal.brake .fill { background: linear-gradient(to top, #5a0d0d, var(--red) 85%, #ff7a7a); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .5), 0 -6px 18px rgba(255, 45, 45, .45); }
 .pedal.brake.on .fill { height: 100%; }
-.pedal span { position: relative; font: 700 22px/1 var(--f-display); letter-spacing: .1em; z-index: 1; }
-.pedal small { position: absolute; top: 10px; left: 0; right: 0; text-align: center; color: var(--dim); font-size: 14px; z-index: 1; }
-.paddles { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 12px; }
-.btn {
-  font: 700 22px/1 var(--f-display); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 12px; min-height: 52px; cursor: pointer; touch-action: manipulation;
+.pedal.on { transform: scale(.985); border-color: var(--line2); }
+.pedal span { position: relative; z-index: 1; font: italic 800 22px/1 var(--f-ui); letter-spacing: .14em; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+.pedal small {
+  position: absolute; top: 9px; left: 50%; transform: translateX(-50%); z-index: 1; max-width: calc(100% - 12px);
+  padding: 4px 8px; border-radius: 6px; background: rgba(5, 7, 10, .62); color: #b4bfcc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font: 600 12px/1.2 var(--f-ui); letter-spacing: .05em; text-transform: uppercase;
 }
-.btn:active { background: #1b222a; }
-.btn.toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-.btn:focus-visible, .seg button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.drivepanel { display: none; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 14px; min-height: 150px; flex-direction: column; gap: 8px; font-size: 17px; }
-.drivepanel p { margin: 0; color: var(--dim); text-wrap: pretty; }
-.drivepanel dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; }
-.drivepanel dt { color: var(--dim); }
+.paddles { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 10px; }
+.btn {
+  position: relative; font: italic 800 20px/1 var(--f-ui); letter-spacing: .1em; color: var(--ink);
+  min-height: 52px; cursor: pointer; touch-action: manipulation; transition: transform .1s ease-out, filter .1s;
+}
+.btn:active { transform: scale(.97); filter: brightness(1.25); }
+.btn.pad { font-size: 26px; font-style: normal; font-weight: 700; }
+.btn.toggle[aria-pressed="true"] { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); }
+.btn:focus-visible, .seg button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, #start button:focus-visible {
+  outline: 2px solid var(--acc2); outline-offset: 2px;
+}
+.row2 { display: grid; grid-template-columns: 2.3fr 1fr; gap: 10px; }
+.seg.wide { width: 100%; }
+.seg.wide button { flex: 1; padding: 0 2px; min-height: 46px; font-size: 13px; letter-spacing: .06em; }
+.btn.tun { font-size: 14px; letter-spacing: .08em; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.tun::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #2a2f37; flex: none; }
+.btn.tun[aria-pressed="true"] { color: var(--on-acc); border-color: transparent; background: linear-gradient(180deg, var(--acc2), var(--acc)); box-shadow: 0 0 18px color-mix(in srgb, var(--acc) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.btn.tun[aria-pressed="true"]::before { background: var(--on-acc); }
+.btn.tun.auto-on { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 55%, transparent); }
+.btn.tun.auto-on::before { background: var(--acc); box-shadow: 0 0 8px var(--acc); }
+
+/* ---------- kjørepanel ---------- */
+.drivepanel { display: none; padding: 14px; flex-direction: column; gap: 10px; font-size: 16px; }
+.drivepanel p { margin: 0; color: var(--dim); line-height: 1.35; text-wrap: pretty; }
+.drivepanel .warn { color: var(--ink); }
+.drivepanel dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; }
+.drivepanel dt { color: var(--dim); font: italic 800 12px/1.6 var(--f-ui); letter-spacing: .1em; text-transform: uppercase; }
 .drivepanel dd { margin: 0; font-variant-numeric: tabular-nums; }
 body[data-mode="drive"] .pedals, body[data-mode="drive"] .paddles { display: none; }
 body[data-mode="drive"] .drivepanel { display: flex; }
-details { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 0 14px; }
-summary { padding: 12px 0; cursor: pointer; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); }
-.opts { display: grid; gap: 12px; padding-bottom: 14px; }
-.opts label { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 12px; }
-.opts input[type=range] { width: 100%; accent-color: var(--accent); }
-.opts .chk { display: flex; gap: 10px; align-items: center; }
-.opts .chk input { width: 22px; height: 22px; accent-color: var(--accent); }
-.hint { color: var(--dim); font-size: 15px; margin: 0 0 12px; text-wrap: pretty; }
-#start {
-  position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-  background: rgba(10, 12, 15, .94); padding: 24px; text-align: center;
+
+/* ---------- innstillinger ---------- */
+details { padding: 0 14px; }
+summary {
+  list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 46px; cursor: pointer;
+  font: italic 800 14px/1 var(--f-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
 }
-#start p { max-width: 34ch; color: var(--dim); margin: 0; text-wrap: balance; }
-#start button {
-  width: 100%;
-  font: 700 22px/1 var(--f-display); letter-spacing: .08em; color: var(--bg); background: var(--accent);
-  border: 0; border-radius: 14px; padding: 20px 20px; cursor: pointer;
+summary::-webkit-details-marker { display: none; }
+summary svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.4; transition: transform .15s; }
+details[open] summary { color: var(--ink); }
+details[open] summary svg { transform: rotate(180deg); }
+.opts { display: grid; gap: 12px; padding: 4px 0 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.opts label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; font-weight: 600; }
+.opts input[type=range] { width: 100%; min-height: 44px; accent-color: var(--acc); }
+.opts .chk { display: flex; gap: 12px; align-items: center; min-height: 44px; font-weight: 500; }
+.opts .chk span { flex: 1; }
+.opts .chk input { width: 22px; height: 22px; accent-color: var(--acc); flex: none; }
+.opts select {
+  width: 100%; min-height: 44px; font: 600 16px var(--f-ui); color: var(--ink); background: var(--panel2);
+  border: 1px solid var(--line2); border-radius: 8px; padding: 0 10px;
+}
+.opts .btn { font-size: 15px; }
+.hint { color: var(--dim); font-size: 14px; line-height: 1.4; margin: 0 0 4px; text-wrap: pretty; }
+
+/* ---------- startskjerm ---------- */
+#start {
+  position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  padding: max(24px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+  text-align: center; overflow-y: auto;
+  background:
+    radial-gradient(90% 55% at 50% 30%, color-mix(in srgb, var(--acc) 16%, transparent), transparent 70%),
+    radial-gradient(140% 100% at 50% 50%, transparent 50%, rgba(0, 0, 0, .8) 100%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .018) 0 3px, transparent 3px 6px),
+    var(--bg);
 }
 #start.hide { display: none; }
-@media (prefers-reduced-motion: no-preference) { .pedal .fill { transition: height 40ms linear; } }
+#start .mark { width: 112px; height: 112px; filter: drop-shadow(0 0 22px color-mix(in srgb, var(--acc) 45%, transparent)); }
+#start h1 { font-size: clamp(38px, 12vw, 58px); letter-spacing: .1em; margin: -4px 0 0; padding-right: .1em; }
+#start h1::after { content: ""; display: block; height: 3px; width: 64px; margin: 14px auto 0; background: linear-gradient(90deg, var(--acc), var(--amber), var(--red)); transform: skewX(-20deg); }
+#start p { max-width: 34ch; color: var(--dim); margin: 0; line-height: 1.4; text-wrap: balance; }
+#start p b { display: block; color: var(--acc); font: italic 800 19px/1.2 var(--f-ui); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+.startbtns { display: grid; gap: 12px; width: min(340px, 100%); }
+#start button {
+  position: relative; overflow: hidden; width: 100%; min-height: 60px; cursor: pointer;
+  font: italic 800 18px/1 var(--f-ui); letter-spacing: .1em; border-radius: var(--r); padding: 0 20px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: transform .1s ease-out, filter .1s;
+}
+#start button:active { transform: scale(.98); filter: brightness(1.15); }
+#start button svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: square; }
+#startDrive {
+  color: var(--on-acc); border: 0;
+  background: linear-gradient(100deg, var(--acc) 0%, var(--acc2) 100%);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--acc) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, .55);
+}
+#start button.sec { color: var(--ink); background: rgba(255, 255, 255, .03); border: 1px solid var(--line2); }
+#start small { color: var(--dim); font-size: 13px; max-width: 36ch; line-height: 1.4; text-wrap: pretty; }
+#start small svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; fill: var(--amber); }
 
-.evt { color: var(--accent); font: 600 15px/1 var(--f-display); letter-spacing: .04em; }
-.row2 { display: grid; grid-template-columns: 1.7fr 1fr; gap: 12px; }
-.seg.wide { width: 100%; }
-.seg.wide button { flex: 1; padding: 10px 4px; min-height: 48px; }
-.btn.tun { font-size: 17px; letter-spacing: .08em; }
-.btn.tun[aria-pressed="true"] { border-color: var(--accent); color: var(--bg); background: var(--accent); }
-.btn.tun.auto-on { border-color: var(--accent); color: var(--accent); }
-body[data-mode="drive"] .drivepanel { min-height: 0; }
-.drivepanel .warn { color: var(--ink); }
-.opts .chk span { flex: 1; }
-.opts select { width: 100%; min-height: 44px; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; }
-h1 .car { color: var(--accent); display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-header h1 { min-width: 0; }
-header .seg { flex-shrink: 0; }
-.startbtns { display: grid; gap: 14px; width: min(320px, 100%); }
-#start button.sec { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
-#start small { color: var(--dim); max-width: 36ch; text-wrap: pretty; }
+@media (prefers-reduced-motion: no-preference) {
+  .pedal .fill { transition: height 40ms linear; }
+  /* tynt lysglimt over hovedknappen, bare på startskjermen */
+  #startDrive::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .55), transparent);
+    transform: translateX(-120%) skewX(-20deg); animation: sweep 2.8s ease-in-out 0.6s infinite;
+  }
+  @keyframes sweep { 0% { transform: translateX(-120%) skewX(-20deg); } 45%, 100% { transform: translateX(320%) skewX(-20deg); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* ---------- små telefoner ---------- */
+@media (max-height: 700px) and (orientation: portrait) {
+  .app { gap: 8px; }
+  .gaugebox { min-height: 190px; }
+  .pedals { height: 118px; }
+  .btn { min-height: 48px; }
+  .seg.wide button { min-height: 44px; }
+  summary { min-height: 44px; }
+  #start { gap: 14px; }
+  #start .mark { width: 84px; height: 84px; }
+}
+@media (max-width: 370px) {
+  .seg.wide button { font-size: 12px; letter-spacing: .03em; }
+  .btn.tun { font-size: 12.5px; letter-spacing: .04em; gap: 6px; }
+}
+
+/* ---------- liggende (telefon i holder på tvers): turteller til venstre, betjening til høyre ---------- */
+@media (orientation: landscape) and (max-height: 560px) {
+  .app {
+    max-width: none; height: 100%; display: grid; gap: 8px 16px;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+  }
+  header { grid-column: 1; grid-row: 1; }
+  .gaugebox { grid-column: 1; grid-row: 2 / 5; min-height: 0; }
+  .status { grid-column: 1; grid-row: 5; }
+  .sys { grid-column: 1; grid-row: 6; min-height: 26px; }
+  .pedals { grid-column: 2; grid-row: 1 / 3; height: auto; min-height: 100px; }
+  .paddles { grid-column: 2; grid-row: 3; }
+  .drivepanel { grid-column: 2; grid-row: 1 / 4; overflow: auto; }
+  .row2 { grid-column: 2; grid-row: 4; }
+  details { grid-column: 2; grid-row: 5 / 7; align-self: end; }
+  details[open] { grid-column: 1 / -1; grid-row: 7; }
+  .btn { min-height: 46px; }
+  .seg.wide button { min-height: 44px; }
+  #start { flex-direction: row; flex-wrap: wrap; gap: 14px 28px; }
+  #start .hero { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #start .mark { width: 76px; height: 76px; }
+  #start .startcol { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+}
+.hero, .startcol { display: contents; }
+@media (orientation: landscape) and (max-height: 560px) { .hero, .startcol { display: flex; } }
 </style>
 </head>
 <body data-mode="test">
 <div class="app">
   <header>
-    <h1><span class="car" id="carTag">M4 CSL</span>LYDMOTOR</h1>
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ma" d="M10.6 54.1A29 29 0 0 1 5.7 46.8L13.9 43.0A20 20 0 0 0 17.3 48.0ZM4.7 44.4A29 29 0 0 1 3.0 35.8L12.0 35.4A20 20 0 0 0 13.2 41.3ZM3.0 33.2A29 29 0 0 1 4.7 24.6L13.2 27.7A20 20 0 0 0 12.0 33.6ZM5.7 22.2A29 29 0 0 1 10.6 14.9L17.3 21.0A20 20 0 0 0 13.9 26.0ZM12.4 13.1A29 29 0 0 1 19.7 8.2L23.5 16.4A20 20 0 0 0 18.5 19.8ZM22.1 7.2A29 29 0 0 1 30.7 5.5L31.1 14.5A20 20 0 0 0 25.2 15.7ZM33.3 5.5A29 29 0 0 1 41.9 7.2L38.8 15.7A20 20 0 0 0 32.9 14.5Z"/><path class="mw" d="M44.3 8.2A29 29 0 0 1 51.6 13.1L45.5 19.8A20 20 0 0 0 40.5 16.4ZM53.4 14.9A29 29 0 0 1 58.3 22.2L50.1 26.0A20 20 0 0 0 46.7 21.0Z"/><path class="mr" d="M59.3 24.6A29 29 0 0 1 61.0 33.2L52.0 33.6A20 20 0 0 0 50.8 27.7Z"/><path class="md" d="M61.0 35.8A29 29 0 0 1 59.3 44.4L50.8 41.3A20 20 0 0 0 52.0 35.4ZM58.3 46.8A29 29 0 0 1 53.4 54.1L46.7 48.0A20 20 0 0 0 50.1 43.0Z"/><path class="mq" d="M22.3 32.4h2.6v6.3h-2.6ZM26.5 29.6h2.6v11.7h-2.6ZM30.7 28.0h2.6v15.0h-2.6ZM34.9 30.9h2.6v9.3h-2.6ZM39.1 33.2h2.6v4.5h-2.6Z"/><path class="mn" d="M62.9 32.6L45.1 35.5L44.9 31.9Z"/></svg>
+      <h1 class="ital"><span class="car" id="carTag">M4 CSL</span>LYDMOTOR</h1>
+    </div>
     <div class="seg" role="group" aria-label="Modus">
       <button type="button" id="mTest" aria-pressed="true">Test</button>
       <button type="button" id="mDrive" aria-pressed="false">Kjør</button>
@@ -131,9 +316,9 @@ header .seg { flex-shrink: 0; }
     <div class="pedal gas" id="gas"><small>dra opp for mer gass</small><div class="fill" id="gasFill"></div><span>GASS</span></div>
   </div>
   <div class="paddles">
-    <button type="button" class="btn" id="dn" aria-label="Ned et gir">&minus;</button>
+    <button type="button" class="btn pad" id="dn" aria-label="Ned et gir">&minus;</button>
     <button type="button" class="btn toggle" id="auto" aria-pressed="true">AUTO</button>
-    <button type="button" class="btn" id="up" aria-label="Opp et gir">+</button>
+    <button type="button" class="btn pad" id="up" aria-label="Opp et gir">+</button>
   </div>
 
   <div class="drivepanel" id="drivePanel">
@@ -158,7 +343,7 @@ header .seg { flex-shrink: 0; }
   </div>
 
   <details>
-    <summary>Innstillinger</summary>
+    <summary>Innstillinger <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg></summary>
     <div class="opts">
       <label for="car">Bil <select id="car"></select></label>
       <label for="outp">Lydanlegg <select id="outp"></select></label>
@@ -173,20 +358,25 @@ header .seg { flex-shrink: 0; }
       <p class="hint">Bil: lyden er laget fra bunnen av (syntese, ingen opptak). Byttet skjer med en kort uttoning, og motoren starter på tomgang i girer som passer farten. Lydanlegg: «BMW i4 M50 Harman Kardon» gir full bass ned mot 25-30 Hz, mer diskant, mer luft til toppene og smalere stereo fordi bilen selv fordeler lyden på alle høyttalerne. «Standard» passer små høyttalere.</p>
       <p class="hint">Eksos: Komfort har lukkede klaffer og nesten ingen smell. Sport åpner klaffene i lave gir, ved mye gass og høyt turtall, og gir burble når du slipper gassen. Bane er høyest, med raskest skift.</p>
       <p class="hint">Tunnel: Knappen virker alltid. GPS-bortfall oppdager en tunnel først to til tre sekunder etter at signalet forsvinner, og kan slå feil under bruer og i parkeringshus. Kartoppslag vet om tunnelen før du kjører inn, men trenger mobilnett og sender posisjonen din til en åpen OpenStreetMap-tjener (overpass-api.de). Det er derfor av til du slår det på.</p>
-      <p class="hint">Kjøremodus trenger GPS og bevegelsessensor. Det virker bare når siden ligger på sin egen https-adresse og er åpnet i Safari, ikke inne i Claude-appen. Skjermen må være på hele turen.</p>
+      <p class="hint">Kjøremodus trenger GPS og bevegelsessensor. Det virker bare når siden ligger på sin egen https-adresse og er åpnet i Safari, ikke inne i Claude-appen. Skjermen må være på hele turen. Legg siden til på Hjem-skjermen (Del, Legg til på Hjem-skjerm) for å åpne den som en app.</p>
       <p class="hint">Tastatur: W eller pil opp for gass, mellomrom for brems, Q og E for gir, A for auto, T for tunnel.</p>
     </div>
   </details>
 </div>
 
 <div id="start">
-  <h1>LYDMOTOR</h1>
-  <p><b id="startCar">BMW M4 CSL</b>: <span id="startBlurb">Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.</span> Skru opp lyden før du starter. Bil velges under Innstillinger.</p>
-  <div class="startbtns">
-    <button type="button" id="startDrive">KJØR MED SENSORER</button>
-    <button type="button" id="startTest" class="sec">TEST MED PEDALER</button>
+  <div class="hero">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ma" d="M10.6 54.1A29 29 0 0 1 5.7 46.8L13.9 43.0A20 20 0 0 0 17.3 48.0ZM4.7 44.4A29 29 0 0 1 3.0 35.8L12.0 35.4A20 20 0 0 0 13.2 41.3ZM3.0 33.2A29 29 0 0 1 4.7 24.6L13.2 27.7A20 20 0 0 0 12.0 33.6ZM5.7 22.2A29 29 0 0 1 10.6 14.9L17.3 21.0A20 20 0 0 0 13.9 26.0ZM12.4 13.1A29 29 0 0 1 19.7 8.2L23.5 16.4A20 20 0 0 0 18.5 19.8ZM22.1 7.2A29 29 0 0 1 30.7 5.5L31.1 14.5A20 20 0 0 0 25.2 15.7ZM33.3 5.5A29 29 0 0 1 41.9 7.2L38.8 15.7A20 20 0 0 0 32.9 14.5Z"/><path class="mw" d="M44.3 8.2A29 29 0 0 1 51.6 13.1L45.5 19.8A20 20 0 0 0 40.5 16.4ZM53.4 14.9A29 29 0 0 1 58.3 22.2L50.1 26.0A20 20 0 0 0 46.7 21.0Z"/><path class="mr" d="M59.3 24.6A29 29 0 0 1 61.0 33.2L52.0 33.6A20 20 0 0 0 50.8 27.7Z"/><path class="md" d="M61.0 35.8A29 29 0 0 1 59.3 44.4L50.8 41.3A20 20 0 0 0 52.0 35.4ZM58.3 46.8A29 29 0 0 1 53.4 54.1L46.7 48.0A20 20 0 0 0 50.1 43.0Z"/><path class="mq" d="M22.3 32.4h2.6v6.3h-2.6ZM26.5 29.6h2.6v11.7h-2.6ZM30.7 28.0h2.6v15.0h-2.6ZM34.9 30.9h2.6v9.3h-2.6ZM39.1 33.2h2.6v4.5h-2.6Z"/><path class="mn" d="M62.9 32.6L45.1 35.5L44.9 31.9Z"/></svg>
+    <h1 class="ital">LYDMOTOR</h1>
   </div>
-  <small>Sett opp alt mens bilen står stille. Ikke betjen skjermen mens du kjører.</small>
+  <div class="startcol">
+    <p><b id="startCar">BMW M4 CSL</b><span id="startBlurb">Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.</span> Skru opp lyden før du starter. Bil velges under Innstillinger.</p>
+    <div class="startbtns">
+      <button type="button" id="startDrive">KJØR MED SENSORER <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M4 3l6 6-6 6M10 3l6 6-6 6"/></svg></button>
+      <button type="button" id="startTest" class="sec">TEST MED PEDALER</button>
+    </div>
+    <small><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l7.5 13.5H.5z M7.2 6h1.6v4.2H7.2z M7.2 11.2h1.6v1.6H7.2z" fill-rule="evenodd"/></svg>Sett opp alt mens bilen står stille. Ikke betjen skjermen mens du kjører.</small>
+  </div>
 </div>
 
 <script>
@@ -1077,9 +1267,13 @@ class EngineCore {
   'use strict';
   const $ = (s) => document.querySelector(s);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-  const css = getComputedStyle(document.documentElement);
-  const cv = (n) => css.getPropertyValue(n).trim();
-  const COL = { line: cv('--line'), ink: cv('--ink'), dim: cv('--dim'), accent: cv('--accent'), hot: cv('--hot'), disp: cv('--f-display') };
+  // Aksentfarge per bil: [aksent, varmere variant for glød]. Turtallssperren er alltid rød.
+  const ACCENTS = { m4csl: ['#29b6ff', '#8fd8ff'], vanqs: ['#2fd18b', '#8ff0bf'], v12vs: ['#ffb020', '#ffd27a'], f12: ['#ff2b2b', '#ff8a7a'],
+    gt3: ['#ffd60a', '#fff08a'], lfa: ['#ff5a1f', '#ffa07a'], cgt: ['#c4ccd8', '#ffffff'] };
+  const COL = { ink: '#eef2f6', dim: '#98a3b1', amber: '#ffb020', orange: '#ff6a1a', red: '#ff2d2d',
+    ui: getComputedStyle(document.documentElement).getPropertyValue('--f-ui').trim() || 'system-ui, sans-serif',
+    num: getComputedStyle(document.documentElement).getPropertyValue('--f-num').trim() || 'monospace' };
+  const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const st = { ctx: null, node: null, core: null, started: false, mode: 'test', auto: true, exMode: 1,
     thrPed: 0, thrKey: 0, brake: 0, keyGas: false,
@@ -1183,17 +1377,19 @@ class EngineCore {
       else if (now - st.resT > (st.resN > 5 ? 5000 : 1000)) { st.resT = now; st.resN++; resumeAudio(); }
       if (!st.wake && now - st.wakeT > 10000) wakeLock();
     }
-    const bad = (t) => '<span class="bad">' + t + '</span>';
+    // statusbrikker: grønn = ok, gul = venter/info, rød = feil
+    const chip = (k) => (t) => '<span class="chip ' + k + '"><svg viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4"/></svg>' + t + '</span>';
+    const ok = chip('ok'), warn = chip('warn'), bad = chip('bad');
     const parts = [
-      !navigator.wakeLock ? bad('Skjermlås støttes ikke') : st.wake ? 'Skjerm våken' : bad('Skjermen kan slukke'),
-      audioOk ? 'Lyd på' : bad(c.state === 'interrupted' ? 'Lyd avbrutt' : 'Lyd pauset')
+      !navigator.wakeLock ? bad('Skjermlås støttes ikke') : st.wake ? ok('Skjerm våken') : bad('Skjermen kan slukke'),
+      audioOk ? ok('Lyd på') : bad(c.state === 'interrupted' ? 'Lyd avbrutt' : 'Lyd pauset')
     ];
     if (S.on) {
       const age = now - S.lastGood;
-      parts.push(S.lastGood && age < 2500 ? 'GPS OK' : !S.gpsSeen ? bad('GPS venter') : bad('GPS borte'));
-      if (S.dir === 'R') parts.push('Rygger');
+      parts.push(S.lastGood && age < 2500 ? ok('GPS OK') : !S.gpsSeen ? warn('GPS venter') : bad('GPS borte'));
+      if (S.dir === 'R') parts.push(warn('Rygger'));
     }
-    const html = parts.join(' · ');
+    const html = parts.join(' ');
     if (html !== st.sys) { st.sys = html; $('#stSys').innerHTML = html; }
   }
 
@@ -1212,6 +1408,7 @@ class EngineCore {
     ctx.resume().catch(() => {});
     st.started = true;
     $('#start').classList.add('hide');
+    st.sweepT = reduceMotion ? 0 : performance.now(); // kort viserfeiing på turtelleren, bare visuelt
     let path = '';
     try {
       if (!ctx.audioWorklet) throw new Error('ingen worklet');
@@ -1283,6 +1480,8 @@ registerProcessor('m4-engine', M4Proc);`;
   // velgere for bil og lydanlegg; bytte underveis tones ut og inn i motoren (ca. 150 ms)
   function showCar() {
     const p = prof(); $('#carTag').textContent = p.short.toUpperCase(); $('#startCar').textContent = p.name; $('#startBlurb').textContent = p.blurb;
+    const a = ACCENTS[st.car] || ACCENTS.m4csl, rs = document.documentElement.style;
+    rs.setProperty('--acc', a[0]); rs.setProperty('--acc2', a[1]); COL.acc = a[0]; COL.acc2 = a[1];
   }
   for (const k in PROFS) $('#car').add(new Option(PROFS[k].name, k));
   for (const k in OUTS) $('#outp').add(new Option(OUTS[k].name, k));
@@ -1314,6 +1513,7 @@ registerProcessor('m4-engine', M4Proc);`;
     const thr = Math.max(st.thrPed, st.thrKey);
     send({ k: 'in', thr: thr, brake: st.brake });
     $('#gasFill').style.height = (thr * 100).toFixed(0) + '%';
+    $('#gas').classList.toggle('on', thr > 0);
   }
   function bindPedal(el, onDown, onUp) {
     el.addEventListener('pointerdown', (e) => { try { el.setPointerCapture(e.pointerId); } catch (x) {} onDown(e, el); e.preventDefault(); });
@@ -1360,7 +1560,7 @@ registerProcessor('m4-engine', M4Proc);`;
   function setMode(m) {
     st.mode = m; document.body.dataset.mode = m;
     $('#mTest').setAttribute('aria-pressed', String(m === 'test')); $('#mDrive').setAttribute('aria-pressed', String(m === 'drive'));
-    st.thrPed = 0; st.thrKey = 0; st.keyGas = false; st.brake = 0; $('#brake').classList.remove('on'); $('#gasFill').style.height = '0%';
+    st.thrPed = 0; st.thrKey = 0; st.keyGas = false; st.brake = 0; $('#brake').classList.remove('on'); $('#gas').classList.remove('on'); $('#gasFill').style.height = '0%';
     if (m === 'test') { st.tunGps = false; st.tunMap = false; applyTunnel(); }
     if (st.started) { send({ k: 'mode', drive: m === 'drive' }); pushCfg(); }
   }
@@ -1770,7 +1970,56 @@ registerProcessor('m4-engine', M4Proc);`;
   }
 
   // ---------- turteller ----------
+  // Det stillestående laget tegnes én gang per størrelse/bil/farge i et eget lerret; hvert bilde tegner bare
+  // tente segmenter, skiftelys, viser og tall (ingen shadowBlur).
   const cvs = $('#gauge');
+  let GL = null;
+  function gaugeLayer(w, h, dpr) {
+    const p = prof(), key = [w, h, dpr, st.car, COL.acc].join();
+    if (GL && GL.key === key) return GL;
+    const tc = p.tach, MAX = tc.max, red = tc.red, warn = tc.warn;
+    const ledH = clamp(h * 0.045, 9, 15), R = Math.max(30, Math.min((w - 8) / 2, (h - ledH - 16) / 1.9));
+    const top = Math.max(2, (h - (ledH + 12 + 1.9 * R)) / 2), cx = w / 2, cy = top + ledH + 12 + R;
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (r) => a0 + (a1 - a0) * r / MAX;
+    const segR = R * 0.875, segW = R * 0.12, gapA = Math.max(1.6, R * 0.012) / segR, step = 250, seg = [];
+    for (let r = 0; r < MAX; r += step) {
+      const col = r >= red ? COL.red : r >= warn ? COL.orange : r >= red * 0.7 ? COL.amber : COL.acc;
+      seg.push({ r0: r, a0: ang(r) + gapA / 2, a1: ang(r + step) - gapA / 2, col: col });
+    }
+    const n = 12, LW = Math.min(w - 8, R * 2.05), lg = Math.max(3, LW * 0.012), lw = (LW - lg * (n - 1)) / n, leds = [];
+    for (let i = 0; i < n; i++) leds.push({ x: cx - LW / 2 + i * (lw + lg), y: top, w: lw, h: ledH, k: ledH * 0.22 });
+    const c = document.createElement('canvas'); c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // skive
+    const fg = g.createRadialGradient(cx, cy - R * 0.2, R * 0.1, cx, cy, R);
+    fg.addColorStop(0, '#171a20'); fg.addColorStop(0.7, '#0d0f13'); fg.addColorStop(1, 'rgba(6,7,9,0.6)');
+    g.fillStyle = fg; g.beginPath(); g.arc(cx, cy, R * 0.99, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.10)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * 0.99, a0 - 0.08, a1 + 0.08); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.05)'; g.beginPath(); g.arc(cx, cy, R * 0.66, 0, Math.PI * 2); g.stroke();
+    // spor for segmentene
+    g.lineWidth = segW;
+    for (const s of seg) { g.strokeStyle = s.r0 >= red ? 'rgba(255,45,45,.26)' : '#1a1e25'; g.beginPath(); g.arc(cx, cy, segR, s.a0, s.a1); g.stroke(); }
+    // rødt felt innenfor sporet
+    g.strokeStyle = COL.red; g.lineWidth = Math.max(2, R * 0.018); g.beginPath(); g.arc(cx, cy, R * 0.79, ang(red), ang(MAX)); g.stroke();
+    // streker og tall
+    for (let r = 0; r <= MAX; r += 500) {
+      const maj = r % 1000 === 0, a = ang(r), r0 = R * (maj ? 0.715 : 0.75), r1 = R * 0.79, rz = r >= red;
+      g.strokeStyle = rz ? COL.red : maj ? 'rgba(235,240,246,.85)' : 'rgba(200,210,222,.45)'; g.lineWidth = maj ? Math.max(2, R * 0.016) : Math.max(1, R * 0.008);
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.stroke();
+      if (maj) {
+        g.fillStyle = rz ? COL.red : '#c9d1db'; g.font = 'italic 800 ' + Math.max(12, Math.round(R * 0.095)) + 'px ' + COL.ui;
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(r / 1000), cx + Math.cos(a) * R * 0.6, cy + Math.sin(a) * R * 0.6);
+      }
+    }
+    // skiftelys av
+    for (const d of leds) {
+      g.fillStyle = '#15181d'; g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(d.x + d.k, d.y); g.lineTo(d.x + d.w + d.k, d.y); g.lineTo(d.x + d.w - d.k, d.y + d.h); g.lineTo(d.x - d.k, d.y + d.h); g.closePath(); g.fill(); g.stroke();
+    }
+    GL = { key, cv: c, cx, cy, R, MAX, red, warn, ang, seg, segR, segW, leds };
+    return GL;
+  }
   function draw(ts) {
     requestAnimationFrame(draw);
     const target = st.keyGas ? 1 : 0;
@@ -1784,27 +2033,65 @@ registerProcessor('m4-engine', M4Proc);`;
     st.drawT = ts;
     const dpr = Math.min(window.devicePixelRatio || 1, 3), w = cvs.clientWidth, h = cvs.clientHeight;
     if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) { cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr); }
-    const g = cvs.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-    const cx = w / 2, cy = h / 2 + 2, R = Math.max(20, Math.min(w, h) / 2 - 14);
-    const tc = prof().tach, MAX = tc.max, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (r) => a0 + (a1 - a0) * r / MAX;
-    g.lineWidth = R * 0.085; g.lineCap = 'butt';
-    const arc = (r0, r1, col) => { g.beginPath(); g.arc(cx, cy, R, ang(r0), ang(r1)); g.strokeStyle = col; g.stroke(); };
-    arc(0, tc.red, COL.line); arc(tc.red, MAX, 'rgba(255,77,61,.35)');
-    const rp = clamp(st.rpmD, 0, MAX);
-    arc(0, Math.min(rp, tc.warn), COL.accent);
-    if (rp > tc.warn) arc(tc.warn, rp, COL.hot);
-    g.fillStyle = COL.dim; g.font = '600 ' + Math.max(12, R * 0.09) + 'px ' + COL.disp; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i <= MAX / 1000; i++) { const aa = ang(i * 1000), rr = R - R * 0.17; g.fillText(String(i), cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr); }
+    const g = cvs.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvs.width, cvs.height);
+    const L = gaugeLayer(w, h, dpr);
+    g.drawImage(L.cv, 0, 0); // stillestående lag: skive, segmentspor, streker og tall
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { cx, cy, R, MAX, red, ang, seg, segR, segW } = L;
+    // feiing ved start: 0 -> rødt felt -> tomgang (~0,9 s), bare visning
+    let rp = clamp(st.rpmD, 0, MAX);
+    const sw = st.sweepT ? (performance.now() - st.sweepT) / 900 : 2;
+    if (sw < 1) { const e = sw < 0.45 ? 1 - Math.pow(1 - sw / 0.45, 3) : 1 - (sw - 0.45) / 0.55; rp = sw < 0.45 ? e * red : rp + (red - rp) * e * e; }
+    else st.sweepT = 0;
+    // tente segmenter (fargen blir varmere mot det røde feltet) og en svak glød under
     const na = ang(rp);
-    g.strokeStyle = rp > tc.warn ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(cx + Math.cos(na) * R * 0.52, cy + Math.sin(na) * R * 0.52); g.lineTo(cx + Math.cos(na) * R * 0.72, cy + Math.sin(na) * R * 0.72); g.stroke();
-    g.fillStyle = t.shift ? COL.accent : t.lim ? COL.hot : COL.ink; g.font = '700 ' + R * 0.42 + 'px ' + COL.disp;
-    g.fillText(st.mode === 'drive' && S.dir === 'R' ? 'R' : String(t.gear), cx, cy - R * 0.02);
-    g.fillStyle = COL.dim; g.font = '600 ' + R * 0.12 + 'px ' + COL.disp;
-    g.fillText(Math.round(st.vD * 3.6) + ' km/t', cx, cy + R * 0.34);
-    g.font = '600 ' + R * 0.085 + 'px ' + COL.disp;
-    g.fillText(Math.round(rp / 10) * 10 + ' o/min', cx, cy + R * 0.5);
-    if (st.tunOn) { g.fillStyle = COL.accent; g.fillText('TUNNEL', cx, cy - R * 0.36); }
+    g.lineCap = 'butt';
+    if (rp > 0) {
+      g.globalAlpha = 0.16; g.lineWidth = segW * 2.2; g.strokeStyle = rp > L.warn ? COL.red : COL.acc;
+      g.beginPath(); g.arc(cx, cy, segR, ang(0), na); g.stroke(); g.globalAlpha = 1;
+    }
+    g.lineWidth = segW;
+    for (const s of seg) {
+      if (s.r0 >= rp) break;
+      g.strokeStyle = s.col; g.beginPath(); g.arc(cx, cy, segR, s.a0, Math.min(s.a1, na)); g.stroke();
+    }
+    // skiftelys: rad med LED-er over skiven, aksent -> gul -> rød, alle blinker ved sperren
+    const n = L.leds.length, s0 = red * 0.6, lit = clamp((rp - s0) / (red * 0.985 - s0), 0, 1) * n;
+    const flash = t.lim || rp >= red * 0.985, on = !flash || Math.floor(ts / 70) % 2 === 0;
+    for (let i = 0; i < n; i++) {
+      const d = L.leds[i], isOn = flash ? on : i < lit;
+      if (!isOn) continue;
+      const c = flash ? COL.red : i < n * 0.42 ? COL.acc : i < n * 0.75 ? COL.amber : COL.red;
+      g.fillStyle = c; g.globalAlpha = 0.28; g.fillRect(d.x - 3, d.y - 3, d.w + 6, d.h + 6);
+      g.globalAlpha = 1; g.beginPath(); g.moveTo(d.x + d.k, d.y); g.lineTo(d.x + d.w + d.k, d.y); g.lineTo(d.x + d.w - d.k, d.y + d.h); g.lineTo(d.x - d.k, d.y + d.h); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(d.x + d.k * 0.6, d.y + 1, d.w - 1, Math.max(1, d.h * 0.18));
+    }
+    // viser: spiss kile med myk glød
+    const hot = rp > L.warn, cs = Math.cos(na), sn = Math.sin(na), r0 = R * 0.47, r1 = R * 0.97, wd = Math.max(2.5, R * 0.028);
+    const blade = (k) => { g.beginPath(); g.moveTo(cx + cs * (r1 + k), cy + sn * (r1 + k)); g.lineTo(cx + cs * r0 - sn * wd * k, cy + sn * r0 + cs * wd * k); g.lineTo(cx + cs * r0 + sn * wd * k, cy + sn * r0 - cs * wd * k); g.fill(); };
+    g.fillStyle = hot ? COL.red : COL.acc; g.globalAlpha = 0.3; blade(2.6); g.globalAlpha = 1;
+    g.fillStyle = '#ffffff'; blade(1);
+    // midten: gir, fart, turtall
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    const gear = st.mode === 'drive' && S.dir === 'R' ? 'R' : String(t.gear);
+    g.fillStyle = t.lim ? COL.red : t.shift ? COL.acc2 : COL.ink;
+    g.font = 'italic 800 ' + Math.round(R * 0.5) + 'px ' + COL.ui;
+    g.fillText(gear, cx - R * 0.02, cy + R * 0.12);
+    g.fillStyle = COL.ink; g.font = '700 ' + Math.round(R * 0.16) + 'px ' + COL.num;
+    g.fillText(String(Math.round(st.vD * 3.6)), cx, cy + R * 0.38);
+    g.fillStyle = COL.dim; g.font = 'italic 800 ' + Math.max(12, Math.round(R * 0.065)) + 'px ' + COL.ui;
+    g.fillText('KM/T', cx, cy + R * 0.5);
+    g.fillStyle = hot ? COL.red : COL.ink; g.font = '600 ' + Math.max(12, Math.round(R * 0.085)) + 'px ' + COL.num;
+    g.fillText(String(Math.round(rp / 10) * 10).padStart(4, ' '), cx - R * 0.02, cy + R * 0.76);
+    g.fillStyle = COL.dim; g.font = 'italic 800 ' + Math.max(12, Math.round(R * 0.055)) + 'px ' + COL.ui;
+    g.fillText('O/MIN', cx, cy + R * 0.87);
+    // over giret: ×1000, eller TUNNEL-merke når klangen er på
+    g.font = 'italic 800 ' + Math.max(12, Math.round(R * (st.tunOn ? 0.06 : 0.05))) + 'px ' + COL.ui; g.textBaseline = 'middle';
+    if (st.tunOn) {
+      const tw = g.measureText('TUNNEL').width + 14, th = Math.max(17, R * 0.1), ty = cy - R * 0.37;
+      g.fillStyle = COL.acc; g.fillRect(cx - tw / 2, ty - th / 2, tw, th);
+      g.fillStyle = '#05070a'; g.fillText('TUNNEL', cx, ty + 1);
+    } else if (R > 110) { g.fillStyle = COL.dim; g.fillText('×1000', cx, cy - R * 0.36); }
     const evEl = $('#stEv'), show = performance.now() - st.evT < 1400 ? st.evText : '';
     if (evEl.textContent !== show) evEl.textContent = show;
   }
