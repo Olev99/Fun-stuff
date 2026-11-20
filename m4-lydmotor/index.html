@@ -415,14 +415,17 @@ class EngineCore {
 
   // ---------- utgangsprofiler (kupé-EQ, nivå, toppnivå, stereobredde) ----------
   // hp: DC-sperre Hz; hp2: ekstra 1.-ordens høypass Hz (0 = av); eq: topp [Hz, dB, Q]; lp: diskantavrulling Hz;
-  // pre: nivå før begrenser; lim: begrenserens tak (lineært); side: skalering av stereobredden.
+  // pre: nivå før begrenser; lim: begrenserens tak (lineært); side: skalering av stereobredden;
+  // lp2 (valgfri): ekstra 1.-ordens diskantavrulling Hz etter lp (0/mangler = av, så std er uendret).
   static outputs() {
     return {
       std: { id: 'std', name: 'Standard (liten høyttaler)', hp: 26, hp2: 0, eq: [105, 4, 0.9], lp: 7500, pre: 1, lim: 0.86, side: 1 },
       // BMW i4 M50 med Harman Kardon (16 høyttalere, 464 W): ekte bass ned mot 25-30 Hz, bilens DSP oppmikser stereo.
       // Ren bunn under 25 Hz (to høypass-ledd), vekt rundt 60 Hz, mer diskantrom, smalere stereo. Taket -5.5 dBFS gir
       // rom for tunnelklangen (ca. +2.5 dB) slik at toppene også i tunnel holder seg under -3 dBFS.
-      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, pre: 0.6, lim: 0.53, side: 0.6 }
+      // lp2 10 kHz: mot en 192 kHz-referanse hadde 48 kHz-utgangen 3-4 dB for mye over 8 kHz (speiling, én-polsfiltre nær Nyquist);
+      // andre pol gir ca. -2,5 dB der og koster 0,8 dB i 4-8 kHz.
+      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, lp2: 10000, pre: 0.6, lim: 0.53, side: 0.6 }
     };
   }
 
@@ -430,7 +433,7 @@ class EngineCore {
     const sr = this.sr; this.out = o;
     const A = Math.pow(10, o.eq[1] / 40), w0 = 2 * Math.PI * o.eq[0] / sr, al = Math.sin(w0) / (2 * o.eq[2]), c = Math.cos(w0), a0 = 1 + al / A;
     this.cb0 = (1 + al * A) / a0; this.cb1 = -2 * c / a0; this.cb2 = (1 - al * A) / a0; this.ca1 = -2 * c / a0; this.ca2 = (1 - al / A) / a0;
-    this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0; this.limEnv = 0;
+    this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0; this.tl2 = 0; this.limEnv = 0;
   }
 
   // ---------- bilprofiler (rene data, JSON-kopierbare) ----------
@@ -684,7 +687,7 @@ class EngineCore {
     this.wl = 0; this.wb = 0; this.bl = 0; this.bb = 0;
     this.wc = 1; this.ws = 0;
     this.th1 = 0; this.th2 = 0; this.thImp = 0;
-    this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0;
+    this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0; this.tl2 = 0;
     this.limEnv = 0;
     this.tele.car = this.pr.id;
   }
@@ -1092,6 +1095,7 @@ class EngineCore {
     const cw = P.cw, sw = P.sw, tA1 = this.tA1, tA2 = this.tA2, gTh = 0.3 * Math.sin(6.283185307179586 * 62 / sr);
     const O = this.out, khp = 1 - Math.exp(-6.283185307179586 * O.hp / sr), ktl = 1 - Math.exp(-6.283185307179586 * O.lp / sr);
     const khp2 = O.hp2 > 0 ? 1 - Math.exp(-6.283185307179586 * O.hp2 / sr) : 0, pre = O.pre;
+    const ktl2 = O.lp2 > 0 ? 1 - Math.exp(-6.283185307179586 * O.lp2 / sr) : 0;
     const cb0 = this.cb0, cb1 = this.cb1, cb2 = this.cb2, ca1 = this.ca1, ca2 = this.ca2;
     const gEx = X.ex, gSide = X.side * (0.4 + 0.6 * flap) * O.side, gPop = 1.1;
     const lrel = Math.exp(-1 / (sr * 0.07)), LIM = O.lim;
@@ -1111,7 +1115,7 @@ class EngineCore {
     let mcl = this.mcl, mcb = this.mcb, mechEnv = this.mechEnv;
     let wl = this.wl, wb = this.wb, bl = this.bl, bb = this.bb, wc = this.wc, ws = this.ws;
     let th1 = this.th1, th2 = this.th2;
-    let hp = this.hp, hp2 = this.hp2, cz1 = this.cz1, cz2 = this.cz2, tl = this.tl, limEnv = this.limEnv;
+    let hp = this.hp, hp2 = this.hp2, cz1 = this.cz1, cz2 = this.cz2, tl = this.tl, tl2 = this.tl2, limEnv = this.limEnv;
     let thImp = this.thImp; this.thImp = 0;
 
     for (let i = 0; i < n; i++) {
@@ -1188,11 +1192,12 @@ class EngineCore {
       if (khp2 > 0) { hp2 += khp2 * (sig - hp2); sig -= hp2; }
       const cy = cb0 * sig + cz1; cz1 = cb1 * sig - ca1 * cy + cz2; cz2 = cb2 * sig - ca2 * cy;
       tl += ktl * (cy - tl);
+      let ty = tl; if (ktl2 > 0) { tl2 += ktl2 * (tl - tl2); ty = tl2; } // lp2: andre pol mot speiling over 8 kHz
 
       // ---- stereo + begrenser ----
       sdLP += ko * ((yA - yB) - sdLP);
       const sd = sdLP * gSide * pre;
-      let l = tl + sd, r = tl - sd;
+      let l = ty + sd, r = ty - sd;
       let pk = l < 0 ? -l : l; const pr = r < 0 ? -r : r; if (pr > pk) pk = pr;
       // hylle som aldri faller under dagens topp, ellers kunne utgangen gå litt over taket (0,5301 mot 0,53)
       limEnv = limEnv * lrel; if (pk > limEnv) limEnv = pk;
@@ -1215,7 +1220,7 @@ class EngineCore {
     this.mcl = mcl; this.mcb = mcb; this.mechEnv = mechEnv;
     this.wl = wl; this.wb = wb; this.bl = bl; this.bb = bb; this.wc = wc; this.ws = ws;
     this.th1 = th1; this.th2 = th2;
-    this.hp = hp; this.hp2 = hp2; this.cz1 = cz1; this.cz2 = cz2; this.tl = tl; this.limEnv = limEnv;
+    this.hp = hp; this.hp2 = hp2; this.cz1 = cz1; this.cz2 = cz2; this.tl = tl; this.tl2 = tl2; this.limEnv = limEnv;
 
     this.teleT += dt;
     if (this.teleT >= 0.03) {
