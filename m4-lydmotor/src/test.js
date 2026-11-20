@@ -591,9 +591,10 @@ if (require.main === module) {
       let sd = 0, md = 0; for (let i = 48000; i < 480000; i++) { const a = s.L[i], b = s.R[i]; sd += (a - b) * (a - b); md += (a + b) * (a + b); }
       pk = Math.max(pk, st);
       info.push(PROFS[id].short + ': topp ' + f1(dB(st)) + ' dBFS (i tunnel ' + f1(dB(tp)) + ', mykklipp ' + (tc * 100).toFixed(2) + ' %), <25 Hz ' + f1(sub) + ' dB, >16 kHz ' + f1(hf) + ' dB, side/mid ' + f1(10 * Math.log10(sd / md)) + ' dB');
-      if (st > O.lim + 1e-6 || tp > 0.95 || tc > 0.005 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
+      // taket er eksakt (begrenserens hylle faller aldri under dagens topp): Float32-utgangen når høyst fround(lim)
+      if (st > Math.fround(O.lim) || tp > 0.95 || tc > 0.005 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
     }
-    check0('utgang i4 HK: topper <= -3 dBFS i verste fall uten tunnel (Bane, full burble, sperre), i tunnel < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
+    check0('utgang i4 HK: topper <= -3 dBFS i verste fall uten tunnel (Bane, full burble, sperre), i tunnel < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= Math.fround(O.lim), '\n      ' + info.join('\n      '));
     Sess.out = null; Sess.prof = null;
   }
   console.log(results.join('\n'));

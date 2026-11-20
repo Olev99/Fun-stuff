@@ -1194,7 +1194,8 @@ class EngineCore {
       const sd = sdLP * gSide * pre;
       let l = tl + sd, r = tl - sd;
       let pk = l < 0 ? -l : l; const pr = r < 0 ? -r : r; if (pr > pk) pk = pr;
-      limEnv = pk > limEnv ? pk : limEnv * lrel;
+      // hylle som aldri faller under dagens topp, ellers kunne utgangen gå litt over taket (0,5301 mot 0,53)
+      limEnv = limEnv * lrel; if (pk > limEnv) limEnv = pk;
       if (limEnv > LIM) { const g = LIM / limEnv; l *= g; r *= g; }
       if (xg !== xT) { xg += xg < xT ? xd : -xd; if (xg > 1) xg = 1; else if (xg < 0) xg = 0; }
       const og = outG * xg;
