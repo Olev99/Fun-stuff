@@ -423,8 +423,11 @@ class EngineCore {
     }
     // Stillstand/krypefart: alltid 1. gir (fartsfallet kan være for brått til at vanlig nedgiring rekker det)
     if (g > 1 && this.v < this.pr.box.stopV) { this.gear = 1; this.holdDn = 0; this.holdUp = 0.5; return; }
+    // Deltgass-terskler med hysterese mot gasstøy: oppgir regnes med den høyeste og nedgir med den laveste av gassen og den trege
+    // gassen (0,25 s), så korte topper og dropp ikke skifter. Jevn gass gir samme punkter som før.
+    const tU = Math.max(thr, this.thrSlow), tD = Math.min(thr, this.thrSlow);
     // Slipp (gass 0): hold turtallet oppe, som en Sport-gearkasse som gir ned under rulling
-    const dnR = (sport ? K.dnS : K.dnC) + thr * K.dnK + (thr < 0.05 ? (sport ? K.liftDnS : K.liftDnC) : 0);
+    const dnR = (sport ? K.dnS : K.dnC) + tD * K.dnK + (this.lift ? (sport ? K.liftDnS : K.liftDnC) : 0);
     const tipR = K.tip0 + K.tipK * thr;
     if (this.holdDn <= 0 && this.v > 1.5 && g > 1) {
       let tgt = g;
@@ -440,9 +443,9 @@ class EngineCore {
       if (tgt < g) { this.startShift(tgt, wr, false); return; }
     }
     if (g < this.nG && (this.holdUp <= 0 || rp > K.over) && brake < 0.1 && this.v > 1.5) {
-      let upR = m === 0 ? K.upC0 + K.upCK * Math.pow(thr, 1.5) : K.upS0 + K.upSK * Math.pow(thr, 1.25);
+      let upR = m === 0 ? K.upC0 + K.upCK * Math.pow(tU, 1.5) : K.upS0 + K.upSK * Math.pow(tU, 1.25);
       if (thr > 0.9 || upR > K.wot) upR = K.wot;
-      if (thr < 0.05) upR = this.liftT < (sport ? 3 : 1.2) ? 1e9 : (sport ? K.liftS : K.liftC);
+      if (thr < 0.05 || this.lift) upR = this.liftT < (sport ? 3 : 1.2) ? 1e9 : (sport ? K.liftS : K.liftC);
       const guard = Math.max(dnR, thr > 0.45 ? tipR : 0) + K.guard;
       if (rp > upR && wr * r[g + 1] > guard) this.startShift(g + 1, wr, false);
     }
@@ -463,7 +466,10 @@ class EngineCore {
     this.thrS += (thr - this.thrS) * (1 - Math.exp(-dt / (thr > this.thrS ? 0.022 : 0.04)));
     this.thrSlow += (thr - this.thrSlow) * (1 - Math.exp(-dt / 0.25));
     if (thr > 0.85 && this.thrSlow < 0.55) this.kickT = 0; else this.kickT += dt;
-    if (thr < 0.05) this.liftT += dt; else this.liftT = 0;
+    // slipp: gassen må ligge under 0,05 i 0,15 s før motoren regnes som sluppet (holderstøy rundt 0,05 ga ellers girjakt og falske
+    // smell); ut av slipp straks gassen går over 0,08. Gjelder overrun, drivstoffkutt, rullenedgir og burble.
+    if (thr < 0.05 || (this.liftT >= 0.15 && thr <= 0.08)) this.liftT += dt; else this.liftT = 0;
+    const lift = this.liftT >= 0.15; this.lift = lift;
     if (this.holdUp > 0) this.holdUp -= dt;
     if (this.holdDn > 0) this.holdDn -= dt;
     this.surgeT += dt; this.shufT += dt; this.startT += dt;
@@ -570,7 +576,7 @@ class EngineCore {
     const limDip = this.limOn ? lim.dip * ((this.limT % lim.period) / lim.period) : 0;
 
     // ---- last ----
-    const fuelCut = this.thrS < 0.03 && this.rpm > pr.fuelCut && this.locked && !s.active;
+    const fuelCut = this.thrS < 0.03 && lift && this.rpm > pr.fuelCut && this.locked && !s.active;
     let idleLoad = (pr.idleLd[0] - this.rpm) / pr.idleLd[1]; if (idleLoad > 1) idleLoad = 1; if (idleLoad < 0) idleLoad = 0;
     idleLoad = 0.10 * idleLoad + (this.startT < 1.2 ? 0.25 * (1 - this.startT / 1.2) : 0);
     let L = fuelCut ? 0 : Math.max(this.thrS, idleLoad);
@@ -583,7 +589,7 @@ class EngineCore {
 
     // ---- overrun: slipp av gassen ----
     const ov = pr.ovr, bMode = ov.mode[m];
-    if (L < 0.04 && this.recent > 0.25 && !s.active && this.liftT < 0.4 && this.liftT > 0) {
+    if (L < 0.04 && this.recent > 0.25 && !s.active && this.liftT < 0.4 && lift) {
       if (!this.lifted) {
         this.lifted = true;
         const k = Math.min(1, Math.max(0, (this.rpm - ov.k0) / ov.kR));
@@ -592,7 +598,7 @@ class EngineCore {
         if (this.ovr * this.burble * bMode > 0.15) { this.addPop(0.3 + 0.5 * this.ovr * this.burble, 0.03 + 0.04 * this.rnd()); }
         this.ev('lift', Math.round(this.rpm), Math.round(this.ovr * 100) / 100);
       }
-    } else if (thr > 0.06) this.lifted = false;
+    } else if (!lift) this.lifted = false;
     if (this.thrS > 0.08 && !s.active) this.ovr *= Math.exp(-dt / 0.03);
     this.ovr *= Math.exp(-dt / ov.decay[m]);
     let ovK = (this.rpm - ov.o0) / ov.oR; if (ovK < 0) ovK = 0; if (ovK > 1) ovK = 1;

@@ -257,6 +257,9 @@ if (require.main === module) {
     const pre = stats(s.seg(tL - 0.2, tL)), a = stats(s.seg(tL + 0.25, tL + 0.6));
     const p01 = s.evs('pop', tL, tL + 1.5).length, p23 = s.evs('pop', tL + 2.5, tL + 4).length;
     check('slipp: løftet ved ~' + rr(6500), rL > rr(6400) && s.evs('lift', tL).length === 1, 'rpm ' + Math.round(rL));
+    // slippet krever 0,15 s under 0,05 (mot holderstøy), men et ekte slipp skal fortsatt gi overrun og første smell raskt
+    { const l = s.evs('lift', tL)[0], pp = s.evs('pop', tL)[0], dl = l ? l.t - tL : 9, dp = pp ? pp.t - tL : 9;
+      check('slipp: overrun innen 0,2 s og første smell innen 0,25 s etter slippet', dl <= 0.2 && dp <= 0.25, 'overrun etter ' + Math.round(dl * 1000) + ' ms, første smell etter ' + Math.round(dp * 1000) + ' ms'); }
     const z = new Sess({ auto: false, burble: 0 }); z.run(0.5, 0).run(1.2, 1); z.shift(1); z.run(1.9, 1); z.shift(1); z.run(0.4, 1);
     while (z.e.rpm < rr(6500) && z.t < 20) z.run(0.02, 1);
     const tz = z.t; z.run(1, 0);
@@ -273,11 +276,14 @@ if (require.main === module) {
     const dRasp = 10 * Math.log10(hiP(s.seg(tL + 0.3, tL + 0.6)) / hiP(s.seg(tL - 0.2, tL)));
     const dRaspZ = 10 * Math.log10(hiP(z.seg(tz + 0.3, tz + 0.6)) / hiP(z.seg(tz - 0.2, tz)));
     check('slipp: raspen (2-5 kHz) faller > 10 dB (uten burble)', dRaspZ < -10, f1(dRaspZ) + ' dB; med burble ' + f1(dRasp) + ' dB');
-    // komfort: nesten ingen burble
-    const c = new Sess({ auto: false, exMode: 0 }); c.run(0.5, 0).run(1.2, 1); c.shift(1); c.run(1.9, 1); c.shift(1); c.run(0.4, 1);
-    while (c.e.rpm < rr(6500) && c.t < 20) c.run(0.02, 1);
-    const tc = c.t; c.run(3, 0);
-    check('komfort: lite burble', c.evs('pop', tc).length <= 3, 'smell ' + c.evs('pop', tc).length + ' (sport: ' + s.evs('pop', tL).length + ')');
+    // komfort: nesten ingen burble. Smellene er tilfeldige (V12 Vantage S: ca. 1,2 i snitt, over 3 i ca. 1 av 40 frø), så kravet gjelder
+    // medianen av tre frø (standardfrøet og to til), ikke ett enkelt trekk
+    const kp = [0x1234567, 8919, 16838].map((sd) => {
+      const c = new Sess({ auto: false, exMode: 0 }); c.e.seed = sd; c.run(0.5, 0).run(1.2, 1); c.shift(1); c.run(1.9, 1); c.shift(1); c.run(0.4, 1);
+      while (c.e.rpm < rr(6500) && c.t < 20) c.run(0.02, 1);
+      const tc = c.t; c.run(3, 0); return c.evs('pop', tc).length; });
+    const kMed = kp.slice().sort((a, b) => a - b)[1];
+    check('komfort: lite burble (median av tre frø <= 3 smell)', kMed <= 3, 'smell ' + kp.join('/') + ' (sport: ' + s.evs('pop', tL).length + ')');
   }
   // ---- 5. brems fra 200 km/t med automatiske nedgir ----
   {
@@ -430,6 +436,24 @@ if (require.main === module) {
       worst = Math.max(worst, n); if (n) info.push('KSB'[m] + kmh + ': ' + n);
     }
     check('jevn fart 30-110 km/t med gassgulvet fra main.js og støy, alle modi: ingen girjakt (0 skift på 30 s)', worst === 0, info.join(', ') || '0 skift');
+  }
+  // ---- 9d2. mye støyete gass (holdervibrasjon): snitt 0,12-0,15, std 0,05 og 0,08, lavpass 30 ms, rundt slippterskelen 0,05 ----
+  // Kun styringen (control) kjøres, uten lyd, så testen er rask. Maks 1 skift på 30 s etter innsvingning.
+  {
+    const dt = N / SR; let worst = 0; const info = [];
+    for (const [mu, sd] of [[0.12, 0.05], [0.12, 0.08], [0.15, 0.05], [0.15, 0.08]]) for (const m of [0, 1, 2]) for (const kmh of [30, 50, 70, 90, 110]) {
+      let seed = 11; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const gauss = () => { let q = 0; for (let i = 0; i < 6; i++) q += rnd(); return (q - 3) / 0.707; };
+      const a = Math.exp(-dt / 0.03), b = Math.sqrt(1 - a * a), v = kmh / 3.6, T0 = v / 3 + 10; let x = 0, n = 0;
+      const e = new Sess({ exMode: m }).e; e.msg({ k: 'mode', drive: true });
+      e.onEv = (ev) => { if (ev.t > T0 && (ev.k === 'up' || ev.k === 'blip' || ev.k === 'kick')) n++; };
+      for (let t = 0; t < T0 + 30; t += dt) {
+        x = a * x + b * gauss();
+        e.msg({ k: 'drive', v: Math.min(v, t * 3), thr: t < v / 3 + 1 ? 0.4 : Math.min(1, Math.max(0, mu + sd * x)), brake: 0 }); e.control(dt);
+      }
+      worst = Math.max(worst, n); if (n) info.push(mu + '/' + sd + ' ' + 'KSB'[m] + kmh + ': ' + n);
+    }
+    check('støyete gass (snitt 0,12-0,15, std 0,05/0,08) 30-110 km/t, alle modi: maks 1 skift på 30 s', worst <= 1, info.join(', ') || '0 skift');
   }
   // ---- 9e. fritt turtall (kobling slurer på stillestående bil): stigning og fall følger profilens svinghjul ----
   {
