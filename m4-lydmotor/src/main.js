@@ -2,9 +2,13 @@
   'use strict';
   const $ = (s) => document.querySelector(s);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-  const css = getComputedStyle(document.documentElement);
-  const cv = (n) => css.getPropertyValue(n).trim();
-  const COL = { line: cv('--line'), ink: cv('--ink'), dim: cv('--dim'), accent: cv('--accent'), hot: cv('--hot'), disp: cv('--f-display') };
+  // Aksentfarge per bil: [aksent, varmere variant for glød]. Turtallssperren er alltid rød.
+  const ACCENTS = { m4csl: ['#29b6ff', '#8fd8ff'], vanqs: ['#2fd18b', '#8ff0bf'], v12vs: ['#ffb020', '#ffd27a'], f12: ['#ff2b2b', '#ff8a7a'],
+    gt3: ['#ffd60a', '#fff08a'], lfa: ['#ff5a1f', '#ffa07a'], cgt: ['#c4ccd8', '#ffffff'] };
+  const COL = { ink: '#eef2f6', dim: '#98a3b1', amber: '#ffb020', orange: '#ff6a1a', red: '#ff2d2d',
+    ui: getComputedStyle(document.documentElement).getPropertyValue('--f-ui').trim() || 'system-ui, sans-serif',
+    num: getComputedStyle(document.documentElement).getPropertyValue('--f-num').trim() || 'monospace' };
+  const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   const st = { ctx: null, node: null, core: null, started: false, mode: 'test', auto: true, exMode: 1,
     thrPed: 0, thrKey: 0, brake: 0, keyGas: false,
@@ -108,17 +112,19 @@
       else if (now - st.resT > (st.resN > 5 ? 5000 : 1000)) { st.resT = now; st.resN++; resumeAudio(); }
       if (!st.wake && now - st.wakeT > 10000) wakeLock();
     }
-    const bad = (t) => '<span class="bad">' + t + '</span>';
+    // statusbrikker: grønn = ok, gul = venter/info, rød = feil
+    const chip = (k) => (t) => '<span class="chip ' + k + '"><svg viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4"/></svg>' + t + '</span>';
+    const ok = chip('ok'), warn = chip('warn'), bad = chip('bad');
     const parts = [
-      !navigator.wakeLock ? bad('Skjermlås støttes ikke') : st.wake ? 'Skjerm våken' : bad('Skjermen kan slukke'),
-      audioOk ? 'Lyd på' : bad(c.state === 'interrupted' ? 'Lyd avbrutt' : 'Lyd pauset')
+      !navigator.wakeLock ? bad('Skjermlås støttes ikke') : st.wake ? ok('Skjerm våken') : bad('Skjermen kan slukke'),
+      audioOk ? ok('Lyd på') : bad(c.state === 'interrupted' ? 'Lyd avbrutt' : 'Lyd pauset')
     ];
     if (S.on) {
       const age = now - S.lastGood;
-      parts.push(S.lastGood && age < 2500 ? 'GPS OK' : !S.gpsSeen ? bad('GPS venter') : bad('GPS borte'));
-      if (S.dir === 'R') parts.push('Rygger');
+      parts.push(S.lastGood && age < 2500 ? ok('GPS OK') : !S.gpsSeen ? warn('GPS venter') : bad('GPS borte'));
+      if (S.dir === 'R') parts.push(warn('Rygger'));
     }
-    const html = parts.join(' · ');
+    const html = parts.join(' ');
     if (html !== st.sys) { st.sys = html; $('#stSys').innerHTML = html; }
   }
 
@@ -137,6 +143,7 @@
     ctx.resume().catch(() => {});
     st.started = true;
     $('#start').classList.add('hide');
+    st.sweepT = reduceMotion ? 0 : performance.now(); // kort viserfeiing på turtelleren, bare visuelt
     let path = '';
     try {
       if (!ctx.audioWorklet) throw new Error('ingen worklet');
@@ -208,6 +215,8 @@ registerProcessor('m4-engine', M4Proc);`;
   // velgere for bil og lydanlegg; bytte underveis tones ut og inn i motoren (ca. 150 ms)
   function showCar() {
     const p = prof(); $('#carTag').textContent = p.short.toUpperCase(); $('#startCar').textContent = p.name; $('#startBlurb').textContent = p.blurb;
+    const a = ACCENTS[st.car] || ACCENTS.m4csl, rs = document.documentElement.style;
+    rs.setProperty('--acc', a[0]); rs.setProperty('--acc2', a[1]); COL.acc = a[0]; COL.acc2 = a[1];
   }
   for (const k in PROFS) $('#car').add(new Option(PROFS[k].name, k));
   for (const k in OUTS) $('#outp').add(new Option(OUTS[k].name, k));
@@ -239,6 +248,7 @@ registerProcessor('m4-engine', M4Proc);`;
     const thr = Math.max(st.thrPed, st.thrKey);
     send({ k: 'in', thr: thr, brake: st.brake });
     $('#gasFill').style.height = (thr * 100).toFixed(0) + '%';
+    $('#gas').classList.toggle('on', thr > 0);
   }
   function bindPedal(el, onDown, onUp) {
     el.addEventListener('pointerdown', (e) => { try { el.setPointerCapture(e.pointerId); } catch (x) {} onDown(e, el); e.preventDefault(); });
@@ -285,7 +295,7 @@ registerProcessor('m4-engine', M4Proc);`;
   function setMode(m) {
     st.mode = m; document.body.dataset.mode = m;
     $('#mTest').setAttribute('aria-pressed', String(m === 'test')); $('#mDrive').setAttribute('aria-pressed', String(m === 'drive'));
-    st.thrPed = 0; st.thrKey = 0; st.keyGas = false; st.brake = 0; $('#brake').classList.remove('on'); $('#gasFill').style.height = '0%';
+    st.thrPed = 0; st.thrKey = 0; st.keyGas = false; st.brake = 0; $('#brake').classList.remove('on'); $('#gas').classList.remove('on'); $('#gasFill').style.height = '0%';
     if (m === 'test') { st.tunGps = false; st.tunMap = false; applyTunnel(); }
     if (st.started) { send({ k: 'mode', drive: m === 'drive' }); pushCfg(); }
   }
@@ -695,7 +705,56 @@ registerProcessor('m4-engine', M4Proc);`;
   }
 
   // ---------- turteller ----------
+  // Det stillestående laget tegnes én gang per størrelse/bil/farge i et eget lerret; hvert bilde tegner bare
+  // tente segmenter, skiftelys, viser og tall (ingen shadowBlur).
   const cvs = $('#gauge');
+  let GL = null;
+  function gaugeLayer(w, h, dpr) {
+    const p = prof(), key = [w, h, dpr, st.car, COL.acc].join();
+    if (GL && GL.key === key) return GL;
+    const tc = p.tach, MAX = tc.max, red = tc.red, warn = tc.warn;
+    const ledH = clamp(h * 0.045, 9, 15), R = Math.max(30, Math.min((w - 8) / 2, (h - ledH - 16) / 1.9));
+    const top = Math.max(2, (h - (ledH + 12 + 1.9 * R)) / 2), cx = w / 2, cy = top + ledH + 12 + R;
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (r) => a0 + (a1 - a0) * r / MAX;
+    const segR = R * 0.875, segW = R * 0.12, gapA = Math.max(1.6, R * 0.012) / segR, step = 250, seg = [];
+    for (let r = 0; r < MAX; r += step) {
+      const col = r >= red ? COL.red : r >= warn ? COL.orange : r >= red * 0.7 ? COL.amber : COL.acc;
+      seg.push({ r0: r, a0: ang(r) + gapA / 2, a1: ang(r + step) - gapA / 2, col: col });
+    }
+    const n = 12, LW = Math.min(w - 8, R * 2.05), lg = Math.max(3, LW * 0.012), lw = (LW - lg * (n - 1)) / n, leds = [];
+    for (let i = 0; i < n; i++) leds.push({ x: cx - LW / 2 + i * (lw + lg), y: top, w: lw, h: ledH, k: ledH * 0.22 });
+    const c = document.createElement('canvas'); c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // skive
+    const fg = g.createRadialGradient(cx, cy - R * 0.2, R * 0.1, cx, cy, R);
+    fg.addColorStop(0, '#171a20'); fg.addColorStop(0.7, '#0d0f13'); fg.addColorStop(1, 'rgba(6,7,9,0.6)');
+    g.fillStyle = fg; g.beginPath(); g.arc(cx, cy, R * 0.99, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.10)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R * 0.99, a0 - 0.08, a1 + 0.08); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.05)'; g.beginPath(); g.arc(cx, cy, R * 0.66, 0, Math.PI * 2); g.stroke();
+    // spor for segmentene
+    g.lineWidth = segW;
+    for (const s of seg) { g.strokeStyle = s.r0 >= red ? 'rgba(255,45,45,.26)' : '#1a1e25'; g.beginPath(); g.arc(cx, cy, segR, s.a0, s.a1); g.stroke(); }
+    // rødt felt innenfor sporet
+    g.strokeStyle = COL.red; g.lineWidth = Math.max(2, R * 0.018); g.beginPath(); g.arc(cx, cy, R * 0.79, ang(red), ang(MAX)); g.stroke();
+    // streker og tall
+    for (let r = 0; r <= MAX; r += 500) {
+      const maj = r % 1000 === 0, a = ang(r), r0 = R * (maj ? 0.715 : 0.75), r1 = R * 0.79, rz = r >= red;
+      g.strokeStyle = rz ? COL.red : maj ? 'rgba(235,240,246,.85)' : 'rgba(200,210,222,.45)'; g.lineWidth = maj ? Math.max(2, R * 0.016) : Math.max(1, R * 0.008);
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.stroke();
+      if (maj) {
+        g.fillStyle = rz ? COL.red : '#c9d1db'; g.font = 'italic 800 ' + Math.max(12, Math.round(R * 0.095)) + 'px ' + COL.ui;
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(r / 1000), cx + Math.cos(a) * R * 0.6, cy + Math.sin(a) * R * 0.6);
+      }
+    }
+    // skiftelys av
+    for (const d of leds) {
+      g.fillStyle = '#15181d'; g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(d.x + d.k, d.y); g.lineTo(d.x + d.w + d.k, d.y); g.lineTo(d.x + d.w - d.k, d.y + d.h); g.lineTo(d.x - d.k, d.y + d.h); g.closePath(); g.fill(); g.stroke();
+    }
+    GL = { key, cv: c, cx, cy, R, MAX, red, warn, ang, seg, segR, segW, leds };
+    return GL;
+  }
   function draw(ts) {
     requestAnimationFrame(draw);
     const target = st.keyGas ? 1 : 0;
@@ -709,27 +768,65 @@ registerProcessor('m4-engine', M4Proc);`;
     st.drawT = ts;
     const dpr = Math.min(window.devicePixelRatio || 1, 3), w = cvs.clientWidth, h = cvs.clientHeight;
     if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) { cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr); }
-    const g = cvs.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-    const cx = w / 2, cy = h / 2 + 2, R = Math.max(20, Math.min(w, h) / 2 - 14);
-    const tc = prof().tach, MAX = tc.max, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, ang = (r) => a0 + (a1 - a0) * r / MAX;
-    g.lineWidth = R * 0.085; g.lineCap = 'butt';
-    const arc = (r0, r1, col) => { g.beginPath(); g.arc(cx, cy, R, ang(r0), ang(r1)); g.strokeStyle = col; g.stroke(); };
-    arc(0, tc.red, COL.line); arc(tc.red, MAX, 'rgba(255,77,61,.35)');
-    const rp = clamp(st.rpmD, 0, MAX);
-    arc(0, Math.min(rp, tc.warn), COL.accent);
-    if (rp > tc.warn) arc(tc.warn, rp, COL.hot);
-    g.fillStyle = COL.dim; g.font = '600 ' + Math.max(12, R * 0.09) + 'px ' + COL.disp; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i <= MAX / 1000; i++) { const aa = ang(i * 1000), rr = R - R * 0.17; g.fillText(String(i), cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr); }
+    const g = cvs.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvs.width, cvs.height);
+    const L = gaugeLayer(w, h, dpr);
+    g.drawImage(L.cv, 0, 0); // stillestående lag: skive, segmentspor, streker og tall
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { cx, cy, R, MAX, red, ang, seg, segR, segW } = L;
+    // feiing ved start: 0 -> rødt felt -> tomgang (~0,9 s), bare visning
+    let rp = clamp(st.rpmD, 0, MAX);
+    const sw = st.sweepT ? (performance.now() - st.sweepT) / 900 : 2;
+    if (sw < 1) { const e = sw < 0.45 ? 1 - Math.pow(1 - sw / 0.45, 3) : 1 - (sw - 0.45) / 0.55; rp = sw < 0.45 ? e * red : rp + (red - rp) * e * e; }
+    else st.sweepT = 0;
+    // tente segmenter (fargen blir varmere mot det røde feltet) og en svak glød under
     const na = ang(rp);
-    g.strokeStyle = rp > tc.warn ? COL.hot : COL.ink; g.lineWidth = 3; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(cx + Math.cos(na) * R * 0.52, cy + Math.sin(na) * R * 0.52); g.lineTo(cx + Math.cos(na) * R * 0.72, cy + Math.sin(na) * R * 0.72); g.stroke();
-    g.fillStyle = t.shift ? COL.accent : t.lim ? COL.hot : COL.ink; g.font = '700 ' + R * 0.42 + 'px ' + COL.disp;
-    g.fillText(st.mode === 'drive' && S.dir === 'R' ? 'R' : String(t.gear), cx, cy - R * 0.02);
-    g.fillStyle = COL.dim; g.font = '600 ' + R * 0.12 + 'px ' + COL.disp;
-    g.fillText(Math.round(st.vD * 3.6) + ' km/t', cx, cy + R * 0.34);
-    g.font = '600 ' + R * 0.085 + 'px ' + COL.disp;
-    g.fillText(Math.round(rp / 10) * 10 + ' o/min', cx, cy + R * 0.5);
-    if (st.tunOn) { g.fillStyle = COL.accent; g.fillText('TUNNEL', cx, cy - R * 0.36); }
+    g.lineCap = 'butt';
+    if (rp > 0) {
+      g.globalAlpha = 0.16; g.lineWidth = segW * 2.2; g.strokeStyle = rp > L.warn ? COL.red : COL.acc;
+      g.beginPath(); g.arc(cx, cy, segR, ang(0), na); g.stroke(); g.globalAlpha = 1;
+    }
+    g.lineWidth = segW;
+    for (const s of seg) {
+      if (s.r0 >= rp) break;
+      g.strokeStyle = s.col; g.beginPath(); g.arc(cx, cy, segR, s.a0, Math.min(s.a1, na)); g.stroke();
+    }
+    // skiftelys: rad med LED-er over skiven, aksent -> gul -> rød, alle blinker ved sperren
+    const n = L.leds.length, s0 = red * 0.6, lit = clamp((rp - s0) / (red * 0.985 - s0), 0, 1) * n;
+    const flash = t.lim || rp >= red * 0.985, on = !flash || Math.floor(ts / 70) % 2 === 0;
+    for (let i = 0; i < n; i++) {
+      const d = L.leds[i], isOn = flash ? on : i < lit;
+      if (!isOn) continue;
+      const c = flash ? COL.red : i < n * 0.42 ? COL.acc : i < n * 0.75 ? COL.amber : COL.red;
+      g.fillStyle = c; g.globalAlpha = 0.28; g.fillRect(d.x - 3, d.y - 3, d.w + 6, d.h + 6);
+      g.globalAlpha = 1; g.beginPath(); g.moveTo(d.x + d.k, d.y); g.lineTo(d.x + d.w + d.k, d.y); g.lineTo(d.x + d.w - d.k, d.y + d.h); g.lineTo(d.x - d.k, d.y + d.h); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(d.x + d.k * 0.6, d.y + 1, d.w - 1, Math.max(1, d.h * 0.18));
+    }
+    // viser: spiss kile med myk glød
+    const hot = rp > L.warn, cs = Math.cos(na), sn = Math.sin(na), r0 = R * 0.47, r1 = R * 0.97, wd = Math.max(2.5, R * 0.028);
+    const blade = (k) => { g.beginPath(); g.moveTo(cx + cs * (r1 + k), cy + sn * (r1 + k)); g.lineTo(cx + cs * r0 - sn * wd * k, cy + sn * r0 + cs * wd * k); g.lineTo(cx + cs * r0 + sn * wd * k, cy + sn * r0 - cs * wd * k); g.fill(); };
+    g.fillStyle = hot ? COL.red : COL.acc; g.globalAlpha = 0.3; blade(2.6); g.globalAlpha = 1;
+    g.fillStyle = '#ffffff'; blade(1);
+    // midten: gir, fart, turtall
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    const gear = st.mode === 'drive' && S.dir === 'R' ? 'R' : String(t.gear);
+    g.fillStyle = t.lim ? COL.red : t.shift ? COL.acc2 : COL.ink;
+    g.font = 'italic 800 ' + Math.round(R * 0.5) + 'px ' + COL.ui;
+    g.fillText(gear, cx - R * 0.02, cy + R * 0.12);
+    g.fillStyle = COL.ink; g.font = '700 ' + Math.round(R * 0.16) + 'px ' + COL.num;
+    g.fillText(String(Math.round(st.vD * 3.6)), cx, cy + R * 0.38);
+    g.fillStyle = COL.dim; g.font = 'italic 800 ' + Math.max(12, Math.round(R * 0.065)) + 'px ' + COL.ui;
+    g.fillText('KM/T', cx, cy + R * 0.5);
+    g.fillStyle = hot ? COL.red : COL.ink; g.font = '600 ' + Math.max(12, Math.round(R * 0.085)) + 'px ' + COL.num;
+    g.fillText(String(Math.round(rp / 10) * 10).padStart(4, ' '), cx - R * 0.02, cy + R * 0.76);
+    g.fillStyle = COL.dim; g.font = 'italic 800 ' + Math.max(12, Math.round(R * 0.055)) + 'px ' + COL.ui;
+    g.fillText('O/MIN', cx, cy + R * 0.87);
+    // over giret: ×1000, eller TUNNEL-merke når klangen er på
+    g.font = 'italic 800 ' + Math.max(12, Math.round(R * (st.tunOn ? 0.06 : 0.05))) + 'px ' + COL.ui; g.textBaseline = 'middle';
+    if (st.tunOn) {
+      const tw = g.measureText('TUNNEL').width + 14, th = Math.max(17, R * 0.1), ty = cy - R * 0.37;
+      g.fillStyle = COL.acc; g.fillRect(cx - tw / 2, ty - th / 2, tw, th);
+      g.fillStyle = '#05070a'; g.fillText('TUNNEL', cx, ty + 1);
+    } else if (R > 110) { g.fillStyle = COL.dim; g.fillText('×1000', cx, cy - R * 0.36); }
     const evEl = $('#stEv'), show = performance.now() - st.evT < 1400 ? st.evText : '';
     if (evEl.textContent !== show) evEl.textContent = show;
   }
