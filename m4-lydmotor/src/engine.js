@@ -259,7 +259,48 @@ class EngineCore {
         rasp: [0.4, 0.6, 0.3, 1.0, 2.2, 0.025, 0.9, 2900], refl: [0.32, 0.14, 0.26, 0.24], muff: [280, 300],
         intake: [0.20, 0.004, 210, 560, 0.6], mech: [0.004, 0.035, 0.01, 0.3], ex: 0.42, side: 0.10, dc: 30 }
     };
-    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12, gt3: gt3, lfa: lfa, cgt: cgt };
+    // Ferrari 812 Superfast: F12-profilen (62/58 grader, kutt, smell og sperre fra referansetuningen) som utgangspunkt. Bekreftet
+    // (Ferrari-pressemelding og instruksjonsbok): 6 496 cm3 65 graders V12, 800 cv ved 8 500, 718 Nm ved 7 000 (80 % ved 3 500),
+    // sperre 8 900, girkasse 3.334/2.285/1.728/1.369/1.115/0.904/0.703 og bakaksel 4.375, 315/35 ZR20 bak, 1 525 kg tørr / 1 630 kg
+    // egenvekt, 0-100 2,9 s, 0-200 7,9 s, 340 km/t. Litt mer intens og høyere turtall enn F12: skarpere puls, mer rasp og innsug,
+    // raskere skift (Ferrari: kortere opp- og nedgirtider), litt mer smell. Tomgang og masse (egenvekt + fører) er antatt.
+    const f812 = Object.assign({}, f12, {
+      id: 'f812', name: 'Ferrari 812 Superfast', short: '812 Superfast',
+      blurb: 'V12 på 6,5 liter uten turbo, 800 hk som drar til 8 900 o/min. Sjutrinns dobbeltclutch med enda raskere skift enn F12.',
+      tach: { max: 10000, red: 8900, warn: 8400 },
+      redline: 8900,
+      lim: { max: 8915, on: 8885, off: 8800, deny: 8850, period: 0.06, cut: 0.03, dip: 110, pop: 0.25, keep: 0.4 },
+      gears: [0, 3.334, 2.285, 1.728, 1.369, 1.115, 0.904, 0.703], fd: 4.375, mass: 1705, grip: 9.8, vmax: 94.4,
+      torque: [[1000, 400], [3500, 575], [7000, 718], [8500, 661]], acc100: 2.9,
+      box: { hardT: [0.06, 0.06, 0.042], softT: [0.13, 0.18], manual: 0.03, shuf: 0.6, slip: [3100, 2500, 1000], stopV: 1.5, cut: 0.5 },
+      ovr: { k0: 2800, kR: 2600, o0: 2200, oR: 1500, mode: [0.1, 0.85, 1.0], decay: [0.9, 0.95, 1.35], rate: 9 }, popK: 0.5,
+      snd: { modeG: [0.86, 1.02, 1.14], motor: 0.04, cyc: [0.02, 0.05], dec: [52, 30], fc: [400, 3500, 0.1],
+        rasp: [0.3, 0.6, 0.45, 0.95, 1.2, 0.05, 0.8, 3400], refl: [0.44, 0.14, 0.26, 0.24], muff: [280, 320],
+        intake: [0.31, 0.004, 235, 660, 0.6], mech: [0.005, 0.042, 0.06, 0.3], ex: 0.40, side: 0.10, dc: 35 }
+    });
+    // Porsche 911 GT3 RS 4.0 (997.2, 2011): GT3-profilen med Mezger-motorens data. Bekreftet (Porsche via Wikipedia, Car and Driver):
+    // 3 996 cm3 boksersekser, 500 PS ved 8 250, 460 Nm ved 5 750, turtall til 8 500, 1 360 kg DIN, 0-100 3,9 s, 310 km/t, sekstrinns
+    // manuell. Utvekslinger 3.82/2.26/1.64/1.29/1.06 (som 997 GT3) og 0.88 i 6. med bakaksel 3.88 (8:31) er fra forum (Rennlist,
+    // 6SpeedOnline), ikke fra Porsche. Manuell kjørt av appens automat: tregere skift med helt momentbrudd (ingen box.cut), tydelig
+    // rykk. Mer mekanisk hyl (girdrevne kamaksler) og rått rasp, mer syklusvariasjon og ujevn tomgang, hardere slipp enn 991.2 GT3.
+    const rs40 = Object.assign({}, gt3, {
+      id: 'gt3rs4', name: 'Porsche 911 GT3 RS 4.0 (997)', short: 'GT3 RS 4.0',
+      blurb: 'Mezger-boksersekser på 4,0 liter uten turbo, 500 hk til 8 500 o/min. Sekstrinns manuell (appen skifter selv): rått, mekanisk og uten filter.',
+      tach: { max: 10000, red: 8500, warn: 8000 },
+      gain: [1.0, 0.97, 1.03, 0.98, 1.02, 0.97], runner: [0.00030, 0.00024, 0.00033, 0.00026, 0.00031, 0.00025],
+      idle: 850, redline: 8500,
+      lim: { max: 8515, on: 8485, off: 8400, deny: 8450, period: 0.055, cut: 0.028, dip: 120, pop: 0.2, keep: 0.45 },
+      gears: [0, 3.82, 2.26, 1.64, 1.29, 1.06, 0.88], fd: 3.88, wheel: 0.33, mass: 1360, grip: 8.1, vmax: 86.1,
+      torque: [[1000, 260], [3000, 400], [5750, 460], [8250, 426]], acc100: 3.9,
+      box: { hardT: [0.32, 0.28, 0.24], softT: [0.5, 0.6], manual: 0.08, shuf: 1.8, slip: [3200, 2600, 1100], stopV: 1.5, kick: 0.2 },
+      fuelCut: 1300, idleLd: [1550, 500],
+      ovr: { k0: 2800, kR: 2600, o0: 2200, oR: 1500, mode: [0.08, 0.8, 0.95], decay: [0.8, 0.85, 1.1], rate: 9 }, popK: 0.45,
+      pipe: { DA: [1.5, 560], DB: [0.35, 480], SA: [0.30, 660], SB: [0.31, 660] },
+      snd: { modeG: [0.85, 1.0, 1.12], motor: 0.05, cyc: [0.03, 0.07], dec: [46, 30], fc: [380, 3300, 0.11],
+        rasp: [0.4, 0.7, 0.45, 1.08, 1.6, 0.05, 1.15, 3400], refl: [0.42, 0.14, 0.24, 0.24], muff: [300, 340],
+        intake: [0.33, 0.004, 250, 700, 0.55], mech: [0.008, 0.055, 0.012, 0.38], ex: 0.42, side: 0.10, dc: 30 }
+    });
+    return { m4csl: m4, vanqs: vanq, v12vs: vant, f12: f12, gt3: gt3, lfa: lfa, cgt: cgt, f812: f812, gt3rs4: rs40 };
   }
 
   setProfile(p) {

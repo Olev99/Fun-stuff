@@ -267,7 +267,7 @@ if (require.main === module) {
     check('slipp: grunnlyden (uten burble) faller > 12 dB', zd < -12, f1(zd) + ' dB');
     // V12-ene og GT3: opptak av seriebilene gir nesten ingen smell ved slipp, så de har svake smell (lav popK) og et roligere overrun
     // (nedre grense -20 dB i stedet for -16); for alle biler må burble fortsatt løfte overrun minst 8 dB over overrun uten burble
-    const ovLo = ['vanqs', 'v12vs', 'f12', 'gt3'].includes(pid) ? -20 : -16, ovD = dB(a.rms / pre.rms);
+    const ovLo = ['vanqs', 'v12vs', 'f12', 'gt3', 'f812', 'gt3rs4'].includes(pid) ? -20 : -16, ovD = dB(a.rms / pre.rms);
     check('slipp: med burble ligger overrun 4-' + (-ovLo) + ' dB under full gass, minst 8 dB over overrun uten burble', ovD < -4 && ovD > ovLo && ovD - zd >= 8, f1(ovD) + ' dB (uten burble ' + f1(zd) + ' dB)');
     // forventet antall følger bilens burble-mengde i Sport (M4 = 5)
     const minP = Math.max(2, Math.round(5 * Math.min(1, p.ovr.mode[1] * p.ovr.rate * p.popK / (0.8 * 13))));
@@ -543,8 +543,9 @@ if (require.main === module) {
       if (id !== 'm4csl' && h > -15) ok = false;
       if (id === 'gt3' && h > -23.9) ok = false; // GT3: ventiltikk, men ikke mer sus enn den roligste V12-en (Vanquish S)
       if ((id === 'lfa' || id === 'cgt') && h > -19) ok = false; // V10-ene: samme krav som V12 Vantage S
+      if ((id === 'f812' || id === 'gt3rs4') && h > -19) ok = false; // 812 og GT3 RS 4.0: samme krav
     }
-    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB, V10-ene under -19 dB', ok, info.join(', '));
+    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB, V10-ene, 812 og GT3 RS 4.0 under -19 dB', ok, info.join(', '));
   }
   if (all.lfa && all.cgt) { // V10-ene: Carrera GT (68/76 grader) skal ha tydelig mer 2,5. orden (bankrytme) enn den jevne LFA-en; LFA løfter 2. og 3. orden
     const ord = (id) => {
