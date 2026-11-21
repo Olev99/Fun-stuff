@@ -155,7 +155,7 @@ h1 .car { display: block; color: var(--acc); font-size: 13px; letter-spacing: .1
 .btn:active { transform: scale(.97); filter: brightness(1.25); }
 .btn.pad { font-size: 26px; font-style: normal; font-weight: 700; }
 .btn.toggle[aria-pressed="true"] { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); }
-.btn:focus-visible, .seg button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, #start button:focus-visible {
+.btn:focus-visible, .seg button:focus-visible, .chip.tapchip:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, #start button:focus-visible {
   outline: 2px solid var(--acc2); outline-offset: 2px;
 }
 .row2 { display: grid; grid-template-columns: 2.3fr 1fr; gap: 10px; }
@@ -200,6 +200,21 @@ details[open] summary svg { transform: rotate(180deg); }
 }
 .opts .btn { font-size: 15px; }
 .hint { color: var(--dim); font-size: 14px; line-height: 1.4; margin: 0 0 4px; text-wrap: pretty; }
+
+/* gruppe-overskrift, rad med etikett + bryter, to knapper side om side */
+.opts .grp { margin: 6px 0 -2px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12.5px; letter-spacing: .14em; color: var(--dim); }
+.opts .lrow { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; font-weight: 600; }
+.opts .lrow .seg.wide button { font-size: 12px; letter-spacing: .03em; }
+.opts .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.opts .two .btn { font-size: 14px; letter-spacing: .06em; padding: 0 6px; }
+/* trykkbare statusbrikker: synlig 26 px, trykkflate 44 px */
+.chip.tapchip { position: relative; cursor: pointer; font-family: var(--f-ui); }
+.chip.tapchip::after { content: ""; position: absolute; inset: -9px -4px; }
+.chip.tapchip.ok { color: var(--ink); border-color: color-mix(in srgb, var(--acc) 55%, transparent); background: color-mix(in srgb, var(--acc) 14%, transparent); }
+.chip.tapchip.ok svg { fill: var(--acc); filter: drop-shadow(0 0 3px var(--acc)); }
+.chip.rec { font-family: var(--f-num); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.chip.rec svg { fill: var(--red); filter: drop-shadow(0 0 3px var(--red)); }
+.chip.rec.off svg { fill: var(--dim); filter: none; }
 
 /* ---------- startskjerm ---------- */
 #start {
@@ -282,7 +297,9 @@ details[open] summary svg { transform: rotate(180deg); }
   .drivepanel { grid-column: 2; grid-row: 1 / 4; overflow: auto; }
   .row2 { grid-column: 2; grid-row: 4; }
   details { grid-column: 2; grid-row: 5 / 7; align-self: end; }
-  details[open] { grid-column: 1 / -1; grid-row: 7; }
+  details[open] { grid-column: 1 / -1; grid-row: 7; align-self: start; }
+  /* åpne innstillinger henger under skjermbildet (siden ruller) i stedet for å klemme turtelleren */
+  .app:has(details[open]) { grid-template-rows: auto minmax(0, 1fr) auto auto auto auto 0; }
   .btn { min-height: 46px; }
   .seg.wide button { min-height: 44px; }
   #start { flex-direction: row; flex-wrap: wrap; gap: 14px 28px; }
@@ -350,12 +367,37 @@ details[open] summary svg { transform: rotate(180deg); }
       <label for="vol">Volum <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
       <label for="bur">Burble <input id="bur" type="range" min="0" max="1" step="0.01" value="0.7"></label>
       <label for="tunAmt">Tunnelklang <input id="tunAmt" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+      <div class="lrow"><span id="vcLbl">Veistøy</span>
+        <div class="seg wide" role="group" aria-labelledby="vcLbl">
+          <button type="button" data-vc="0" aria-pressed="false">Av</button>
+          <button type="button" data-vc="1" aria-pressed="false">Lav</button>
+          <button type="button" data-vc="2" aria-pressed="true">Normal</button>
+          <button type="button" data-vc="3" aria-pressed="false">Høy</button>
+        </div>
+      </div>
       <label class="chk" for="idle"><input id="idle" type="checkbox" checked> <span>Tomgangslyd når bilen står stille</span></label>
       <label class="chk" for="tunGps"><input id="tunGps" type="checkbox" checked> <span>Automatisk tunnel fra GPS-bortfall</span></label>
       <label class="chk" for="tunMap"><input id="tunMap" type="checkbox"> <span>Slå opp tunneler i kart (OpenStreetMap)</span></label>
       <button type="button" class="btn" id="calReset">Nullstill kalibrering</button>
+      <h2 class="grp ital">Kjørelogg</h2>
+      <label class="chk" for="rec"><input id="rec" type="checkbox"> <span>Ta opp kjøring</span></label>
+      <label class="chk" for="recPos"><input id="recPos" type="checkbox"> <span>Ta med posisjon (GPS-koordinater)</span></label>
+      <div class="two">
+        <button type="button" class="btn" id="logDl">Last ned logg</button>
+        <button type="button" class="btn" id="logDel">Slett logg</button>
+      </div>
+      <p class="hint" id="logInfo" aria-live="polite">Ingen logg lagret.</p>
+      <h2 class="grp ital">Innstillinger på fil</h2>
+      <div class="two">
+        <button type="button" class="btn" id="cfgExp">Eksporter</button>
+        <button type="button" class="btn" id="cfgImp">Importer</button>
+      </div>
+      <input type="file" id="cfgFile" accept=".json,application/json" hidden>
+      <p class="hint" id="cfgMsg" aria-live="polite">Lagrer bil, lyd, tunnel og veistøy i en JSON-fil, for eksempel for å flytte dem til en annen telefon.</p>
       <p class="hint">Appen husker hvilken vei som er fremover for telefonen i holderen. Flytter du holderen, trykk Nullstill og gi gass rett frem en gang. Flyttes telefonen tydelig, lærer den på nytt av seg selv.</p>
       <p class="hint">Bil: lyden er laget fra bunnen av (syntese, ingen opptak). Byttet skjer med en kort uttoning, og motoren starter på tomgang i girer som passer farten. Lydanlegg: «BMW i4 M50 Harman Kardon» gir full bass ned mot 25-30 Hz, mer diskant, mer luft til toppene og smalere stereo fordi bilen selv fordeler lyden på alle høyttalerne. «Standard» passer små høyttalere.</p>
+      <p class="hint">Veistøy: løfter volumet litt med farten, opptil ca. 2 / 3,5 / 5 dB ved 120 km/t, så motoren ikke drukner i vei- og vindstøy. Bare i kjøremodus, og aldri så mye at lyden forvrenges. Volum, eksos og burble huskes for hver bil.</p>
+      <p class="hint">Kjørelogg: tar opp fart, akselerasjon, gass og brems, gir og turtall ti ganger i sekundet, slik at sensorlogikken kan justeres i etterkant. Posisjon tas bare med hvis du krysser av. Loggen ligger bare på telefonen (maks to timer) til du laster den ned.</p>
       <p class="hint">Eksos: Komfort har lukkede klaffer og nesten ingen smell. Sport åpner klaffene i lave gir, ved mye gass og høyt turtall, og gir burble når du slipper gassen. Bane er høyest, med raskest skift.</p>
       <p class="hint">Tunnel: Knappen virker alltid. GPS-bortfall oppdager en tunnel først to til tre sekunder etter at signalet forsvinner, og kan slå feil under bruer og i parkeringshus. Kartoppslag vet om tunnelen før du kjører inn, men trenger mobilnett og sender posisjonen din til en åpen OpenStreetMap-tjener (overpass-api.de). Det er derfor av til du slår det på.</p>
       <p class="hint">Kjøremodus trenger GPS og bevegelsessensor. Det virker bare når siden ligger på sin egen https-adresse og er åpnet i Safari, ikke inne i Claude-appen. Skjermen må være på hele turen. Legg siden til på Hjem-skjermen (Del, Legg til på Hjem-skjerm) for å åpne den som en app.</p>
@@ -1322,7 +1364,9 @@ class EngineCore {
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   // Aksentfarge per bil: [aksent, varmere variant for glød]. Turtallssperren er alltid rød.
   const ACCENTS = { m4csl: ['#29b6ff', '#8fd8ff'], vanqs: ['#2fd18b', '#8ff0bf'], v12vs: ['#ffb020', '#ffd27a'], f12: ['#ff2b2b', '#ff8a7a'],
-    gt3: ['#ffd60a', '#fff08a'], lfa: ['#ff5a1f', '#ffa07a'], cgt: ['#c4ccd8', '#ffffff'] };
+    gt3: ['#ffd60a', '#fff08a'], lfa: ['#ff5a1f', '#ffa07a'], cgt: ['#c4ccd8', '#ffffff'],
+    f812: ['#d8001e', '#ff5a6e'], gt3rs4: ['#9be22a', '#d4ff8a'] }; // ukjent bil: M4-blå
+  const BUILD = '9125a9276b03'; // innholdshash fra build.py, samme som VERSION i sw.js
   const COL = { ink: '#eef2f6', dim: '#98a3b1', amber: '#ffb020', orange: '#ff6a1a', red: '#ff2d2d',
     ui: getComputedStyle(document.documentElement).getPropertyValue('--f-ui').trim() || 'system-ui, sans-serif',
     num: getComputedStyle(document.documentElement).getPropertyValue('--f-num').trim() || 'monospace' };
@@ -1332,7 +1376,8 @@ class EngineCore {
     thrPed: 0, thrKey: 0, brake: 0, keyGas: false,
     tele: { rpm: 780, gear: 1, v: 0, load: 0, lim: false, shift: 0, ev: [] }, rpmD: 780, vD: 0,
     evText: '', evT: 0, tunManual: false, tunGps: false, tunMap: false, tunOn: false, wake: null, wakeT: -1e9,
-    resT: -1e9, resN: 0, drawT: 0, sys: '' };
+    resT: -1e9, resN: 0, drawT: 0, sys: '', vc: 2, vcDb: 0, vcT: 0, volSent: -1, muted: false, frames: 0, moveT: 0, touchT: 0,
+    cars: {}, audioSt: '' };
 
   // ---------- bilprofiler og lydanlegg ----------
   const PROFS = EngineCore.profiles(), OUTS = EngineCore.outputs();
@@ -1342,22 +1387,334 @@ class EngineCore {
     get() { try { return JSON.parse(localStorage.getItem('lydmotor') || localStorage.getItem('m4csl') || '{}') || {}; } catch (e) { return {}; } },
     set(o) { try { localStorage.setItem('lydmotor', JSON.stringify(o)); localStorage.removeItem('m4csl'); } catch (e) {} }
   };
-  (function loadCfg() {
-    const c = store.get();
+  // Streng kontroll av lagrede og importerte innstillinger: ukjente nøkler forkastes, tall klemmes, kaster aldri.
+  const num = (a, b) => (x) => (typeof x === 'number' && isFinite(x) ? clamp(x, a, b) : undefined);
+  const bool = (x) => (typeof x === 'boolean' ? x : undefined);
+  const CFG = { vol: num(0, 1), bur: num(0, 1), tunAmt: num(0, 1.5), idle: bool, tunGps: bool, tunMap: bool, ex: (x) => { const v = num(0, 2)(x); return v === undefined ? v : Math.round(v); },
+    car: (x) => (PROFS[x] ? x : undefined), out: (x) => (OUTS[x] ? x : undefined), vc: (x) => { const v = num(0, 3)(x); return v === undefined ? v : Math.round(v); },
+    rec: bool, recPos: bool };
+  const CAR_CFG = { vol: CFG.vol, bur: CFG.bur, ex: CFG.ex };
+  function cleanCfg(c) {
+    const o = {};
+    try {
+      if (!c || typeof c !== 'object') return o;
+      for (const k in CFG) { const v = CFG[k](c[k]); if (v !== undefined) o[k] = v; }
+      if (c.cars && typeof c.cars === 'object') {
+        o.cars = {};
+        for (const id in c.cars) {
+          if (!PROFS[id] || !c.cars[id] || typeof c.cars[id] !== 'object') continue;
+          const p = {}; for (const k in CAR_CFG) { const v = CAR_CFG[k](c.cars[id][k]); if (v !== undefined) p[k] = v; }
+          o.cars[id] = p;
+        }
+      }
+    } catch (e) {}
+    return o;
+  }
+  function applyCfg(c) {
     if (c.vol != null) $('#vol').value = c.vol;
     if (c.bur != null) $('#bur').value = c.bur;
     if (c.tunAmt != null) $('#tunAmt').value = c.tunAmt;
-    if (c.idle != null) $('#idle').checked = !!c.idle;
-    if (c.tunGps != null) $('#tunGps').checked = !!c.tunGps;
-    if (c.tunMap != null) $('#tunMap').checked = !!c.tunMap;
-    if (c.ex != null) st.exMode = clamp(c.ex | 0, 0, 2);
-    st.car = PROFS[c.car] ? c.car : 'm4csl';
-    st.outId = OUTS[c.out] ? c.out : 'i4hk';
-  })();
-  function saveCfg() {
-    store.set({ vol: +$('#vol').value, bur: +$('#bur').value, tunAmt: +$('#tunAmt').value, idle: $('#idle').checked,
-      tunGps: $('#tunGps').checked, tunMap: $('#tunMap').checked, ex: st.exMode, car: st.car, out: st.outId });
+    if (c.idle != null) $('#idle').checked = c.idle;
+    if (c.tunGps != null) $('#tunGps').checked = c.tunGps;
+    if (c.tunMap != null) $('#tunMap').checked = c.tunMap;
+    if (c.rec != null) $('#rec').checked = c.rec;
+    if (c.recPos != null) $('#recPos').checked = c.recPos;
+    if (c.ex != null) st.exMode = c.ex;
+    if (c.vc != null) st.vc = c.vc;
+    if (c.cars) st.cars = c.cars;
+    if (c.car) st.car = c.car;
+    if (c.out) st.outId = c.out;
   }
+  st.car = 'm4csl'; st.outId = 'i4hk';
+  applyCfg(cleanCfg(store.get()));
+  // Volum, eksosmodus og burble huskes per bil (de globale nøklene vol/bur/ex følger bilen som er valgt).
+  const carPreset = () => ({ vol: +$('#vol').value, bur: +$('#bur').value, ex: st.exMode });
+  function saveCfg() {
+    st.cars[st.car] = carPreset();
+    store.set({ vol: +$('#vol').value, bur: +$('#bur').value, tunAmt: +$('#tunAmt').value, idle: $('#idle').checked,
+      tunGps: $('#tunGps').checked, tunMap: $('#tunMap').checked, ex: st.exMode, car: st.car, out: st.outId,
+      vc: st.vc, rec: $('#rec').checked, recPos: $('#recPos').checked, cars: st.cars });
+  }
+
+  // ---------- kjørelogg ----------
+  // Kolonner i forhåndsallokerte typed arrays (ingen allokering per prøve), maks 2 timer i minnet; nye rader
+  // lagres i IndexedDB hvert 30. sekund og når siden skjules. Formatet er beskrevet i CLAUDE.md («Kjørelogg»).
+  const REC_MS = 100, REC_CAP = 2 * 3600 * 10, GPS_CAP = 2 * 3600 * 2, EV_CAP = 20000;
+  const SCOLS = ['aRaw', 'aLin', 'rot', 'vEst', 'thr', 'brk', 'dir', 'grade', 'held', 'rpm', 'gear', 'load', 'vEng', 'volDb'];
+  const GCOLS = ['spd', 'acc', 'hdg', 'good', 'lat', 'lon'];
+  const EPOCH = Date.now() - performance.now();
+  const REC = { on: false, ready: false, n: 0, gn: 0, next: 0, last: 0, dur: 0, saved: 0, gsaved: 0, esaved: 0, rewrite: false, busy: false,
+    persistT: 0, infoT: 0, ev: [], t: null, c: null, gt: null, gts: null, g: null };
+  function recAlloc() {
+    if (REC.t) return;
+    REC.t = new Float64Array(REC_CAP); REC.c = {}; for (const k of SCOLS) REC.c[k] = new Float32Array(REC_CAP);
+    REC.gt = new Float64Array(GPS_CAP); REC.gts = new Float64Array(GPS_CAP); REC.g = {};
+    for (const k of GCOLS) REC.g[k] = k === 'lat' || k === 'lon' ? new Float64Array(GPS_CAP) : new Float32Array(GPS_CAP);
+  }
+  function recTrim() { // fullt: kast den eldste halvdelen (sjelden) og skriv IndexedDB på nytt
+    if (REC.n >= REC_CAP) {
+      const h = REC_CAP / 2; REC.dur *= (REC.n - h) / REC.n;
+      REC.t.copyWithin(0, h, REC.n); for (const k of SCOLS) REC.c[k].copyWithin(0, h, REC.n); REC.n -= h;
+    }
+    if (REC.gn >= GPS_CAP) {
+      const h = GPS_CAP / 2; REC.gt.copyWithin(0, h, REC.gn); REC.gts.copyWithin(0, h, REC.gn);
+      for (const k of GCOLS) REC.g[k].copyWithin(0, h, REC.gn); REC.gn -= h;
+    }
+    if (REC.ev.length >= EV_CAP) REC.ev.splice(0, EV_CAP / 2);
+    REC.rewrite = true;
+  }
+  function recRow(now) { // fra fuse(), 60 Hz: skriver en rad hvert 100. ms
+    if (!REC.on || !REC.ready || now < REC.next) return;
+    REC.next = now - REC.next < REC_MS ? REC.next + REC_MS : now + REC_MS;
+    if (REC.last) REC.dur += Math.min(now - REC.last, 1000);
+    REC.last = now;
+    if (REC.n >= REC_CAP) recTrim();
+    const i = REC.n++, c = REC.c, t = st.tele;
+    REC.t[i] = EPOCH + now; c.aRaw[i] = S.aRaw; c.aLin[i] = S.aLin; c.rot[i] = S.rot; c.vEst[i] = S.vEst; c.thr[i] = S.thr; c.brk[i] = S.brk;
+    c.dir[i] = S.dir === 'R' ? -1 : 1; c.grade[i] = S.grade; c.held[i] = now < S.rotHold ? 1 : 0;
+    c.rpm[i] = t.rpm; c.gear[i] = t.gear; c.load[i] = t.load; c.vEng[i] = t.v; c.volDb[i] = st.vcDb;
+  }
+  function recGps(c, ts, good, now) {
+    if (!REC.on || !REC.ready) return;
+    if (REC.gn >= GPS_CAP) recTrim();
+    const i = REC.gn++, g = REC.g, pos = $('#recPos').checked, ok = (x) => x != null && !isNaN(x);
+    REC.gt[i] = EPOCH + now; REC.gts[i] = ts;
+    g.spd[i] = ok(c.speed) ? c.speed : NaN; g.acc[i] = ok(c.accuracy) ? c.accuracy : NaN; g.hdg[i] = ok(c.heading) ? c.heading : NaN;
+    g.good[i] = good ? 1 : 0; g.lat[i] = pos ? c.latitude : NaN; g.lon[i] = pos ? c.longitude : NaN;
+  }
+  function recEv(k, v) {
+    if (!REC.on || !REC.ready) return;
+    if (REC.ev.length >= EV_CAP) recTrim();
+    REC.ev.push([Math.round(EPOCH + performance.now()), k, v]);
+  }
+  const fmtDur = (ms) => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+  const IDB = { p: null };
+  function idb() {
+    if (!IDB.p) IDB.p = new Promise((res) => {
+      try {
+        const q = indexedDB.open('lydmotor-logg', 1);
+        q.onupgradeneeded = () => { try { q.result.createObjectStore('chunks', { autoIncrement: true }); } catch (e) {} };
+        q.onsuccess = () => res(q.result); q.onerror = () => res(null); q.onblocked = () => res(null);
+      } catch (e) { res(null); }
+    });
+    return IDB.p;
+  }
+  const idbTx = (db, fn) => new Promise((res, rej) => {
+    const tx = db.transaction('chunks', 'readwrite'); fn(tx.objectStore('chunks'));
+    tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error);
+  });
+  async function recPersist() {
+    if (REC.busy || !REC.ready || !REC.t) return;
+    REC.busy = true;
+    try {
+      const db = await idb(); if (!db) return;
+      const all = REC.rewrite, s0 = all ? 0 : REC.saved, g0 = all ? 0 : REC.gsaved, e0 = all ? 0 : REC.esaved;
+      const n = REC.n, gn = REC.gn, en = REC.ev.length;
+      if (!all && s0 === n && g0 === gn && e0 === en) return;
+      REC.rewrite = false;
+      const ch = { v: 1, dur: REC.dur, t: REC.t.slice(s0, n), c: {}, gt: REC.gt.slice(g0, gn), gts: REC.gts.slice(g0, gn), g: {}, ev: REC.ev.slice(e0, en) };
+      for (const k of SCOLS) ch.c[k] = REC.c[k].slice(s0, n);
+      for (const k of GCOLS) ch.g[k] = REC.g[k].slice(g0, gn);
+      await idbTx(db, (os) => { if (all) os.clear(); os.add(ch); });
+      if (!REC.rewrite) { REC.saved = n; REC.gsaved = gn; REC.esaved = en; }
+    } catch (e) { REC.rewrite = true; } finally { REC.busy = false; }
+  }
+  async function recLoad() { // etter krasj/omlasting: fortsett der loggen slapp
+    try {
+      const db = await idb(); if (!db) return;
+      const chunks = await new Promise((res) => {
+        try { const q = db.transaction('chunks').objectStore('chunks').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); } catch (e) { res([]); }
+      });
+      let trimmed = false;
+      for (const ch of chunks) {
+        if (!ch || ch.v !== 1 || !ch.t || !ch.c) continue;
+        recAlloc();
+        for (let i = 0; i < ch.t.length; i++) {
+          if (REC.n >= REC_CAP) { recTrim(); trimmed = true; }
+          const j = REC.n++; REC.t[j] = ch.t[i]; for (const k of SCOLS) REC.c[k][j] = ch.c[k] ? ch.c[k][i] : NaN;
+        }
+        for (let i = 0; ch.gt && i < ch.gt.length; i++) {
+          if (REC.gn >= GPS_CAP) { recTrim(); trimmed = true; }
+          const j = REC.gn++; REC.gt[j] = ch.gt[i]; REC.gts[j] = ch.gts ? ch.gts[i] : NaN; for (const k of GCOLS) REC.g[k][j] = ch.g && ch.g[k] ? ch.g[k][i] : NaN;
+        }
+        if (Array.isArray(ch.ev)) for (const e of ch.ev) { if (REC.ev.length >= EV_CAP) { recTrim(); trimmed = true; } REC.ev.push(e); }
+        if (typeof ch.dur === 'number') REC.dur = ch.dur;
+      }
+      REC.saved = REC.n; REC.gsaved = REC.gn; REC.esaved = REC.ev.length; REC.rewrite = trimmed;
+    } catch (e) {} finally { REC.ready = true; recEv('load', { build: BUILD, car: st.car, out: st.outId, ex: st.exMode, vc: st.vc }); recInfo(); }
+  }
+  async function recClear() {
+    REC.n = 0; REC.gn = 0; REC.ev = []; REC.dur = 0; REC.last = 0; REC.saved = 0; REC.gsaved = 0; REC.esaved = 0; REC.rewrite = false;
+    try { const db = await idb(); if (db) await idbTx(db, (os) => os.clear()); } catch (e) {}
+    recInfo();
+  }
+  function recInfo() {
+    const mb = (REC.n * SCOLS.length * 7 + REC.gn * 60 + REC.ev.length * 30) / 1e6;
+    const s = REC.n || REC.gn ? fmtDur(REC.dur) + ' tatt opp (' + REC.n + ' målinger, ' + REC.gn + ' GPS-punkter, ca. ' + mb.toFixed(1).replace('.', ',') + ' MB).' : 'Ingen logg lagret.';
+    if ($('#logInfo').textContent !== s) $('#logInfo').textContent = s;
+  }
+  function recTick(now) { // fra sysTick
+    if (now - REC.persistT > 30000) { REC.persistT = now; recPersist(); }
+    if (now - REC.infoT > 1000) { REC.infoT = now; recInfo(); }
+  }
+  function recSet(on) {
+    if (on) recAlloc();
+    if (on && !REC.on) { REC.on = true; recEv('rec', { car: st.car, out: st.outId, mode: st.mode, ex: st.exMode, vc: st.vc, build: BUILD }); }
+    else if (!on && REC.on) { recEv('rec', 0); REC.on = false; recPersist(); }
+    $('#rec').checked = on;
+  }
+  function logData() {
+    const r3 = (x) => (x === x ? Math.round(x * 1000) / 1000 : null), r6 = (x) => (x === x ? Math.round(x * 1e6) / 1e6 : null), ri = (x) => (x === x ? Math.round(x) : null);
+    const col = (a, n, f) => { const o = new Array(n); for (let i = 0; i < n; i++) o[i] = f(a[i]); return o; };
+    const s = { t: col(REC.t, REC.n, ri) }, g = { t: col(REC.gt, REC.gn, ri), ts: col(REC.gts, REC.gn, ri) };
+    for (const k of SCOLS) s[k] = col(REC.c ? REC.c[k] : null, REC.n, r3);
+    for (const k of GCOLS) g[k] = col(REC.g ? REC.g[k] : null, REC.gn, k === 'lat' || k === 'lon' ? r6 : r3);
+    return { format: 'lydmotor-logg', version: 1, build: BUILD, created: new Date().toISOString(), ua: navigator.userAgent,
+      hz: 1000 / REC_MS, gpsLag: GPS_LAG, durMs: Math.round(REC.dur), pos: $('#recPos').checked,
+      state: { car: st.car, out: st.outId, mode: st.mode, ex: st.exMode, vc: st.vc, cfg: cleanCfg(store.get()), fwd: S.fwd, bias: S.bias, gBase: S.gBase },
+      s: s, gps: g, ev: REC.ev };
+  }
+  // Fil til brukeren: delingsark på telefon (Arkiv/Meldinger), ellers vanlig nedlasting.
+  async function giveFile(text, name) {
+    const blob = new Blob([text], { type: 'application/json' });
+    try {
+      const f = typeof File === 'function' ? new File([blob], name, { type: 'application/json' }) : null;
+      if (f && navigator.canShare && window.matchMedia && matchMedia('(pointer: coarse)').matches && navigator.canShare({ files: [f] })) {
+        await navigator.share({ files: [f], title: name }); return 'Delt.';
+      }
+    } catch (e) { if (e && e.name === 'AbortError') return 'Avbrutt.'; }
+    try {
+      const a = document.createElement('a'), u = URL.createObjectURL(blob);
+      a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
+      return 'Lastet ned: ' + name;
+    } catch (e) { return 'Nettleseren lot oss ikke lagre filen.'; }
+  }
+  const stamp = () => { const d = new Date(), p = (x) => String(x).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()); };
+  $('#rec').addEventListener('change', () => { recSet($('#rec').checked); saveCfg(); sysTick(); });
+  $('#recPos').addEventListener('change', () => { recEv('pos', $('#recPos').checked ? 1 : 0); saveCfg(); });
+  $('#logDl').addEventListener('click', async () => {
+    if (!REC.n && !REC.gn) { $('#logInfo').textContent = 'Loggen er tom. Slå på «Ta opp kjøring» og kjør med sensorer.'; return; }
+    const r = await giveFile(JSON.stringify(logData()), 'lydmotor-logg-' + stamp() + '.json');
+    $('#logInfo').textContent = r;
+  });
+  $('#logDel').addEventListener('click', () => {
+    const b = $('#logDel');
+    if (!b.dataset.arm) { b.dataset.arm = '1'; b.textContent = 'Trykk igjen for å slette'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Slett logg'; }, 3000); return; }
+    delete b.dataset.arm; b.textContent = 'Slett logg';
+    recClear().then(() => { $('#logInfo').textContent = 'Loggen er slettet.'; });
+  });
+  addEventListener('pagehide', () => recPersist());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) recPersist(); });
+  REC.on = $('#rec').checked; if (REC.on) recAlloc();
+  recLoad();
+
+  // ---------- eksport og import av innstillinger ----------
+  const setMsg = (s) => { $('#cfgMsg').textContent = s; };
+  $('#cfgExp').addEventListener('click', async () => {
+    saveCfg();
+    setMsg(await giveFile(JSON.stringify({ format: 'lydmotor-innstillinger', version: 1, build: BUILD, settings: cleanCfg(store.get()) }, null, 1), 'lydmotor-innstillinger.json'));
+  });
+  $('#cfgImp').addEventListener('click', () => $('#cfgFile').click());
+  $('#cfgFile').addEventListener('change', async () => {
+    const inp = $('#cfgFile'), f = inp.files && inp.files[0];
+    try {
+      if (!f || f.size > 256 * 1024) throw new Error('size');
+      const j = JSON.parse(await f.text()), c = cleanCfg(j && typeof j === 'object' && j.settings ? j.settings : j), n = Object.keys(c).length;
+      if (!n) throw new Error('empty');
+      importCfg(c);
+      setMsg('Importert (' + n + ' innstillinger).');
+    } catch (e) { setMsg('Kunne ikke lese filen. Velg en JSON-fil som er eksportert fra Lydmotor.'); }
+    try { inp.value = ''; } catch (e) {}
+  });
+  function importCfg(c) {
+    const car = c.car; delete c.car;
+    applyCfg(c);
+    if (car && car !== st.car) { st.car = car; showCar(); if (st.started) send({ k: 'profile', p: prof() }); }
+    $('#car').value = st.car; $('#outp').value = st.outId;
+    if (st.started && c.out) send({ k: 'out', o: OUTS[st.outId] });
+    if (c.tunGps === false) st.tunGps = false;
+    if (c.tunMap === false) st.tunMap = false;
+    recSet($('#rec').checked); setVc(st.vc); setEx(st.exMode); applyTunnel(); // setEx -> pushCfg -> lagrer
+  }
+
+  // ---------- Media Session (låseskjerm, CarPlay «Spilles nå») ----------
+  // iOS viser «Spilles nå» for det stille lydsporet i sløyfe (st.keep). Pause demper motoren mykt (master-gain),
+  // spill av slår lyden på igjen; lydsporet og vakthunden i sysTick fortsetter som før.
+  function mediaMeta() {
+    try {
+      if (!navigator.mediaSession || typeof MediaMetadata !== 'function') return;
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'Lydmotor', artist: prof().name, album: 'Lydmotor',
+        artwork: [192, 512].map((s) => ({ src: new URL('icon-' + s + '.png', location.href).href, sizes: s + 'x' + s, type: 'image/png' })) });
+    } catch (e) {}
+  }
+  function mediaInit() {
+    const ms = navigator.mediaSession; if (!ms) return;
+    mediaMeta();
+    const h = (a, f) => { try { ms.setActionHandler(a, f); } catch (e) {} };
+    h('play', () => setMuted(false)); h('pause', () => setMuted(true)); h('stop', () => setMuted(true));
+    try { ms.playbackState = st.muted ? 'paused' : 'playing'; } catch (e) {}
+  }
+  function setMuted(m) {
+    st.muted = m; recEv('mute', m ? 1 : 0);
+    if (st.master && st.ctx) st.master.gain.setTargetAtTime(m ? 0 : 1, st.ctx.currentTime, 0.08);
+    if (!m) resumeAudio();
+    try { if (navigator.mediaSession) navigator.mediaSession.playbackState = m ? 'paused' : 'playing'; } catch (e) {}
+    st.sys = ''; sysTick();
+  }
+
+  // ---------- service worker (frakoblet bruk) ----------
+  // Bare på https eller localhost. Ny versjon tas i bruk ved neste oppstart; er siden allerede den nye versjonen
+  // (index.html hentes nett-først), byttes arbeideren stille. Ellers vises «Ny versjon klar», som laster på nytt ved trykk.
+  const SW = { reg: null, ready: null, upT: 0 };
+  function swInit() {
+    try {
+      if (!('serviceWorker' in navigator) || !(location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) return;
+      navigator.serviceWorker.register('sw.js', { scope: './' }).then((reg) => {
+        SW.reg = reg;
+        const watch = (w) => {
+          if (!w) return;
+          const f = () => { if (w.state === 'installed' && navigator.serviceWorker.controller) swWaiting(w); };
+          w.addEventListener('statechange', f); f();
+        };
+        watch(reg.waiting); watch(reg.installing);
+        reg.addEventListener('updatefound', () => watch(reg.installing));
+      }).catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (SW.reload) location.reload(); });
+    } catch (e) {}
+  }
+  function swWaiting(w) {
+    try {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = (e) => {
+        if (e.data && e.data.v === BUILD) w.postMessage({ k: 'skip' }); // siden er alt den nye versjonen
+        else { SW.ready = w; st.sys = ''; sysTick(); }
+      };
+      w.postMessage({ k: 'ver' }, [ch.port2]);
+    } catch (e) {}
+  }
+  function swApply() {
+    if (!SW.ready) return;
+    SW.reload = true; try { SW.ready.postMessage({ k: 'skip' }); } catch (e) {}
+    setTimeout(() => location.reload(), 1500);
+  }
+  function swCheck() { // se etter ny versjon når appen kommer frem igjen, høyst en gang i timen
+    const now = performance.now();
+    if (!SW.reg || now - SW.upT < 3600e3) return;
+    SW.upT = now; try { SW.reg.update().catch(() => {}); } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) swCheck(); });
+  swInit();
+  $('#stSys').addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    if (b.id === 'chMute') setMuted(false); else if (b.id === 'chNew') swApply();
+  });
+  // liggende: åpne innstillinger ligger under turtelleren; rull dit (lukket: tilbake til toppen)
+  $('details').addEventListener('toggle', () => {
+    try { if (matchMedia('(orientation: landscape) and (max-height: 560px)').matches) { if ($('details').open) $('details').scrollIntoView({ block: 'start' }); else scrollTo(0, 0); } } catch (e) {}
+  });
+  addEventListener('pointerdown', () => { st.touchT = performance.now(); }, { passive: true, capture: true });
+  addEventListener('keydown', () => { st.touchT = performance.now(); }, { capture: true });
 
   function send(m) {
     if (st.node) st.node.port.postMessage(m);
@@ -1367,7 +1724,7 @@ class EngineCore {
     lim: () => 'turtallssperre', deny: () => 'skift nektet', lift: () => 'overrun' };
   function onTele(t) {
     st.tele = t;
-    if (t.ev) for (const e of t.ev) { const f = EVN[e.k]; if (f) { st.evText = f(e); st.evT = performance.now(); } }
+    if (t.ev) for (const e of t.ev) { const f = EVN[e.k]; if (f) { st.evText = f(e); st.evT = performance.now(); if (REC.on) recEv('eng', e.k + (e.a != null ? ' ' + e.a + (e.b != null ? '>' + e.b : '') : '')); } }
   }
 
   // ---------- lyd ----------
@@ -1388,10 +1745,11 @@ class EngineCore {
     const N = 2049, curve = new Float32Array(N);
     for (let i = 0; i < N; i++) { const x = i / (N - 1) * 2 - 1, a = Math.abs(x); curve[i] = a < 0.8 ? x : Math.sign(x) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2)); }
     shaper.curve = curve; shaper.oversample = 'none';
-    const dry = ctx.createGain(), sendG = ctx.createGain(), wet = ctx.createGain();
-    sendG.gain.value = 0; wet.gain.value = 0;
-    src.connect(dry); dry.connect(shaper); shaper.connect(ctx.destination);
-    st.dry = dry; st.sendG = sendG; st.wet = wet;
+    const dry = ctx.createGain(), sendG = ctx.createGain(), wet = ctx.createGain(), master = ctx.createGain();
+    sendG.gain.value = 0; wet.gain.value = 0; master.gain.value = st.muted ? 0 : 1;
+    // master: bare demping fra Media Session (pause/spill av), etter mykklipperen
+    src.connect(dry); dry.connect(shaper); shaper.connect(master); master.connect(ctx.destination);
+    st.dry = dry; st.sendG = sendG; st.wet = wet; st.shaper = shaper; st.master = master;
     try {
       const ir = EngineCore.tunnelIR(ctx.sampleRate, TUN.irDur);
       const buf = ctx.createBuffer(2, ir[0].length, ctx.sampleRate);
@@ -1414,9 +1772,9 @@ class EngineCore {
     st.wakeT = performance.now();
     try {
       navigator.wakeLock.request('screen').then((w) => {
-        st.wake = w;
+        st.wake = w; recEv('wake', 1);
         // iOS slipper låsen av og til (f.eks. etter et anrop); be om den igjen så lenge siden vises
-        w.addEventListener('release', () => { st.wake = null; if (!document.hidden) setTimeout(wakeLock, 1000); });
+        w.addEventListener('release', () => { st.wake = null; recEv('wake', 0); if (!document.hidden) setTimeout(wakeLock, 1000); });
       }).catch(() => {});
     } catch (e) {}
   }
@@ -1425,6 +1783,10 @@ class EngineCore {
     const c = st.ctx, now = performance.now();
     if (!c) return;
     const audioOk = c.state === 'running' && !(st.keep && st.keep.paused);
+    const aSt = c.state + (st.keep && st.keep.paused ? '/keep-pause' : '');
+    if (aSt !== st.audioSt) { st.audioSt = aSt; recEv('audio', aSt); }
+    vcTick(now);
+    recTick(now);
     if (!document.hidden) {
       if (audioOk) st.resN = 0;
       else if (now - st.resT > (st.resN > 5 ? 5000 : 1000)) { st.resT = now; st.resN++; resumeAudio(); }
@@ -1442,6 +1804,11 @@ class EngineCore {
       parts.push(S.lastGood && age < 2500 ? ok('GPS OK') : !S.gpsSeen ? warn('GPS venter') : bad('GPS borte'));
       if (S.dir === 'R') parts.push(warn('Rygger'));
     }
+    // trykkbare brikker (egen knapp, 44 px trykkflate): dempet fra låseskjerm/CarPlay, ny versjon
+    const btn = (id, k, t) => '<button type="button" class="chip tapchip ' + k + '" id="' + id + '"><svg viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4"/></svg>' + t + '</button>';
+    if (st.muted) parts.push(btn('chMute', 'warn', 'Dempet · trykk for lyd'));
+    if (REC.on || REC.n) parts.push('<span class="chip rec' + (REC.on ? '' : ' off') + '"><svg viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4"/></svg>' + (REC.on ? 'REC ' : 'Logg ') + fmtDur(REC.dur) + '</span>');
+    if (SW.ready) parts.push(btn('chNew', 'ok', 'Ny versjon klar'));
     const html = parts.join(' ');
     if (html !== st.sys) { st.sys = html; $('#stSys').innerHTML = html; }
   }
@@ -1456,7 +1823,9 @@ class EngineCore {
     // Stille lydspor i sløyfe holder iOS-lyden på selv med stillebryteren på.
     try { const a = new Audio(silentWavUrl()); a.loop = true; a.setAttribute('playsinline', ''); a.volume = 0.01; a.play().catch(() => {}); st.keep = a; } catch (e) {}
     let ctx;
-    try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
+    try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) {
+      try { ctx = new AC(); } catch (e2) { $('#start p').textContent = 'Lyden kunne ikke starte (' + (e2 && e2.name || 'feil') + '). Lukk andre apper som spiller lyd, og last siden på nytt.'; return; }
+    }
     st.ctx = ctx;
     ctx.resume().catch(() => {});
     st.started = true;
@@ -1482,15 +1851,19 @@ registerProcessor('m4-engine', M4Proc);`;
       buildGraph(ctx, node);
       st.node = node; path = 'AudioWorklet';
     } catch (err) {
-      const core = new EngineCore(ctx.sampleRate);
-      const sp = ctx.createScriptProcessor(256, 0, 2);
-      sp.onaudioprocess = (e) => {
-        if (core.render(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.length)) onTele(core.tele);
-      };
-      buildGraph(ctx, sp);
-      st.core = core; st.sp = sp; path = 'ScriptProcessor';
+      try {
+        const core = new EngineCore(ctx.sampleRate);
+        const sp = ctx.createScriptProcessor(256, 0, 2);
+        sp.onaudioprocess = (e) => {
+          if (core.render(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.length)) onTele(core.tele);
+        };
+        buildGraph(ctx, sp);
+        st.core = core; st.sp = sp; path = 'ScriptProcessor';
+      } catch (e2) { path = 'ingen'; $('#stLat').textContent = 'Lydmotoren kunne ikke starte. Last siden på nytt.'; }
     }
     st.path = path;
+    recEv('start', mode + ' ' + path);
+    mediaInit();
     send({ k: 'out', o: OUTS[st.outId], now: true }); send({ k: 'profile', p: prof(), now: true });
     pushCfg(); send({ k: 'start' });
     setMode(mode);
@@ -1498,14 +1871,14 @@ registerProcessor('m4-engine', M4Proc);`;
     showLatency();
     setTimeout(showLatency, 1500);
     ctx.addEventListener('statechange', () => { if (ctx.state !== 'running' && !document.hidden) setTimeout(resumeAudio, 200); });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { resumeAudio(); wakeLock(); } });
+    document.addEventListener('visibilitychange', () => { recEv('vis', document.hidden ? 0 : 1); if (!document.hidden) { resumeAudio(); wakeLock(); } });
     addEventListener('pointerdown', resumeAudio, { passive: true });
     wakeLock();
     setInterval(sysTick, 250);
     if (mode === 'drive') enableSensors(motionP);
   }
   function showLatency() {
-    const ctx = st.ctx; if (!ctx) return;
+    const ctx = st.ctx; if (!ctx || st.path === 'ingen') return;
     const ms = ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000 + (st.path === 'AudioWorklet' ? 0 : 5);
     $('#stLat').innerHTML = ms > 0.5 ? 'Forsinkelse ca. <b>' + Math.round(ms) + ' ms</b>' : 'Lyd på';
     $('#stLat').title = st.path;
@@ -1514,9 +1887,36 @@ registerProcessor('m4-engine', M4Proc);`;
   $('#startTest').addEventListener('click', () => startAudio('test'));
 
   function pushCfg() {
-    send({ k: 'cfg', vol: +$('#vol').value, burble: +$('#bur').value, idleOn: $('#idle').checked, auto: st.mode === 'drive' ? true : st.auto, exMode: st.exMode });
+    st.volSent = effVol();
+    send({ k: 'cfg', vol: st.volSent, burble: +$('#bur').value, idleOn: $('#idle').checked, auto: st.mode === 'drive' ? true : st.auto, exMode: st.exMode });
     saveCfg();
   }
+
+  // ---------- veistøykompensasjon ----------
+  // Volumet løftes med farten (lineært 0 dB i ro til VC_DB ved 120 km/t, glattet ~1 s) via cfg vol, før motorens
+  // begrenser er utgangen vol × tak (i4hk 0,53). Løftet stopper der verste topp ville passert ca. -2 dBFS
+  // (PEAK_MAX, mykklipperen starter på 0,8); i tunnel regnes klangens ekstra topp med (TUN_PK, målt i sensortest).
+  // Aldri lavere enn brukerens eget volum. Bare i kjøremodus med sensorer; testmodus får 0 dB.
+  const VC_DB = [0, 2, 3.5, 5], PEAK_MAX = 0.79, TUN_PK = 1.9;
+  const vcTarget = (v) => VC_DB[st.vc] * clamp(v * 3.6 / 120, 0, 1);
+  function effVol() {
+    const vol = +$('#vol').value, o = OUTS[st.outId], pk = ((o && o.lim) || 0.86) * (st.tunOn ? TUN_PK : 1);
+    return Math.min(vol * Math.pow(10, st.vcDb / 20), Math.max(vol, PEAK_MAX / pk));
+  }
+  function vcTick(now) {
+    const dt = st.vcT ? clamp((now - st.vcT) / 1000, 0, 1) : 0.25; st.vcT = now;
+    const tgt = st.mode === 'drive' && S.on ? vcTarget(S.vEst) : 0;
+    st.vcDb += (tgt - st.vcDb) * (1 - Math.exp(-dt / 1.0));
+    const v = effVol();
+    if (Math.abs(v - st.volSent) > 0.002) { st.volSent = v; send({ k: 'cfg', vol: v }); }
+  }
+  function setVc(m) {
+    st.vc = m;
+    document.querySelectorAll('[data-vc]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.vc === m)));
+    saveCfg();
+  }
+  document.querySelectorAll('[data-vc]').forEach((b) => b.addEventListener('click', () => setVc(+b.dataset.vc)));
+  setVc(st.vc);
   $('#vol').addEventListener('input', pushCfg);
   $('#bur').addEventListener('input', pushCfg);
   $('#idle').addEventListener('change', pushCfg);
@@ -1524,6 +1924,7 @@ registerProcessor('m4-engine', M4Proc);`;
   $('#tunGps').addEventListener('change', () => { saveCfg(); if (!$('#tunGps').checked) { st.tunGps = false; applyTunnel(); } });
   $('#tunMap').addEventListener('change', () => { saveCfg(); if (!$('#tunMap').checked) { st.tunMap = false; applyTunnel(); } });
   function setEx(m) {
+    if (st.exMode !== m) recEv('ex', m);
     st.exMode = m;
     document.querySelectorAll('[data-ex]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ex === m)));
     pushCfg();
@@ -1535,12 +1936,22 @@ registerProcessor('m4-engine', M4Proc);`;
     const p = prof(); $('#carTag').textContent = p.short.toUpperCase(); $('#startCar').textContent = p.name; $('#startBlurb').textContent = p.blurb;
     const a = ACCENTS[st.car] || ACCENTS.m4csl, rs = document.documentElement.style;
     rs.setProperty('--acc', a[0]); rs.setProperty('--acc2', a[1]); COL.acc = a[0]; COL.acc2 = a[1];
+    mediaMeta();
   }
   for (const k in PROFS) $('#car').add(new Option(PROFS[k].name, k));
   for (const k in OUTS) $('#outp').add(new Option(OUTS[k].name, k));
   $('#car').value = st.car; $('#outp').value = st.outId; showCar();
-  $('#car').addEventListener('change', () => { st.car = $('#car').value; showCar(); saveCfg(); if (st.started) send({ k: 'profile', p: prof() }); });
-  $('#outp').addEventListener('change', () => { st.outId = $('#outp').value; saveCfg(); if (st.started) send({ k: 'out', o: OUTS[st.outId] }); });
+  function setCar(id) {
+    if (!PROFS[id]) return;
+    saveCfg(); // husk innstillingene for bilen vi forlater
+    st.car = id; $('#car').value = id;
+    const p = st.cars[id]; // bilens egne innstillinger, ellers arves de som er nå
+    if (p) { if (p.vol != null) $('#vol').value = p.vol; if (p.bur != null) $('#bur').value = p.bur; if (p.ex != null) setEx(p.ex); }
+    showCar(); pushCfg(); recEv('car', id);
+    if (st.started) send({ k: 'profile', p: prof() });
+  }
+  $('#car').addEventListener('change', () => setCar($('#car').value));
+  $('#outp').addEventListener('change', () => { st.outId = $('#outp').value; pushCfg(); recEv('out', st.outId); if (st.started) send({ k: 'out', o: OUTS[st.outId] }); });
 
   // ---------- tunnel ----------
   function applyTunnel() {
@@ -1551,7 +1962,9 @@ registerProcessor('m4-engine', M4Proc);`;
     b.setAttribute('aria-pressed', String(st.tunManual));
     b.classList.toggle('auto-on', on && !st.tunManual);
     b.textContent = on && !st.tunManual ? 'TUNNEL · AUTO' : 'TUNNEL';
+    if (st.tunOn !== on) recEv('tun', on ? why : 0);
     st.tunOn = on;
+    if (st.ctx) vcTick(performance.now()); // taket for veistøyløftet er lavere i tunnel
     if (!st.ctx || !st.tunReady) return;
     const t = st.ctx.currentTime, amt = +$('#tunAmt').value, tau = on ? TUN.tauIn : TUN.tauOut;
     st.sendG.gain.setTargetAtTime(on ? TUN.send : 0, t, on ? TUN.tauIn : 0.05);
@@ -1611,7 +2024,7 @@ registerProcessor('m4-engine', M4Proc);`;
 
   // ---------- modus ----------
   function setMode(m) {
-    st.mode = m; document.body.dataset.mode = m;
+    st.mode = m; document.body.dataset.mode = m; recEv('mode', m);
     $('#mTest').setAttribute('aria-pressed', String(m === 'test')); $('#mDrive').setAttribute('aria-pressed', String(m === 'drive'));
     st.thrPed = 0; st.thrKey = 0; st.keyGas = false; st.brake = 0; $('#brake').classList.remove('on'); $('#gas').classList.remove('on'); $('#gasFill').style.height = '0%';
     if (m === 'test') { st.tunGps = false; st.tunMap = false; applyTunnel(); }
@@ -1628,7 +2041,7 @@ registerProcessor('m4-engine', M4Proc);`;
     thr: 0, brk: 0, motionT: 0, motionSeen: false, gpsSeen: false, motionDenied: false,
     lat: null, lon: null, hdg: null, acc: null, accBase: 12, lastGood: 0, goodN: 0, everGood: false, vHold: 0, tickT: 0, uiT: 0,
     hist: [], fixNow: 0, rotHold: 0, gRef: null, offT: 0, grade: 0, gBase: 0, saveT: 0,
-    dir: 'F', rI: 0, heldT: 0, rv0: null, rvA: null, rvP: null, rvB: 0, rvLast: null };
+    dir: 'F', rI: 0, heldT: 0, rv0: null, rvA: null, rvP: null, rvB: 0, rvLast: null, aRaw: NaN, aLin: NaN, rot: 0 };
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const nrm = (a) => Math.hypot(a[0], a[1], a[2]);
   const GPS_LAG = 1000; // ms: GPS-farten beskriver bilen omtrent ett sekund tilbake i tid
@@ -1712,6 +2125,7 @@ registerProcessor('m4-engine', M4Proc);`;
       S.brk += (b - S.brk) * Math.min(1, dt / 0.1);
     }
     histPush(performance.now(), h, !held);
+    recRow(performance.now());
     // Revers: motoren blir i 1. gir på lavt turtall (fart ×0,8 som R-utvekslingen, maks 3,4 m/s ≈ 1500 o/min), dempet gass.
     if (st.mode === 'drive') send(sg < 0 ? { k: 'drive', v: Math.min(S.vEst * 0.8, 3.4), thr: Math.min(S.thr, 0.5), brake: S.brk }
       : { k: 'drive', v: S.vEst, thr: S.thr, brake: S.brk });
@@ -1776,6 +2190,7 @@ registerProcessor('m4-engine', M4Proc);`;
     const hasV = c.speed != null && !isNaN(c.speed) && c.speed >= 0;
     const good = hasV && acc <= Math.max(35, 2.5 * S.accBase);
     S.acc = acc;
+    recGps(c, pos.timestamp, good, now);
     if (good) {
       if (acc < 30) S.accBase += (acc - S.accBase) * 0.1;
       const v = c.speed, tPast = now - GPS_LAG;
@@ -1826,7 +2241,9 @@ registerProcessor('m4-engine', M4Proc);`;
   }
   function onGpsErr(err) {
     S.goodN = 0;
-    $('#dpGps').textContent = err.code === 1 ? 'Blokkert. Tillat posisjon for Safari i Innstillinger.' : 'Ingen signal';
+    $('#dpGps').textContent = err.code === 1 ? 'Blokkert. Tillat posisjon for Safari (Innstillinger › Personvern › Stedstjenester) og last siden på nytt.'
+      : err.code === 2 ? 'Ingen posisjon tilgjengelig. Sjekk at Stedstjenester er på.' : 'Venter på GPS-signal …';
+    recEv('gpsErr', err.code);
   }
 
   function onMotion(e) {
@@ -1837,7 +2254,8 @@ registerProcessor('m4-engine', M4Proc);`;
     S.motionSeen = true; S.motionT = now;
     // Telefonen dreies raskt (tas ut av holderen, slag): ikke tolk rykkene som gass eller brems.
     const rr = e.rotationRate;
-    if (rr && Math.hypot(rr.alpha || 0, rr.beta || 0, rr.gamma || 0) > 80) S.rotHold = now + 700;
+    S.rot = rr ? Math.hypot(rr.alpha || 0, rr.beta || 0, rr.gamma || 0) : NaN;
+    if (S.rot > 80) S.rotHold = now + 700;
     const held = now < S.rotHold;
     let lin, g; const osLin = !!(a && a.x != null);
     if (osLin) { lin = [a.x, a.y, a.z]; g = [ag.x - a.x, ag.y - a.y, ag.z - a.z]; }
@@ -1868,6 +2286,8 @@ registerProcessor('m4-engine', M4Proc);`;
       S.grade += (clamp(sl - S.gBase, -0.1, 0.1) - S.grade) * Math.min(1, dt / 1.5);
     } else if (!S.fwd) S.grade = 0;
     const aLong = S.fwd ? dot(ah, S.fwd) - clamp(S.bias, -0.5, 0.5) : (now - S.aGpsT < 2500 ? S.aGps : 0);
+    // for kjøreloggen: rå akselerasjon (med tyngde) og tyngdeseparert, begge langs lært fremover
+    S.aRaw = S.fwd ? dot([ag.x, ag.y, ag.z], S.fwd) : NaN; S.aLin = S.fwd ? aLong : NaN;
     fuse(aLong, dt, ah, held);
   }
 
@@ -1876,7 +2296,7 @@ registerProcessor('m4-engine', M4Proc);`;
     const now = performance.now(), dt = S.tickT ? clamp((now - S.tickT) / 1000, 0.01, 1) : 0.25; S.tickT = now;
     if (st.mode !== 'drive') return;
     const motionLive = S.motionSeen && now - S.motionT < 600;
-    if (!motionLive) fuse(now - S.aGpsT < 1300 ? S.aGps : 0, dt, null, false);
+    if (!motionLive) { S.aRaw = S.aLin = NaN; fuse(now - S.aGpsT < 1300 ? S.aGps : 0, dt, null, false); }
     if (S.fwd && motionLive && now - S.saveT > 30000) { S.saveT = now; calSave(); }
     // GPS-vakt: i fart, og så blir det stille fra GPS-en
     if ($('#tunGps').checked && S.everGood) {
@@ -1907,6 +2327,7 @@ registerProcessor('m4-engine', M4Proc);`;
     const ok = await (motionP || askMotion());
     S.motionDenied = !ok;
     if (ok) addEventListener('devicemotion', onMotion);
+    else { $('#dpMsg').innerHTML = '<span class="warn">Bevegelsessensoren er avslått.</span> Lyden følger bare GPS (tregere). Trykk Prøv igjen og svar Tillat; har du svart Ikke tillat, lukk fanen og åpne siden på nytt.'; $('#sensBtn').hidden = false; $('#sensBtn').textContent = 'Prøv igjen'; S.retry = true; }
     if (navigator.geolocation) {
       try { navigator.geolocation.watchPosition(onGps, onGpsErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }); }
       catch (e) { $('#dpGps').textContent = 'Blokkert'; }
@@ -1914,6 +2335,7 @@ registerProcessor('m4-engine', M4Proc);`;
     setInterval(driveTick, 250);
     wakeLock();
     setTimeout(() => {
+      if (S.motionDenied && S.gpsSeen) return; // avslag-meldingen over står
       const miss = [!S.gpsSeen ? 'GPS' : '', !S.motionSeen ? 'bevegelsesdata' : ''].filter(Boolean);
       if (miss.length) {
         $('#dpMsg').innerHTML = '<span class="warn">Mangler ' + miss.join(' og ') + '.</span> Sensorer virker bare når siden er åpnet i Safari fra sin egen https-adresse, og du har svart ja på spørsmålene. Bruk testmodus her.';
@@ -2082,8 +2504,13 @@ registerProcessor('m4-engine', M4Proc);`;
     }
     const t = st.tele;
     st.rpmD += (t.rpm - st.rpmD) * 0.6; st.vD += (t.v - st.vD) * 0.3;
-    if (ts - st.drawT < 30) return; // tegn med 30 bilder i sekundet, sparer batteri
-    st.drawT = ts;
+    // 30 bilder i sekundet; 15 når bilen har stått stille på tomgang uten pedal i over 20 s; ingenting når siden er skjult
+    const p = prof(), drv = st.mode === 'drive';
+    const still = t.v < 0.1 && (!drv || S.vEst < 0.1) && !t.shift && !st.brake && Math.max(st.thrPed, st.thrKey, drv ? S.thr : 0) < 0.02 && t.rpm < p.idle + 250;
+    if (!still || st.sweepT) st.moveT = ts;
+    const slow = ts - Math.max(st.moveT, st.touchT) > 20000;
+    if (document.hidden || ts - st.drawT < (slow ? 63 : 30)) return;
+    st.drawT = ts; st.frames++;
     const dpr = Math.min(window.devicePixelRatio || 1, 3), w = cvs.clientWidth, h = cvs.clientHeight;
     if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) { cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr); }
     const g = cvs.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvs.width, cvs.height);
@@ -2151,7 +2578,9 @@ registerProcessor('m4-engine', M4Proc);`;
   requestAnimationFrame(draw);
 
   // for automatisk test
-  window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, onMotion: onMotion, calReset: calReset, sysTick: sysTick, driveTick: driveTick, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate };
+  window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, onMotion: onMotion, calReset: calReset, sysTick: sysTick, driveTick: driveTick, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate,
+    BUILD: BUILD, REC: REC, recSet: recSet, logData: logData, recPersist: recPersist, recLoad: recLoad, effVol: effVol, vcTick: vcTick, VC_DB: VC_DB, TUN: TUN, TUN_PK: TUN_PK, PEAK_MAX: PEAK_MAX,
+    buildGraph: buildGraph, setMuted: setMuted, SW: SW, cleanCfg: cleanCfg, importCfg: importCfg, setCar: setCar, saveCfg: saveCfg, store: store };
 })();
 </script>
 </body>
