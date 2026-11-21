@@ -6,7 +6,16 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const file = path.resolve(process.argv[2] || path.join(__dirname, '..', 'index.html'));
 
-const server = http.createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); r.end(fs.readFileSync(file)); });
+// Statisk tjener for mappen siden ligger i ('/' = siden). OVR: innhold som overstyrer filer (test av ny versjon).
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.json': 'application/json' };
+const OVR = {};
+const server = http.createServer((q, r) => {
+  const p = decodeURIComponent(q.url.split('?')[0]), rel = p === '/' ? path.basename(file) : p.slice(1);
+  const f = p === '/' || rel === 'index.html' ? file : path.join(path.dirname(file), rel);
+  if (rel.includes('..') || (!OVR[rel] && !fs.existsSync(f))) { r.writeHead(404); r.end(); return; }
+  r.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+  r.end(OVR[rel] != null ? OVR[rel] : fs.readFileSync(f));
+});
 let fails = 0;
 const check = (name, ok, info) => { if (!ok) fails++; console.log((ok ? 'PASS ' : 'FAIL ') + name + (info ? '  [' + info + ']' : '')); };
 
@@ -16,8 +25,8 @@ const PROFILE = [[2, 0, 0], [10, 2, 0], [8, 0, 0], [6, -2.5, 0], [4, 0, 0], [10,
   [1, 0, 0, 'jolt'], [4, 0, 0], // telefonen løftes
   [3, 0, 0], [2, 3, 0], [2, 0, 0]]; // trinn i gass for responstid
 
-async function sim(page) {
-  return page.evaluate((PROFILE) => {
+async function sim(page, lag) {
+  return page.evaluate(([PROFILE, LAG]) => {
     const M = window.__m4, S = M.S;
     let T = 0, rs = 12345; const rnd = () => { rs = (rs * 1103515245 + 12345) % 2147483648; return rs / 2147483648; };
     const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
@@ -39,16 +48,16 @@ async function sim(page) {
         let jump = null;
         if (T >= nextFix) { // GPS: farten fra ett sekund siden, levert nå
           nextFix += 1000;
-          const old = truth.find((x) => x.t >= T - 1000) || truth[0];
+          const old = truth.find((x) => x.t >= T - LAG) || truth[0];
           const before = S.vEst;
-          M.onGps({ timestamp: T - 1000, coords: { speed: Math.max(0, old.v + gauss() * 0.1), accuracy: 5, heading: null, latitude: 59.9, longitude: 10.7 } });
+          M.onGps({ timestamp: T - LAG, coords: { speed: Math.max(0, old.v + gauss() * 0.1), accuracy: 5, heading: null, latitude: 59.9, longitude: 10.7 } });
           jump = S.vEst - before;
         }
         out.push({ t: T / 1000, seg: si, v, est: S.vEst, thr: S.thr, brk: S.brk, jump, fwd: !!S.fwd, grade: S.grade || 0 });
       }
     }
     return out;
-  }, PROFILE);
+  }, [PROFILE, lag || 1000]);
 }
 
 // ---- revers: syntetiske turer med fortegnet fart. Segment: [varighet s, akselerasjon langs bilen m/s², valg] ----
@@ -157,6 +166,242 @@ function revReport(rv) {
   }
 }
 
+// ---- kjørelogg: syntetisk tur gjennom den ekte fusjonen med opptak på, så loganalyze.js på loggen ----
+async function logSim(browser, url, watch, lag) {
+  const ctx = await browser.newContext(); const page = await ctx.newPage(); watch(page);
+  await page.addInitScript(() => { window.__T = 0; performance.now = () => window.__T; try { localStorage.clear(); } catch (e) {} });
+  await page.goto(url); await page.waitForFunction(() => window.__m4.REC.ready);
+  await page.evaluate(() => window.__m4.recSet(true));
+  await sim(page, lag);
+  const json = await page.evaluate(() => JSON.stringify(window.__m4.logData()));
+  if (process.env.LOGOUT) fs.writeFileSync(process.env.LOGOUT + '-' + lag + '.json', json); // eksempel-logg for loganalyze.js
+  // lagring i IndexedDB overlever omlasting
+  const n1 = await page.evaluate(async () => { await window.__m4.recPersist(); return window.__m4.REC.n; });
+  await page.reload(); await page.waitForFunction(() => window.__m4.REC.ready);
+  const n2 = await page.evaluate(() => window.__m4.REC.n);
+  await ctx.close();
+  return { log: JSON.parse(json), bytes: json.length, n1, n2 };
+}
+function logChecks(r, lag) {
+  const { analyze, report } = require('./loganalyze.js');
+  const L = r.log, A = analyze(L);
+  console.log('\nKJØRELOGG (syntetisk tur, GPS ' + lag + ' ms forsinket, ' + (r.bytes / 1e6).toFixed(2) + ' MB JSON):\n' + report(A));
+  check('logg: format, kolonner og 10 rader i sekundet', L.format === 'lydmotor-logg' && L.version === 1 && A.rows > 1500 && Math.abs(A.rowMs - 100) <= 17 && ['aRaw', 'aLin', 'rot', 'vEst', 'thr', 'brk', 'dir', 'grade', 'rpm', 'gear', 'volDb'].every((k) => Array.isArray(L.s[k]) && L.s[k].length === A.rows), A.rows + ' rader, median ' + A.rowMs + ' ms');
+  check('logg: hvert GPS-punkt er med, uten posisjon som standard', A.fixes >= 150 && L.gps.lat.every((x) => x === null) && L.pos === false, A.fixes + ' punkter');
+  check('logg: lagret i IndexedDB og lest inn igjen etter omlasting', r.n1 > 0 && r.n2 === r.n1, r.n1 + ' -> ' + r.n2);
+  const ls = A.lagSensor, lf = A.lagFused;
+  check('loganalyze: GPS-forsinkelse fra akselerometeret innen ±0,15 s', ls && Math.abs(ls.lag - lag) <= 150, ls ? Math.round(ls.lag) + ' ms' : '–');
+  if (lag === 1000) {
+    check('loganalyze: GPS-forsinkelse fra fusjonert fart innen ±0,25 s', lf && Math.abs(lf.lag - lag) <= 250, lf ? Math.round(lf.lag) + ' ms' : '–');
+    check('loganalyze: fartsfeil liten (rms < 0,6 m/s), ingen girjakt i data uten motor', A.speedErr.rms < 0.6 && A.dirChanges === 0, 'rms ' + A.speedErr.rms.toFixed(2));
+  }
+}
+
+// ---- nye funksjoner på siden: Media Session, veistøy, innstillinger, per bil, bilderate, service worker, skjermbilder ----
+async function features(browser, url, watch, port) {
+  const shots = process.env.SHOTS; // mappe for skjermbilder
+  const shot = async (p, name) => { if (shots) await p.screenshot({ path: path.join(shots, name + '.png') }); };
+  // Media Session: handlerne fanges opp (Chrome viser dem ikke)
+  const ctx = await browser.newContext({ viewport: { width: 393, height: 852 }, acceptDownloads: true }); const p = await ctx.newPage(); watch(p);
+  await p.addInitScript(() => {
+    if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', 1); try { localStorage.clear(); } catch (e) {} }
+    window.__msH = {}; const ms = navigator.mediaSession, o = ms.setActionHandler.bind(ms);
+    ms.setActionHandler = (a, f) => { window.__msH[a] = f; o(a, f); };
+  });
+  await p.goto(url); await p.click('#startTest'); await p.waitForTimeout(600);
+  const m1 = await p.evaluate(() => { const m = navigator.mediaSession.metadata; return { t: m && m.title, a: m && m.artist, art: m ? m.artwork.length : 0, st: navigator.mediaSession.playbackState, h: Object.keys(window.__msH).sort().join(',') }; });
+  check('media: metadata (Lydmotor, bilnavn, to ikoner), spiller, play/pause/stop koblet', m1.t === 'Lydmotor' && /M4 CSL/.test(m1.a) && m1.art === 2 && m1.st === 'playing' && m1.h === 'pause,play,stop', JSON.stringify(m1));
+  await p.evaluate(() => window.__m4.setCar('gt3'));
+  const a2 = await p.evaluate(() => navigator.mediaSession.metadata.artist);
+  check('media: bilbytte oppdaterer artist', /911 GT3/.test(a2), a2);
+  await p.evaluate(() => window.__msH.pause()); await p.waitForTimeout(600);
+  const m2 = await p.evaluate(() => { const M = window.__m4; M.sysTick(); return { g: M.st.master.gain.value, st: navigator.mediaSession.playbackState, keep: M.st.keep.paused, chip: document.querySelector('#chMute') ? document.querySelector('#chMute').textContent : '', run: M.st.ctx.state }; });
+  check('media: pause demper mykt (master-gain), lydspor og lydkontekst går videre', m2.g < 0.01 && m2.st === 'paused' && !m2.keep && m2.run === 'running' && /Dempet/.test(m2.chip), JSON.stringify(m2));
+  await p.click('#chMute'); await p.waitForTimeout(600);
+  const m3 = await p.evaluate(() => ({ g: window.__m4.st.master.gain.value, st: navigator.mediaSession.playbackState }));
+  check('media: trykk på Dempet (eller play) slår lyden på igjen', m3.g > 0.99 && m3.st === 'playing', JSON.stringify(m3));
+
+  // veistøykompensasjon: kartlegging, glatting, tak, testmodus
+  const vc = await p.evaluate(() => {
+    const M = window.__m4, st = M.st, S = M.S, r = {}; let T = performance.now() + 1e6;
+    M.vcTick(T);
+    const run = (sec) => { for (let i = 0; i < sec * 4; i++) { T += 250; M.vcTick(T); } };
+    document.querySelector('#vol').value = 0.8; st.vc = 2; st.mode = 'drive'; S.on = true; S.vEst = 120 / 3.6;
+    run(1); r.after1 = st.vcDb; run(9); r.db120 = st.vcDb; r.vol = st.volSent;
+    S.vEst = 60 / 3.6; run(10); r.db60 = st.vcDb;
+    S.vEst = 200 / 3.6; st.vc = 3; document.querySelector('#vol').value = 1; run(10); r.capVol = st.volSent;
+    st.tunOn = true; run(1); r.tunVol = st.volSent; st.tunOn = false;
+    st.mode = 'test'; run(10); r.testDb = st.vcDb; r.testVol = st.volSent;
+    S.on = false; document.querySelector('#vol').value = 0.8; st.vc = 2; run(1);
+    r.lim = M.store && 0; return r;
+  });
+  console.log('INFO veistøy: ' + JSON.stringify(vc));
+  check('veistøy: Normal = +3,5 dB ved 120 km/t, +1,75 ved 60, glattet (63 % etter 1 s)', Math.abs(vc.db120 - 3.5) < 0.01 && Math.abs(vc.db60 - 1.75) < 0.02 && vc.after1 > 0.55 * 3.5 && vc.after1 < 0.7 * 3.5, vc.db120.toFixed(2) + ' / ' + vc.db60.toFixed(2) + ' / ' + vc.after1.toFixed(2));
+  check('veistøy: volum 0,8 -> 1,20 ved 120 km/t (cfg vol)', Math.abs(vc.vol - 0.8 * Math.pow(10, 3.5 / 20)) < 0.003, vc.vol.toFixed(3));
+  check('veistøy: taket holder i4hk under -2 dBFS (vol 1, Høy, 200 km/t: ' + (20 * Math.log10(vc.capVol * 0.53)).toFixed(2) + ' dBFS), i tunnel intet løft', vc.capVol * 0.53 <= 0.7943 && Math.abs(vc.tunVol - 1) < 1e-6, vc.capVol.toFixed(3) + ' / ' + vc.tunVol.toFixed(3));
+  check('veistøy: testmodus går tilbake til 0 dB', vc.testDb < 0.01 && Math.abs(vc.testVol - 1) < 0.003, vc.testDb.toFixed(3));
+
+  // skjermbilder av de nye delene: statusrad med brikker, innstillinger
+  await p.evaluate(() => { const M = window.__m4; M.recSet(true); M.REC.dur = 754000; M.SW.ready = {}; M.setMuted(true); });
+  await p.click('summary'); await p.waitForTimeout(200);
+  await shot(p, 'status-393x852');
+  await p.locator('#vcLbl').scrollIntoViewIfNeeded(); await shot(p, 'settings-veistoy-393x852');
+  await p.locator('#logDl').scrollIntoViewIfNeeded(); await shot(p, 'settings-logg-393x852');
+  await p.setViewportSize({ width: 852, height: 393 }); await p.waitForTimeout(300);
+  await p.evaluate(() => window.scrollTo(0, 0)); await shot(p, 'status-852x393');
+  await p.locator('#logDl').scrollIntoViewIfNeeded(); await shot(p, 'settings-logg-852x393');
+  await p.setViewportSize({ width: 393, height: 852 });
+  await p.evaluate(() => { const M = window.__m4; M.SW.ready = null; M.setMuted(false); M.recSet(false); M.REC.dur = 0; });
+
+  // innstillinger: streng kontroll, eksport, import, ugyldig fil
+  const cl = await p.evaluate(() => {
+    const C = window.__m4.cleanCfg;
+    return [JSON.stringify(C({ vol: 5, bur: 'x', foo: 1, car: 'nope', ex: 1.6, vc: -3, rec: 1, cars: { m4csl: { vol: -1, zz: 3, ex: 9 }, nope: { vol: 0.5 } } })),
+      JSON.stringify(C(null)), JSON.stringify(C('tekst')), JSON.stringify(C({ cars: 5, tunAmt: NaN, idle: false })), JSON.stringify(C([1, 2]))];
+  });
+  check('innstillinger: ukjente nøkler forkastes, tall klemmes, kaster aldri', cl[0] === '{"vol":1,"ex":2,"vc":0,"cars":{"m4csl":{"vol":0,"ex":2}}}' && cl[1] === '{}' && cl[2] === '{}' && cl[3] === '{"idle":false}' && cl[4] === '{}', cl.join(' '));
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#cfgExp')]);
+  const exp = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  check('innstillinger: eksport gir JSON med format og innstillinger', exp.format === 'lydmotor-innstillinger' && exp.settings && exp.settings.car === 'gt3', dl.suggestedFilename());
+  const imp = { format: 'lydmotor-innstillinger', version: 1, settings: { vol: 0.42, ex: 0, car: 'lfa', vc: 3, ukjent: true, cars: { m4csl: { vol: 0.33, ex: 2, bur: 0.1 } } } };
+  await p.setInputFiles('#cfgFile', { name: 'inn.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(imp)) }); await p.waitForTimeout(500);
+  const im = await p.evaluate(() => ({ vol: +document.querySelector('#vol').value, car: window.__m4.st.car, ex: window.__m4.st.exMode, vc: window.__m4.st.vc, msg: document.querySelector('#cfgMsg').textContent, tele: window.__m4.st.tele.car }));
+  check('innstillinger: import tar i bruk bil, volum, eksos og veistøy', im.vol === 0.42 && im.car === 'lfa' && im.ex === 0 && im.vc === 3 && /Importert/.test(im.msg) && im.tele === 'lfa', JSON.stringify(im));
+  await p.setInputFiles('#cfgFile', { name: 'feil.json', mimeType: 'application/json', buffer: Buffer.from('{ikke json') }); await p.waitForTimeout(300);
+  const bad = await p.evaluate(() => ({ msg: document.querySelector('#cfgMsg').textContent, vol: +document.querySelector('#vol').value }));
+  check('innstillinger: ugyldig fil gir melding og endrer ingenting', /Kunne ikke lese/.test(bad.msg) && bad.vol === 0.42, bad.msg);
+  // per bil: volum, eksos og burble huskes og hentes ved bilbytte
+  const pc = await p.evaluate(() => {
+    const M = window.__m4, vol = document.querySelector('#vol'), r = [];
+    M.setCar('m4csl'); r.push(+vol.value, M.st.exMode); // fra import: 0.33 / 2
+    M.setCar('vanqs'); r.push(+vol.value); // ingen forhåndsinnstilling: arver 0.33
+    vol.value = 0.55; vol.dispatchEvent(new Event('input')); document.querySelector('[data-ex="1"]').click();
+    M.setCar('m4csl'); r.push(+vol.value, M.st.exMode);
+    M.setCar('vanqs'); r.push(+vol.value, M.st.exMode);
+    return r.concat([JSON.stringify(M.store.get().cars.vanqs)]);
+  });
+  check('per bil: volum og eksos huskes per bil, ny bil arver', pc.slice(0, 7).join() === '0.33,2,0.33,0.33,2,0.55,1', pc.join(' '));
+  await p.reload(); await p.waitForTimeout(300);
+  const rl = await p.evaluate(() => ({ car: window.__m4.st.car, vol: +document.querySelector('#vol').value, ex: window.__m4.st.exMode }));
+  check('per bil: lagret over omlasting', rl.car === 'vanqs' && rl.vol === 0.55 && rl.ex === 1, JSON.stringify(rl));
+  await ctx.close();
+
+  // gamle lagrede innstillinger (uten per bil) og en bil motoren ikke kjenner: ingen feil, M4 eller lagret bil
+  const c3 = await browser.newContext(); const q = await c3.newPage(); watch(q);
+  await q.addInitScript(() => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', 1); localStorage.clear(); localStorage.setItem('m4csl', JSON.stringify({ vol: 0.6, ex: 0, car: 'gt3', bur: 0.2 })); } });
+  await q.goto(url);
+  const mg = await q.evaluate(() => ({ car: window.__m4.st.car, vol: +document.querySelector('#vol').value, ex: window.__m4.st.exMode, acc: getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() }));
+  check('migrering: gamle innstillinger leses (bil, volum, eksos)', mg.car === 'gt3' && mg.vol === 0.6 && mg.ex === 0 && mg.acc === '#ffd60a', JSON.stringify(mg));
+  await q.evaluate(() => localStorage.setItem('lydmotor', JSON.stringify({ car: 'f812', cars: { f812: { vol: 0.3 } } })));
+  await q.reload();
+  const uk = await q.evaluate(() => { const P = EngineCore.profiles(); return { car: window.__m4.st.car, known: !!P.f812, tag: document.querySelector('#carTag').textContent, acc: getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() }; });
+  check('ukjent bil (f812 før motorgrenen): faller tilbake uten feil', uk.known ? uk.car === 'f812' && uk.acc === '#d8001e' : uk.car === 'm4csl' && uk.acc === '#29b6ff', JSON.stringify(uk));
+  await c3.close();
+
+  // bilderate: 30 fps, 15 fps etter 20 s stillstand, tilbake ved trykk, 0 når skjult
+  const c4 = await browser.newContext({ viewport: { width: 393, height: 852 } }); const f = await c4.newPage(); watch(f);
+  await f.goto(url); await f.click('#startTest'); await f.waitForTimeout(1500);
+  const frames = (ms) => f.evaluate((ms) => new Promise((res) => { const a = window.__m4.st.frames; setTimeout(() => res((window.__m4.st.frames - a) * 1000 / ms), ms); }), ms);
+  const fFast = await frames(2000);
+  await f.evaluate(() => { window.__m4.st.moveT = performance.now() - 21000; window.__m4.st.touchT = -1e9; });
+  const fSlow = await frames(2000);
+  await f.mouse.click(200, 300); const fBack = await frames(1000);
+  await f.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); });
+  const fHid = await frames(1000);
+  await f.evaluate(() => { delete document.hidden; });
+  console.log('INFO bilderate: ' + [fFast, fSlow, fBack, fHid].map((x) => x.toFixed(1)).join(' / ') + ' bilder/s (i fart / stillstand > 20 s / etter trykk / skjult)');
+  check('turteller: ~30 fps, ~15 fps i stillstand, 30 igjen ved trykk, 0 når skjult', fFast > 25 && fFast < 33 && fSlow > 12 && fSlow < 17 && fBack > 25 && fHid === 0);
+  await c4.close();
+
+  // service worker: forhåndslager, frakoblet oppstart, ny versjon (stille bytte eller «Ny versjon klar»)
+  const c5 = await browser.newContext({ viewport: { width: 393, height: 852 } }); const w = await c5.newPage(); watch(w);
+  await w.goto(url);
+  await w.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 15000 });
+  const build = await w.evaluate(() => window.__m4.BUILD);
+  const ck = await w.evaluate(async () => { const ks = await caches.keys(); const c = await caches.open(ks[0]); return { ks, files: (await c.keys()).map((r) => r.url.split('/').pop()).sort() }; });
+  check('sw: forhåndslager med byggets versjon (index, manifest, ikoner)', ck.ks.length === 1 && ck.ks[0] === 'lydmotor-' + build && ck.files.length === 7 && ck.files.includes('index.html'), ck.ks.join() + ' | ' + ck.files.join(' '));
+  await c5.setOffline(true);
+  await w.reload(); await w.click('#startTest'); await w.waitForTimeout(500);
+  const off = await w.evaluate(async (port) => {
+    const r = { started: window.__m4.st.started, build: window.__m4.BUILD };
+    try { r.icon = (await fetch('icon-192.png')).ok; } catch (e) { r.icon = false; }
+    try { await fetch('http://127.0.0.1:' + port + '/icon-192.png'); r.cross = 'svar'; } catch (e) { r.cross = 'feilet'; }
+    return r;
+  }, port);
+  check('sw: frakoblet starter siden i testmodus, ikoner fra cache, annen opprinnelse røres ikke', off.started && off.build === build && off.icon && off.cross === 'feilet', JSON.stringify(off));
+  await c5.setOffline(false);
+  // nytt bygg (ny hash i både sw.js og index.html): siden er alt ny, arbeideren byttes stille og gammel cache slettes
+  const html = fs.readFileSync(file, 'utf8'), swSrc = fs.readFileSync(path.join(path.dirname(file), 'sw.js'), 'utf8');
+  OVR['index.html'] = html.split(build).join('nytt2'); OVR['sw.js'] = swSrc.split(build).join('nytt2');
+  await w.reload(); await w.waitForTimeout(300);
+  await w.evaluate(() => window.__m4.SW.reg.update());
+  const keys = () => w.evaluate(async () => (await caches.keys()).join());
+  for (let i = 0; i < 50 && (await keys()) !== 'lydmotor-nytt2'; i++) await w.waitForTimeout(200);
+  const k2 = await w.evaluate(async () => ({ ks: (await caches.keys()).join(), build: window.__m4.BUILD, chip: !!window.__m4.SW.ready }));
+  check('sw: nytt bygg gir ny cache-versjon og sletter den gamle, uten melding når siden alt er ny', k2.ks === 'lydmotor-nytt2' && k2.build === 'nytt2' && !k2.chip, JSON.stringify(k2));
+  // enda et bygg mens den åpne siden er gammel: «Ny versjon klar», trykk laster på nytt
+  OVR['sw.js'] = swSrc.split(build).join('nytt3');
+  await w.click('#startTest'); await w.waitForTimeout(300);
+  await w.evaluate(() => window.__m4.SW.reg.update());
+  await w.waitForSelector('#chNew', { timeout: 15000 }).catch(() => {});
+  const hasChip = await w.evaluate(() => (document.querySelector('#chNew') || {}).textContent || '');
+  await shot(w, 'ny-versjon-393x852');
+  check('sw: ny versjon mens siden er gammel gir brikken «Ny versjon klar»', /Ny versjon klar/.test(hasChip), hasChip);
+  if (hasChip) {
+    await Promise.all([w.waitForEvent('load', { timeout: 10000 }).catch(() => {}), w.click('#chNew')]);
+    await w.waitForTimeout(500);
+    const k3 = await w.evaluate(async () => ({ ks: (await caches.keys()).join(), started: window.__m4.st.started }));
+    check('sw: trykk på brikken tar i bruk ny versjon og laster siden på nytt', k3.ks === 'lydmotor-nytt3' && !k3.started, JSON.stringify(k3));
+  }
+  delete OVR['index.html']; delete OVR['sw.js'];
+  await c5.close();
+}
+
+// ---- veistøyløftets tak: verste topper før mykklipperen, gjennom sidens egen lydgraf (OfflineAudioContext) ----
+// Hver bil: Bane, full burble, manuell, full gass i sperren, slipp (smell), gass igjen. Tørt og tunnel (klang 1,5).
+async function peaks(browser, url, watch) {
+  const ctx = await browser.newContext(); const p = await ctx.newPage(); watch(p);
+  await p.goto(url);
+  const res = await p.evaluate(async () => {
+    const M = window.__m4, st = M.st, TUN = M.TUN, sr = 48000, out = [], P = EngineCore.profiles(), O = EngineCore.outputs();
+    const cases = Object.keys(P).map((k) => [k, 'i4hk']).concat([['m4csl', 'std']]);
+    for (const [car, o] of cases) {
+      const e = new EngineCore(sr); e.msg({ k: 'out', o: O[o], now: true }); e.msg({ k: 'profile', p: P[car], now: true });
+      e.msg({ k: 'cfg', vol: 1, burble: 1, exMode: 2, auto: false, idleOn: true }); e.msg({ k: 'start' });
+      const n = sr * 6, L = new Float32Array(n), R = new Float32Array(n);
+      for (let i = 0; i < n; i += 128) { const t = i / sr; e.msg({ k: 'in', thr: t < 3 || t > 4.5 ? 1 : 0, brake: 0 }); e.render(L.subarray(i, i + 128), R.subarray(i, i + 128), 128); }
+      const r = { car: car, o: o, lim: O[o].lim };
+      for (const amt of [0, 1.5]) {
+        const oac = new OfflineAudioContext(2, n, sr), b = oac.createBuffer(2, n, sr); b.getChannelData(0).set(L); b.getChannelData(1).set(R);
+        const src = oac.createBufferSource(); src.buffer = b; M.buildGraph(oac, src); st.shaper.curve = null; // lineært: mål før klipperen
+        const on = amt > 0; st.sendG.gain.value = on ? TUN.send : 0; st.wet.gain.value = on ? TUN.wet * amt : 0; st.dry.gain.value = on ? 1 + (TUN.dryBoost - 1) * Math.min(1, amt) : 1;
+        src.start(); const buf = await oac.startRendering(); let pk = 0;
+        for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) { const a = Math.abs(d[i]); if (a > pk) pk = a; } }
+        r[on ? 'tun' : 'dry'] = pk / O[o].lim;
+      }
+      // sidens egen effVol med største løft (Høy, 5 dB), for volum 0,2-1, tørt og i tunnel
+      st.outId = o; st.vcDb = M.VC_DB[3]; let worst = -99, ok = true;
+      for (const tun of [false, true]) {
+        st.tunOn = tun;
+        for (let v = 0.2; v <= 1.0001; v += 0.05) {
+          document.querySelector('#vol').value = v;
+          const ratio = tun ? r.tun : r.dry, pk = M.effVol() * O[o].lim * ratio, base = v * O[o].lim * ratio;
+          if (pk > Math.max(base, Math.pow(10, -2 / 20)) * 1.0005) ok = false;
+          if (pk > base * 1.0001) worst = Math.max(worst, 20 * Math.log10(pk)); // bare der løftet virker
+        }
+      }
+      st.tunOn = false; st.vcDb = 0; r.worstBoostDb = worst; r.ok = ok; out.push(r);
+    }
+    return { out: out, TUN_PK: M.TUN_PK };
+  });
+  await ctx.close();
+  console.log('\nVEISTØY-TAK (topp/tak ved vol 1, Bane, full burble, sperre; verste topp med løft):');
+  for (const r of res.out) console.log('INFO ' + r.car + '/' + r.o + ': tørt ' + r.dry.toFixed(4) + ', tunnel ' + r.tun.toFixed(3) + ', verste topp med løft ' + (r.worstBoostDb > -99 ? r.worstBoostDb.toFixed(2) + ' dBFS' : 'ingen løft'));
+  check('veistøy: motorens begrenser holder tørre topper på taket (≤ +0,05 %)', res.out.every((r) => r.dry <= 1.0005), res.out.map((r) => r.dry.toFixed(4)).join(' '));
+  check('veistøy: tunnelklangens toppfaktor under TUN_PK (' + res.TUN_PK + ')', res.out.every((r) => r.tun <= res.TUN_PK), 'maks ' + Math.max(...res.out.map((r) => r.tun)).toFixed(3));
+  check('veistøy: med løft aldri over -2 dBFS før mykklipperen (og aldri over toppen uten løft)', res.out.every((r) => r.ok && r.worstBoostDb <= -1.99));
+}
+
 (async () => {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = 'http://localhost:' + server.address().port + '/';
@@ -166,7 +411,7 @@ function revReport(rv) {
 
   // 1) Siden: testmodus, så bytte til kjøremodus (sensorer skal slå seg på uten eget trykk). NO_UI=1 hopper over (for eldre bygg).
   if (!process.env.NO_UI) {
-    const ctx = await browser.newContext(); const p = await ctx.newPage(); watch(p);
+    const ctx = await browser.newContext(); await ctx.grantPermissions(['accelerometer', 'gyroscope']); const p = await ctx.newPage(); watch(p);
     await p.goto(url); await p.click('#startTest'); await p.waitForTimeout(1500);
     const a = await p.evaluate(() => ({ state: window.__m4.st.ctx && window.__m4.st.ctx.state, sys: document.querySelector('#stSys').textContent }));
     await p.click('#mDrive'); await p.waitForTimeout(800);
@@ -191,6 +436,9 @@ function revReport(rv) {
     await q.selectOption('#car', process.env.SHOT_CAR || 'gt3'); await q.waitForTimeout(400);
     if (process.env.SHOT) await q.screenshot({ path: process.env.SHOT });
     await c2.close();
+    await features(browser, url, watch, server.address().port);
+    await peaks(browser, url, watch);
+    for (const lag of [1000, 1500]) logChecks(await logSim(browser, url, watch, lag), lag);
   }
   // 2) Syntetisk kjøretur med falsk klokke
   const ctx = await browser.newContext(); const page = await ctx.newPage(); watch(page);

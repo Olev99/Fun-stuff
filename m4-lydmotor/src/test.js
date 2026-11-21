@@ -257,6 +257,9 @@ if (require.main === module) {
     const pre = stats(s.seg(tL - 0.2, tL)), a = stats(s.seg(tL + 0.25, tL + 0.6));
     const p01 = s.evs('pop', tL, tL + 1.5).length, p23 = s.evs('pop', tL + 2.5, tL + 4).length;
     check('slipp: løftet ved ~' + rr(6500), rL > rr(6400) && s.evs('lift', tL).length === 1, 'rpm ' + Math.round(rL));
+    // slippet krever 0,15 s under 0,05 (mot holderstøy), men et ekte slipp skal fortsatt gi overrun og første smell raskt
+    { const l = s.evs('lift', tL)[0], pp = s.evs('pop', tL)[0], dl = l ? l.t - tL : 9, dp = pp ? pp.t - tL : 9;
+      check('slipp: overrun innen 0,2 s og første smell innen 0,25 s etter slippet', dl <= 0.2 && dp <= 0.25, 'overrun etter ' + Math.round(dl * 1000) + ' ms, første smell etter ' + Math.round(dp * 1000) + ' ms'); }
     const z = new Sess({ auto: false, burble: 0 }); z.run(0.5, 0).run(1.2, 1); z.shift(1); z.run(1.9, 1); z.shift(1); z.run(0.4, 1);
     while (z.e.rpm < rr(6500) && z.t < 20) z.run(0.02, 1);
     const tz = z.t; z.run(1, 0);
@@ -264,7 +267,7 @@ if (require.main === module) {
     check('slipp: grunnlyden (uten burble) faller > 12 dB', zd < -12, f1(zd) + ' dB');
     // V12-ene og GT3: opptak av seriebilene gir nesten ingen smell ved slipp, så de har svake smell (lav popK) og et roligere overrun
     // (nedre grense -20 dB i stedet for -16); for alle biler må burble fortsatt løfte overrun minst 8 dB over overrun uten burble
-    const ovLo = ['vanqs', 'v12vs', 'f12', 'gt3'].includes(pid) ? -20 : -16, ovD = dB(a.rms / pre.rms);
+    const ovLo = ['vanqs', 'v12vs', 'f12', 'gt3', 'f812', 'gt3rs4'].includes(pid) ? -20 : -16, ovD = dB(a.rms / pre.rms);
     check('slipp: med burble ligger overrun 4-' + (-ovLo) + ' dB under full gass, minst 8 dB over overrun uten burble', ovD < -4 && ovD > ovLo && ovD - zd >= 8, f1(ovD) + ' dB (uten burble ' + f1(zd) + ' dB)');
     // forventet antall følger bilens burble-mengde i Sport (M4 = 5)
     const minP = Math.max(2, Math.round(5 * Math.min(1, p.ovr.mode[1] * p.ovr.rate * p.popK / (0.8 * 13))));
@@ -273,11 +276,14 @@ if (require.main === module) {
     const dRasp = 10 * Math.log10(hiP(s.seg(tL + 0.3, tL + 0.6)) / hiP(s.seg(tL - 0.2, tL)));
     const dRaspZ = 10 * Math.log10(hiP(z.seg(tz + 0.3, tz + 0.6)) / hiP(z.seg(tz - 0.2, tz)));
     check('slipp: raspen (2-5 kHz) faller > 10 dB (uten burble)', dRaspZ < -10, f1(dRaspZ) + ' dB; med burble ' + f1(dRasp) + ' dB');
-    // komfort: nesten ingen burble
-    const c = new Sess({ auto: false, exMode: 0 }); c.run(0.5, 0).run(1.2, 1); c.shift(1); c.run(1.9, 1); c.shift(1); c.run(0.4, 1);
-    while (c.e.rpm < rr(6500) && c.t < 20) c.run(0.02, 1);
-    const tc = c.t; c.run(3, 0);
-    check('komfort: lite burble', c.evs('pop', tc).length <= 3, 'smell ' + c.evs('pop', tc).length + ' (sport: ' + s.evs('pop', tL).length + ')');
+    // komfort: nesten ingen burble. Smellene er tilfeldige (V12 Vantage S: ca. 1,2 i snitt, over 3 i ca. 1 av 40 frø), så kravet gjelder
+    // medianen av tre frø (standardfrøet og to til), ikke ett enkelt trekk
+    const kp = [0x1234567, 8919, 16838].map((sd) => {
+      const c = new Sess({ auto: false, exMode: 0 }); c.e.seed = sd; c.run(0.5, 0).run(1.2, 1); c.shift(1); c.run(1.9, 1); c.shift(1); c.run(0.4, 1);
+      while (c.e.rpm < rr(6500) && c.t < 20) c.run(0.02, 1);
+      const tc = c.t; c.run(3, 0); return c.evs('pop', tc).length; });
+    const kMed = kp.slice().sort((a, b) => a - b)[1];
+    check('komfort: lite burble (median av tre frø <= 3 smell)', kMed <= 3, 'smell ' + kp.join('/') + ' (sport: ' + s.evs('pop', tL).length + ')');
   }
   // ---- 5. brems fra 200 km/t med automatiske nedgir ----
   {
@@ -431,6 +437,24 @@ if (require.main === module) {
     }
     check('jevn fart 30-110 km/t med gassgulvet fra main.js og støy, alle modi: ingen girjakt (0 skift på 30 s)', worst === 0, info.join(', ') || '0 skift');
   }
+  // ---- 9d2. mye støyete gass (holdervibrasjon): snitt 0,12-0,15, std 0,05 og 0,08, lavpass 30 ms, rundt slippterskelen 0,05 ----
+  // Kun styringen (control) kjøres, uten lyd, så testen er rask. Maks 1 skift på 30 s etter innsvingning.
+  {
+    const dt = N / SR; let worst = 0; const info = [];
+    for (const [mu, sd] of [[0.12, 0.05], [0.12, 0.08], [0.15, 0.05], [0.15, 0.08]]) for (const m of [0, 1, 2]) for (const kmh of [30, 50, 70, 90, 110]) {
+      let seed = 11; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const gauss = () => { let q = 0; for (let i = 0; i < 6; i++) q += rnd(); return (q - 3) / 0.707; };
+      const a = Math.exp(-dt / 0.03), b = Math.sqrt(1 - a * a), v = kmh / 3.6, T0 = v / 3 + 10; let x = 0, n = 0;
+      const e = new Sess({ exMode: m }).e; e.msg({ k: 'mode', drive: true });
+      e.onEv = (ev) => { if (ev.t > T0 && (ev.k === 'up' || ev.k === 'blip' || ev.k === 'kick')) n++; };
+      for (let t = 0; t < T0 + 30; t += dt) {
+        x = a * x + b * gauss();
+        e.msg({ k: 'drive', v: Math.min(v, t * 3), thr: t < v / 3 + 1 ? 0.4 : Math.min(1, Math.max(0, mu + sd * x)), brake: 0 }); e.control(dt);
+      }
+      worst = Math.max(worst, n); if (n) info.push(mu + '/' + sd + ' ' + 'KSB'[m] + kmh + ': ' + n);
+    }
+    check('støyete gass (snitt 0,12-0,15, std 0,05/0,08) 30-110 km/t, alle modi: maks 1 skift på 30 s', worst <= 1, info.join(', ') || '0 skift');
+  }
   // ---- 9e. fritt turtall (kobling slurer på stillestående bil): stigning og fall følger profilens svinghjul ----
   {
     const s = new Sess(); s.run(1, 0); const r0 = s.e.rpm, t0 = s.t; let tUp = -1;
@@ -519,8 +543,9 @@ if (require.main === module) {
       if (id !== 'm4csl' && h > -15) ok = false;
       if (id === 'gt3' && h > -23.9) ok = false; // GT3: ventiltikk, men ikke mer sus enn den roligste V12-en (Vanquish S)
       if ((id === 'lfa' || id === 'cgt') && h > -19) ok = false; // V10-ene: samme krav som V12 Vantage S
+      if ((id === 'f812' || id === 'gt3rs4') && h > -19) ok = false; // 812 og GT3 RS 4.0: samme krav
     }
-    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB, V10-ene under -19 dB', ok, info.join(', '));
+    check0('tomgangssus: A-veid 1.5-6 kHz under -15 dB av totalen for de nye bilene (M4 urørt), GT3 under -23.9 dB, V10-ene, 812 og GT3 RS 4.0 under -19 dB', ok, info.join(', '));
   }
   if (all.lfa && all.cgt) { // V10-ene: Carrera GT (68/76 grader) skal ha tydelig mer 2,5. orden (bankrytme) enn den jevne LFA-en; LFA løfter 2. og 3. orden
     const ord = (id) => {
@@ -567,9 +592,10 @@ if (require.main === module) {
       let sd = 0, md = 0; for (let i = 48000; i < 480000; i++) { const a = s.L[i], b = s.R[i]; sd += (a - b) * (a - b); md += (a + b) * (a + b); }
       pk = Math.max(pk, st);
       info.push(PROFS[id].short + ': topp ' + f1(dB(st)) + ' dBFS (i tunnel ' + f1(dB(tp)) + ', mykklipp ' + (tc * 100).toFixed(2) + ' %), <25 Hz ' + f1(sub) + ' dB, >16 kHz ' + f1(hf) + ' dB, side/mid ' + f1(10 * Math.log10(sd / md)) + ' dB');
-      if (st > O.lim + 1e-6 || tp > 0.95 || tc > 0.005 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
+      // taket er eksakt (begrenserens hylle faller aldri under dagens topp): Float32-utgangen når høyst fround(lim)
+      if (st > Math.fround(O.lim) || tp > 0.95 || tc > 0.005 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
     }
-    check0('utgang i4 HK: topper <= -3 dBFS i verste fall uten tunnel (Bane, full burble, sperre), i tunnel < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= O.lim + 1e-6, '\n      ' + info.join('\n      '));
+    check0('utgang i4 HK: topper <= -3 dBFS i verste fall uten tunnel (Bane, full burble, sperre), i tunnel < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= Math.fround(O.lim), '\n      ' + info.join('\n      '));
     Sess.out = null; Sess.prof = null;
   }
   console.log(results.join('\n'));
