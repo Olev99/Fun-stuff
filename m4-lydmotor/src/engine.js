@@ -141,7 +141,7 @@ class EngineCore {
       // Sportshift III (Graziano, én clutch): utvekslinger og bakaksel fra Car and Driver 2017 (én kilde; et forum oppgir 7. gir 0,675)
       gears: [0, 3.29, 2.16, 1.61, 1.27, 1.03, 0.85, 0.70], fd: 3.73, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
       torque: [[1000, 360], [3000, 500], [5750, 620], [6750, 596]], tMin: 200, acc100: 3.9,
-      box: { hardT: [0.22, 0.18, 0.14], softT: [0.45, 0.55], manual: 0.08, shuf: 1.8, slip: [2600, 2200, 1000], stopV: 1.5 },
+      box: { hardT: [0.22, 0.18, 0.14], softT: [0.45, 0.55], manual: 0.08, shuf: 1.8, slip: [2600, 2200, 1000], stopV: 1.5, cut: 0.6 },
       turbo: false,
       fuelCut: 1150, idleLd: [1400, 500],
       ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 10 }, popK: 0.8,
