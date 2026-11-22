@@ -5,7 +5,7 @@ class EngineCore {
     this.sr = sr;
     // ---- inndata / innstillinger ----
     this.drive = false; this.thrIn = 0; this.brakeIn = 0; this.vIn = 0;
-    this.auto = true; this.vol = 0.8; this.burble = 0.7; this.idleOn = true; this.exMode = 1;
+    this.auto = true; this.vol = 0.8; this.gainIn = 1; this.burble = 0.7; this.idleOn = true; this.exMode = 1;
     // ---- tilstand (resten settes i reset()) ----
     this.time = 0; this.v = 0; this.muteG = 1;
     this.evq = []; this.onEv = null;
@@ -39,12 +39,13 @@ class EngineCore {
     return {
       std: { id: 'std', name: 'Standard (liten høyttaler)', hp: 26, hp2: 0, eq: [105, 4, 0.9], lp: 7500, pre: 1, lim: 0.86, side: 1 },
       // BMW i4 M50 med Harman Kardon (16 høyttalere, 464 W): ekte bass ned mot 25-30 Hz, bilens DSP oppmikser stereo.
-      // Ren bunn under 25 Hz (to høypass-ledd), vekt rundt 60 Hz, mer diskantrom, smalere stereo. Taket -5.5 dBFS gir
-      // rom for tunnelklangen (ca. +2.5 dB) slik at toppene også i tunnel holder seg under -3 dBFS.
+      // Ren bunn under 25 Hz (to høypass-ledd), vekt rundt 60 Hz, mer diskantrom, smalere stereo. Lydstyrke som radio
+      // (full gass ca. -14 LUFS, by -20 til -22 LUFS ved volum 0,8): pre 1.12, nivåutjevner lev, tak 0.84 (-1,5 dBFS ved volum 1);
+      // i tunnel demper siden tørr vei og klang (main.js tunK), så summen holder seg under mykklipperen.
       // lp2 10 kHz: mot en 192 kHz-referanse hadde 48 kHz-utgangen 3-4 dB for mye over 8 kHz (speiling, én-polsfiltre nær Nyquist);
       // andre pol gir ca. -2,5 dB der og koster 0,8 dB i 4-8 kHz.
-      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, lp2: 10000, pre: 0.6, lim: 0.53, side: 0.6,
-        lowLd: 1.5, lev: [-27, 2, 5, 0.04, 1.5, 300] }
+      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, lp2: 10000, pre: 1.12, lim: 0.84, side: 0.6,
+        lowLd: 1.5, lev: [-16.5, 3, 15, 0.06, 0.8, 4, -11.5, 3] }
     };
   }
 
@@ -53,7 +54,14 @@ class EngineCore {
     const A = Math.pow(10, o.eq[1] / 40), w0 = 2 * Math.PI * o.eq[0] / sr, al = Math.sin(w0) / (2 * o.eq[2]), c = Math.cos(w0), a0 = 1 + al / A;
     this.cb0 = (1 + al * A) / a0; this.cb1 = -2 * c / a0; this.cb2 = (1 - al * A) / a0; this.ca1 = -2 * c / a0; this.ca2 = (1 - al / A) / a0;
     this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0; this.tl2 = 0; this.limEnv = 0;
-    this.levG = 1; this.levT = 1; this.levLp = 0; this.levE = o.lev ? Math.pow(10, o.lev[0] / 10) : 0;
+    this.levG = 1; this.levT = 1; this.levDb = 0; this.levE = o.lev ? Math.pow(10, (o.lev[0] + 0.691) / 10) / 2 : 0;
+    // K-veiing (ITU-R BS.1770) for nivåutjevnerens detektor, for hvilken som helst samplerate: hylle +4 dB over ca. 1,7 kHz, høypass 38 Hz
+    const sr2 = this.sr; let K = Math.tan(Math.PI * 1681.974450955533 / sr2), Q = 0.7071752369554196;
+    const Vh = Math.pow(10, 3.999843853973347 / 20), Vb = Math.pow(Vh, 0.4996667741545416); let k0 = 1 + K / Q + K * K;
+    this.kw = [(Vh + Vb * K / Q + K * K) / k0, 2 * (K * K - Vh) / k0, (Vh - Vb * K / Q + K * K) / k0, 2 * (K * K - 1) / k0, (1 - K / Q + K * K) / k0];
+    K = Math.tan(Math.PI * 38.13547087602444 / sr2); Q = 0.5003270373238773; k0 = 1 + K / Q + K * K;
+    this.kw.push(2 * (K * K - 1) / k0, (1 - K / Q + K * K) / k0);
+    this.kz = [0, 0, 0, 0];
   }
 
   // ---------- bilprofiler (rene data, JSON-kopierbare) ----------
@@ -389,6 +397,7 @@ class EngineCore {
       case 'out': if (m.now) { this.nextO = null; this.setOut(m.o); } else this.nextO = m.o; break;
       case 'cfg':
         if (m.vol !== undefined) this.vol = m.vol;
+        if (m.gain !== undefined) this.gainIn = m.gain;
         if (m.burble !== undefined) this.burble = m.burble;
         if (m.idleOn !== undefined) this.idleOn = !!m.idleOn;
         if (m.auto !== undefined) this.auto = !!m.auto;
@@ -782,6 +791,9 @@ class EngineCore {
     const gEx = X.ex, gSide = X.side * (0.4 + 0.6 * flap) * O.side, gPop = 1.1;
     const lrel = Math.exp(-1 / (sr * 0.07)), LIM = O.lim;
     const outG = this.vol * this.muteG;
+    // vol (etter begrenseren) og gain (veistøyløft, før begrenseren) glides lineært over blokken når de endres (ingen klikk)
+    const vP = this.volP === undefined ? this.vol : this.volP, dV = (this.vol - vP) / n, mG = this.muteG; let vG = vP; this.volP = this.vol;
+    const gP = this.gainP === undefined ? this.gainIn : this.gainP, dGi = (this.gainIn - gP) / n; let gI = gP; this.gainP = this.gainIn;
     const stereo = Ro && Ro !== Lo;
 
     let w = this.w, seed = this.seed, ph = this.ph, gap = this.gap[this.fi];
@@ -799,11 +811,11 @@ class EngineCore {
     let th1 = this.th1, th2 = this.th2;
     let hp = this.hp, hp2 = this.hp2, cz1 = this.cz1, cz2 = this.cz2, tl = this.tl, tl2 = this.tl2, limEnv = this.limEnv;
     let thImp = this.thImp; this.thImp = 0;
-    // out.lev = [terskel dB, forhold, maks løft dB, angrep s, slipp s, detektor-høypass Hz] (valgfri): langsom nivåutjevner før
-    // begrenseren. Effekten i midtkanalen over høypasset (grovt som øret: grunntonene under ca. 300 Hz teller lite) følges per blokk;
-    // under terskelen løftes nivået (forhold 2 = halve avstanden), toppene tar begrenseren.
-    const lev = O.lev; let levMs = 0, levG = this.levG, levD = 0, levLp = this.levLp;
-    const klev = lev ? 1 - Math.exp(-6.283185307179586 * lev[5] / sr) : 0;
+    // out.lev = [terskel LUFS, forhold, maks løft dB, angrep s, slipp s, maks stigning dB/s] (valgfri): nivåutjevner før begrenseren.
+    // Detektoren er K-veid (som LUFS) i midtkanalen, regnet som L = R ved volum 1; under terskelen løftes nivået (forhold 3 = to
+    // tredjedeler av avstanden opp), høyst 'maks løft', og løftet stiger høyst 'maks stigning' dB/s. Toppene tar begrenseren.
+    const lev = O.lev; let levMs = 0, levG = this.levG, levD = 0;
+    const kw = this.kw, kz = this.kz; let kz1 = kz[0], kz2 = kz[1], hz1 = kz[2], hz2 = kz[3];
     if (lev) levD = (this.levT - levG) / n;
 
     for (let i = 0; i < n; i++) {
@@ -886,13 +898,18 @@ class EngineCore {
       sdLP += ko * ((yA - yB) - sdLP);
       const sd = sdLP * gSide * pre;
       let l = ty + sd, r = ty - sd;
-      if (lev) { levLp += klev * (ty - levLp); const q = ty - levLp; levMs += q * q; levG += levD; l *= levG; r *= levG; }
+      if (lev) {
+        const u = kw[0] * ty + kz1; kz1 = kw[1] * ty - kw[3] * u + kz2; kz2 = kw[2] * ty - kw[4] * u;
+        const q = u + hz1; hz1 = -2 * u - kw[5] * q + hz2; hz2 = u - kw[6] * q;
+        levMs += q * q; levG += levD; l *= levG; r *= levG;
+      }
+      if (dGi !== 0) { gI += dGi; l *= gI; r *= gI; } else if (gI !== 1) { l *= gI; r *= gI; }
       let pk = l < 0 ? -l : l; const pr = r < 0 ? -r : r; if (pr > pk) pk = pr;
       // hylle som aldri faller under dagens topp, ellers kunne utgangen gå litt over taket (0,5301 mot 0,53)
       limEnv = limEnv * lrel; if (pk > limEnv) limEnv = pk;
       if (limEnv > LIM) { const g = LIM / limEnv; l *= g; r *= g; }
       if (xg !== xT) { xg += xg < xT ? xd : -xd; if (xg > 1) xg = 1; else if (xg < 0) xg = 0; }
-      const og = outG * xg;
+      let og; if (dV !== 0) { vG += dV; og = vG * mG * xg; } else og = outG * xg;
       l *= og; r *= og;
       if (!(l === l)) { l = 0; r = 0; }
       Lo[i] = l; if (stereo) Ro[i] = r;
@@ -913,8 +930,12 @@ class EngineCore {
     if (lev) {
       const ms = levMs / n, e = this.levE;
       this.levE = e + (ms - e) * (1 - Math.exp(-dt / (ms > e ? lev[3] : lev[4])));
-      let gd = (lev[0] - 10 * Math.log10(this.levE + 1e-12)) * (1 - 1 / lev[1]); if (gd < 0) gd = 0; if (gd > lev[2]) gd = lev[2];
-      this.levG = levG; this.levLp = levLp; this.levT = Math.pow(10, gd / 20);
+      const D = -0.691 + 10 * Math.log10(2 * this.levE + 1e-12); // som LUFS (L = R) ved volum 1
+      let gd = (lev[0] - D) * (1 - 1 / lev[1]); if (gd < 0) gd = 0; if (gd > lev[2]) gd = lev[2];
+      if (lev[6] !== undefined && D > lev[6]) gd = -(D - lev[6]) * (1 - 1 / lev[7]);
+      if (gd > this.levDb + lev[5] * dt) gd = this.levDb + lev[5] * dt;
+      this.levDb = gd; this.levG = levG; this.levT = Math.pow(10, gd / 20);
+      kz[0] = kz1; kz[1] = kz2; kz[2] = hz1; kz[3] = hz2;
     }
 
     this.teleT += dt;
