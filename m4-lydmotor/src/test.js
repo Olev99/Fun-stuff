@@ -130,8 +130,40 @@ function writeWav(path, L, R) {
   fs.writeFileSync(path, buf);
 }
 
+// A-veiing (effekt) og fast driftspunkt: kjøremodus, låst gir, jevn fart og gass. Tone = effekt innen ±2,5 Hz fra hver halve orden
+// (o/min / 120), støy = resten i 200-6000 Hz, begge A-veid. Gir lvA (A-veid nivå, dBFS), tn (støy mot tone, dB), hi (1,5-6 kHz mot alt, A).
+const aW = (f) => { const f2 = f * f, r = 12194 ** 2 * f2 * f2 / ((f2 + 20.6 ** 2) * Math.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2)) * (f2 + 12194 ** 2)); return r * r * 1.585; };
+function opPoint(p, o, rpm, thr, gear, cfg) {
+  const e = new EngineCore(SR); e.msg({ k: 'out', o, now: true }); e.msg({ k: 'profile', p, now: true });
+  e.msg(Object.assign({ k: 'cfg', vol: 1, burble: 0.7, exMode: 1, auto: false }, cfg || {})); e.msg({ k: 'mode', drive: true });
+  const v = rpm / (e.ratios[gear] * e.finalDrive) * 2 * Math.PI * e.wheelR / 60, L = [], bl = new Float32Array(N), br = new Float32Array(N);
+  for (let t = 0; t < 5; t += N / SR) { e.msg({ k: 'drive', v, thr, brake: 0 }); e.gear = gear; e.render(bl, br, N); if (t > 2.5) for (let i = 0; i < N; i++) L.push(0.5 * (bl[i] + br[i])); }
+  const sp = spectrum(L, 65536), f0 = e.rpmS / 120; let h = 0, nz = 0, hi = 0, tw = 0, t0 = 0, ms = 0;
+  for (let i = 1; i < sp.mag.length; i++) {
+    const f = i * sp.hz, m = sp.mag[i] * aW(f); tw += m; t0 += sp.mag[i]; if (f >= 1500 && f < 6000) hi += m;
+    if (f >= 200 && f < 6000) { if (Math.abs(f - Math.round(f / f0) * f0) < 2.5) h += m; else nz += m; }
+  }
+  for (const x of L) ms += x * x;
+  return { lvA: 10 * Math.log10(ms / L.length * tw / t0), tn: 10 * Math.log10(nz / h), hi: 10 * Math.log10(hi / tw), rpm: e.rpmS };
+}
+// Bykjøring i kjøremodus (som kjøreloggen: rolig gass, små slipp fra lett gass, bremsing med nedgir på lavt turtall): antall smell
+function cityPops(p, o, seed) {
+  const e = new EngineCore(SR); e.msg({ k: 'out', o, now: true }); e.msg({ k: 'profile', p, now: true });
+  e.msg({ k: 'cfg', vol: 1, burble: 0.7, exMode: 1, auto: true }); e.msg({ k: 'mode', drive: true }); if (seed) e.seed = seed;
+  let n = 0, v = 0, t = 0; e.onEv = (x) => { if (x.k === 'pop') n++; }; const dt = N / SR, bl = new Float32Array(N), br = new Float32Array(N);
+  const step = (sec, thr, acc, brake) => { for (let k = 0; k < sec / dt; k++) { v = Math.max(0, v + acc * dt); e.msg({ k: 'drive', v, thr, brake }); e.render(bl, br, N); t += dt; } };
+  for (let c = 0; c < 6; c++) {
+    const top = 9 + 2 * c; // 32-76 km/t
+    step(top / 1.6, 0.25, 1.6, 0); step(4, 0.12, 0, 0);   // rolig opp, jevn fart
+    step(1.5, 0.15, 0, 0); step(2.5, 0, -0.6, 0);         // slipp fra lett gass (0,15), rull
+    step(2, 0.12, 0, 0); step(v / 2.2, 0, -2.2, 0);       // litt gass igjen, regenerering til stopp (i4: brems = 0, nedgir på lavt turtall)
+    step(3, 0, 0, 0);
+  }
+  return n / (t / 60);
+}
+
 Sess.prof = null; Sess.out = null;
-module.exports = { Sess, stats, spectrum, bandPct, linePow, dB, applyTunnel, writeWav, SR, N, TUN, EngineCore };
+module.exports = { Sess, stats, spectrum, bandPct, linePow, dB, applyTunnel, writeWav, SR, N, TUN, EngineCore, opPoint, cityPops };
 
 // =====================================================================
 if (require.main === module) {
@@ -426,9 +458,10 @@ if (require.main === module) {
       const v = kmh / 3.6, aDrag = 0.12 + 0.00026 * v * v, aAvail = Math.min(9.5, 344000 / (1750 * Math.max(v, 4)));
       const est = (a) => Math.pow(Math.min(1, Math.max(0, 1.3 * (aDrag + a) / aAvail + 0.04)), 0.8); // som main.js
       const s = new Sess({ exMode: m }); s.e.msg({ k: 'mode', drive: true });
-      let thr = 0.5, a = 0;
+      // main.js (gassestimatet etter kjøreloggen): slipp under -0,35 m/s² til over -0,2 (hysterese), ellers gass minst 0,1
+      let thr = 0.5, a = 0, lifted = false;
       for (let t = 0; t < 45; t += dt) {
-        let tt = 0.5; if (t > v / 3) { a += (gauss() * 0.5 - a) * 0.3; tt = a < -0.35 ? 0 : est(a); }
+        let tt = 0.5; if (t > v / 3) { a += (gauss() * 0.5 - a) * 0.3; lifted = lifted ? a < -0.2 : a < -0.35; tt = lifted ? 0 : Math.max(0.1, est(a)); }
         thr += (tt - thr) * Math.min(1, dt / (tt > thr ? 0.03 : 0.08));
         s.e.msg({ k: 'drive', v: Math.min(v, t * 3), thr, brake: 0 }); s.e.render(s.bl, s.br, N);
       }
@@ -466,6 +499,34 @@ if (require.main === module) {
     check('fritt turtall: stiger ca. ' + Math.round(eUp) + ' o/min/s og faller ca. ' + Math.round(eDn) + ' o/min/s (±25 %)' + (p.rev ? ', tomgang -> rødsone på <= 0,7 s' : ''),
       Math.abs(up / eUp - 1) < 0.25 && Math.abs(dn / eDn - 1) < 0.25 && (!p.rev || toRed <= 0.7),
       'stiger ' + Math.round(up) + ', faller ' + Math.round(dn) + ' o/min/s, tomgang -> rødsone tilsvarer ' + toRed.toFixed(2) + ' s');
+  }
+  // ---- 9f. lett last i bilen (i4 HK, som kjøreloggen: by, 0,05-0,25 last, 1 200-2 400 o/min) ----
+  // Eieren hørte "mye støy når man ikke gasser direkte" og at lyden var lav. Ved 0,12 last og ca. 2 000 o/min (skalert) skal tonen
+  // dominere (A-veid støy mellom de halve ordenene minst 13 dB under tonen), og nivået skal ligge høyst 14 dB (M4) / 20 dB (andre)
+  // under full gass ved 5 000 o/min (før: 18-31 dB). Rulling uten gass (drivstoffkutt): støyen minst 4 dB under tonen.
+  {
+    const O = EngineCore.outputs().i4hk, lt = opPoint(p, O, rr(2000), 0.12, 3), co = opPoint(p, O, rr(2000), 0, 3), w = opPoint(p, O, rr(5000), 1, 4);
+    check('lett last (i4 HK, 0,12 last, ' + rr(2000) + ' o/min): tone over støy (A-veid støy mellom ordenene <= -13 dB), rulling <= -4 dB',
+      lt.tn <= -13 && co.tn <= -4, 'lett last ' + f1(lt.tn) + ' dB (1,5-6 kHz ' + f1(lt.hi) + ' dB av alt), rulling ' + f1(co.tn) + ' dB');
+    const lim = pid === 'm4csl' ? -14 : -20, d = lt.lvA - w.lvA;
+    check('lett last (i4 HK): A-veid nivå ' + (-lim) + ' til 6 dB under full gass ved ' + rr(5000) + ' o/min', d >= lim && d <= -6, f1(d) + ' dB');
+    // bykjøring med små slipp fra lett gass og nedgir på lavt turtall: få smell (før: 2,6-6,2 per minutt), median av tre frø
+    const pm = [0x1234567, 99, 777].map((sd) => cityPops(p, O, sd)).sort((a, b) => a - b);
+    check('bykjøring (i4 HK): små slipp og nedgir på lavt turtall gir <= 2 smell per minutt (median av tre frø)', pm[1] <= 2, pm.map((x) => f1(x)).join('/') + ' per min');
+  }
+  // ---- 9g. girjakt fra kjøreloggen: gass av etter et rykk gir et deltgass-oppgir, slipp et sekund senere skal ikke gire ned igjen ----
+  // (2 s: etter det kan rullingen på -0,6 m/s² ha senket turtallet så mye at et rullenedgir er riktig)
+  {
+    const dt = N / SR; const info = []; let bad = 0;
+    for (const m of [0, 1, 2]) for (const top of [8, 10, 12, 14, 17, 20]) for (const ease of [0.04, 0.1, 0.15]) {
+      const e = new Sess({ exMode: m }).e; e.msg({ k: 'mode', drive: true }); const evs = [];
+      e.onEv = (x) => { if (x.k === 'up' || x.k === 'blip' || x.k === 'kick') evs.push(x); };
+      let v = 0, t = 0;
+      const step = (sec, thr, acc) => { for (let k = 0; k < sec / dt; k++) { v = Math.max(0, v + acc * dt); e.msg({ k: 'drive', v, thr, brake: 0 }); e.control(dt); t += dt; } };
+      step(top / 2.5, 0.5, 2.5); step(1.0, ease, 0); step(4, 0, -0.6);
+      for (let i = 1; i < evs.length; i++) if (evs[i - 1].k === 'up' && evs[i].k !== 'up' && evs[i].t - evs[i - 1].t < 2) { bad++; info.push('KSB'[m] + top + '/' + ease + ': ' + evs[i - 1].a + '>' + evs[i - 1].b + ' så ' + evs[i].a + '>' + evs[i].b); }
+    }
+    check('girjakt: gass av etter et rykk og slipp et sekund senere gir aldri oppgir og nedgir innen 2 s (alle modi, 8-20 m/s, rulling -0,6 m/s²)', bad === 0, info.slice(0, 6).join(', ') || '0 par');
   }
   // ---- 10. alle eksosmodi + tomgang av ----
   {
