@@ -346,6 +346,7 @@ details[open] summary svg { transform: rotate(180deg); }
       <dt>Bevegelse</dt><dd id="dpMot">–</dd>
       <dt>Fart</dt><dd id="dpV">0 km/t</dd>
       <dt>Gass / brems</dt><dd id="dpT">0 % / 0 %</dd>
+      <dt>GPS-forsinkelse</dt><dd id="dpLag">–</dd>
       <dt>Tunnel</dt><dd id="dpTun">Nei</dd>
     </dl>
   </div>
@@ -1366,7 +1367,7 @@ class EngineCore {
   const ACCENTS = { m4csl: ['#29b6ff', '#8fd8ff'], vanqs: ['#2fd18b', '#8ff0bf'], v12vs: ['#ffb020', '#ffd27a'], f12: ['#ff2b2b', '#ff8a7a'],
     gt3: ['#ffd60a', '#fff08a'], lfa: ['#ff5a1f', '#ffa07a'], cgt: ['#c4ccd8', '#ffffff'],
     f812: ['#d8001e', '#ff5a6e'], gt3rs4: ['#9be22a', '#d4ff8a'] }; // ukjent bil: M4-blå
-  const BUILD = '7e9570b1f1af'; // innholdshash fra build.py, samme som VERSION i sw.js
+  const BUILD = '0017700f3519'; // innholdshash fra build.py, samme som VERSION i sw.js
   const COL = { ink: '#eef2f6', dim: '#98a3b1', amber: '#ffb020', orange: '#ff6a1a', red: '#ff2d2d',
     ui: getComputedStyle(document.documentElement).getPropertyValue('--f-ui').trim() || 'system-ui, sans-serif',
     num: getComputedStyle(document.documentElement).getPropertyValue('--f-num').trim() || 'monospace' };
@@ -1570,9 +1571,9 @@ class EngineCore {
     const s = { t: col(REC.t, REC.n, ri) }, g = { t: col(REC.gt, REC.gn, ri), ts: col(REC.gts, REC.gn, ri) };
     for (const k of SCOLS) s[k] = col(REC.c ? REC.c[k] : null, REC.n, r3);
     for (const k of GCOLS) g[k] = col(REC.g ? REC.g[k] : null, REC.gn, k === 'lat' || k === 'lon' ? r6 : r3);
-    return { format: 'lydmotor-logg', version: 1, build: BUILD, created: new Date().toISOString(), ua: navigator.userAgent,
-      hz: 1000 / REC_MS, gpsLag: GPS_LAG, durMs: Math.round(REC.dur), pos: $('#recPos').checked,
-      state: { car: st.car, out: st.outId, mode: st.mode, ex: st.exMode, vc: st.vc, cfg: cleanCfg(store.get()), fwd: S.fwd, bias: S.bias, gBase: S.gBase },
+    return { format: 'lydmotor-logg', version: 2, build: BUILD, created: new Date().toISOString(), ua: navigator.userAgent,
+      hz: 1000 / REC_MS, gpsLag: Math.round(S.lag), durMs: Math.round(REC.dur), pos: $('#recPos').checked,
+      state: { car: st.car, out: st.outId, mode: st.mode, ex: st.exMode, vc: st.vc, cfg: cleanCfg(store.get()), fwd: S.fwd, bias: S.bias, gBase: S.gBase, lag: Math.round(S.lag), lagN: S.lagN, lagOk: S.lagOk },
       s: s, gps: g, ev: REC.ev };
   }
   // Fil til brukeren: delingsark på telefon (Arkiv/Meldinger), ellers vanlig nedlasting.
@@ -1787,6 +1788,7 @@ class EngineCore {
     if (aSt !== st.audioSt) { st.audioSt = aSt; recEv('audio', aSt); }
     vcTick(now);
     recTick(now);
+    if (now - (st.latT || 0) > 5000) { st.latT = now; showLatency(); } // utgangen kan skifte (CarPlay, Bluetooth)
     if (!document.hidden) {
       if (audioOk) st.resN = 0;
       else if (now - st.resT > (st.resN > 5 ? 5000 : 1000)) { st.resT = now; st.resN++; resumeAudio(); }
@@ -1879,8 +1881,12 @@ registerProcessor('m4-engine', M4Proc);`;
   }
   function showLatency() {
     const ctx = st.ctx; if (!ctx || st.path === 'ingen') return;
-    const ms = ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000 + (st.path === 'AudioWorklet' ? 0 : 5);
-    $('#stLat').innerHTML = ms > 0.5 ? 'Forsinkelse ca. <b>' + Math.round(ms) + ' ms</b>' : 'Lyd på';
+    // baseLatency: lydkontekstens egen buffer. outputLatency (Safari fra iOS 18.4): det operativsystemet oppgir for
+    // utgangen; om Bluetooth- og CarPlay-bufferen er med, avgjør iOS. Uten outputLatency vises bare kontekstens del.
+    const out = typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0;
+    const ms = ((ctx.baseLatency || 0) + (out ? ctx.outputLatency : 0)) * 1000 + (st.path === 'AudioWorklet' ? 0 : 5);
+    const h = ms > 0.5 ? 'Forsinkelse ca. <b>' + Math.round(ms) + ' ms</b>' + (out ? '' : ' + utgang') : 'Lyd på';
+    if ($('#stLat').innerHTML !== h) $('#stLat').innerHTML = h;
     $('#stLat').title = st.path;
   }
   $('#startDrive').addEventListener('click', () => startAudio('drive'));
@@ -2041,17 +2047,22 @@ registerProcessor('m4-engine', M4Proc);`;
     thr: 0, brk: 0, motionT: 0, motionSeen: false, gpsSeen: false, motionDenied: false,
     lat: null, lon: null, hdg: null, acc: null, accBase: 12, lastGood: 0, goodN: 0, everGood: false, vHold: 0, tickT: 0, uiT: 0,
     hist: [], fixNow: 0, rotHold: 0, gRef: null, offT: 0, grade: 0, gBase: 0, saveT: 0,
-    dir: 'F', rI: 0, heldT: 0, rv0: null, rvA: null, rvP: null, rvB: 0, rvLast: null, aRaw: NaN, aLin: NaN, rot: 0 };
+    dir: 'F', rI: 0, heldT: 0, rv0: null, rvA: null, rvP: null, rvB: 0, rvLast: null, aRaw: NaN, aLin: NaN, rot: 0, lift: false,
+    lag: 120, lagN: 0, lagOk: false, lagA: [], lagF: [], cumA: 0, badN: 0, lagAT: 0, lagT: 0, lagPend: null };
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const nrm = (a) => Math.hypot(a[0], a[1], a[2]);
-  const GPS_LAG = 1000; // ms: GPS-farten beskriver bilen omtrent ett sekund tilbake i tid
+  // GPS-forsinkelse (ms, S.lag): hvor gammel GPS-farten er når den kommer. Målt fortløpende (lagEst), startverdi 120 ms
+  // (første ekte kjøretur med iPhone: 0,11 s; tidligere antatt 1,0 s). Lagres med kalibreringen.
+  const LAG_MIN = 50, LAG_MAX = 1500;
 
   // ---- lagret kalibrering (hvilken vei som er fremover i telefonen) ----
   const CAL_KEY = 'm4cal', CAL_MAX_AGE = 14 * 864e5;
   function calLoad() {
     try {
       const c = JSON.parse(localStorage.getItem(CAL_KEY) || 'null');
-      if (!c || !(Date.now() - c.t < CAL_MAX_AGE) || !Array.isArray(c.F) || !Array.isArray(c.g)) return;
+      if (!c || !(Date.now() - c.t < CAL_MAX_AGE)) return;
+      if (typeof c.lag === 'number' && isFinite(c.lag)) { S.lag = clamp(c.lag, LAG_MIN, LAG_MAX); S.lagOk = true; }
+      if (!Array.isArray(c.F) || !Array.isArray(c.g)) return;
       const fin = (a) => a.length === 3 && a.every((x) => typeof x === 'number' && isFinite(x));
       if (!fin(c.F) || !fin(c.g)) return;
       const F = c.F, g = c.g, m = nrm(F);
@@ -2062,9 +2073,9 @@ registerProcessor('m4-engine', M4Proc);`;
   }
   function calSave() {
     if (!S.fwd || !S.gRef) return;
-    try { localStorage.setItem(CAL_KEY, JSON.stringify({ t: Date.now(), F: S.F, g: S.gRef, gb: S.gBase, b: S.bias })); } catch (e) {}
+    try { localStorage.setItem(CAL_KEY, JSON.stringify({ t: Date.now(), F: S.F, g: S.gRef, gb: S.gBase, b: S.bias, lag: S.lagOk ? Math.round(S.lag) : undefined })); } catch (e) {}
   }
-  function calReset() {
+  function calReset() { // GPS-forsinkelsen hører til telefonen, ikke holderen: den beholdes i minnet og lagres med neste kalibrering
     S.F = [0, 0, 0]; S.fwd = null; S.gRef = null; S.offT = 0; S.grade = 0; S.gBase = 0; S.bias = 0; S.rv0 = null; S.dir = 'F';
     try { localStorage.removeItem(CAL_KEY); } catch (e) {}
   }
@@ -2097,15 +2108,74 @@ registerProcessor('m4-engine', M4Proc);`;
     return n ? { n: n, a: a / n, h: [h[0] / n, h[1] / n, h[2] / n], ok: ok } : { n: 0 };
   }
 
+  // ---- måling av GPS-forsinkelsen: endringen i GPS-fart mellom to punkter mot integralet av akselerometeret over det
+  // samme tidsrommet flyttet 0-2 s tilbake; forsinkelsen er flyttingen med best korrelasjon (Pearson, så en konstant
+  // skjevhet i akselerometeret ikke teller). Vindu 45 s, ny måling hvert 10. s, bare med nok fartsendring.
+  function lagRec(now, a, dt) { // fra fuse(): a = rå akselerasjon langs fremover, null = upålitelig (rykk, ukalibrert, revers)
+    if (a === null) S.badN++; else S.cumA += a * dt;
+    if (now - S.lagAT < 50) return;
+    S.lagAT = now; S.lagA.push({ t: now, c: S.cumA, b: S.badN });
+    while (S.lagA[0].t < now - 65000) S.lagA.shift();
+  }
+  function lagAt(t) { // integral og antall dårlige prøver ved tid t (lineært), null utenfor
+    const A = S.lagA; let lo = 0, hi = A.length - 1;
+    if (hi < 1 || t < A[0].t || t > A[hi].t) return null;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (A[m].t <= t) lo = m; else hi = m; }
+    const x = A[lo], y = A[hi], k = y.t > x.t ? (t - x.t) / (y.t - x.t) : 0;
+    return { c: x.c + (y.c - x.c) * k, b: k > 0 ? y.b : x.b };
+  }
+  function lagEst(now) {
+    S.lagT = now;
+    const F = S.lagF, P = [];
+    for (let k = 1; k < F.length; k++) { // GPS-fart under 2 m/s er treg og upålitelig på iPhone (målt): ikke med
+      const dt = F[k].t - F[k - 1].t;
+      if (dt > 500 && dt < 2500 && F[k].v >= 2 && F[k - 1].v >= 2) P.push([F[k - 1].t, F[k].t, F[k].v - F[k - 1].v]);
+    }
+    if (P.length < 20) return;
+    let m = 0, sd = 0; for (const p of P) m += p[2]; m /= P.length; for (const p of P) sd += (p[2] - m) ** 2; sd = Math.sqrt(sd / P.length);
+    if (sd < 0.25) return; // jevn fart: for lite å korrelere mot
+    let best = null; const R = [];
+    for (let lag = 0; lag <= 2000; lag += 25) {
+      let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+      for (const p of P) {
+        const a = lagAt(p[0] - lag - 60), b = lagAt(p[1] - lag + 60);
+        if (!a || !b || b.b !== a.b) continue; // rykk eller hull i vinduet
+        const x = p[2], y = lagAt(p[1] - lag).c - lagAt(p[0] - lag).c;
+        n++; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y;
+      }
+      const vx = sxx - sx * sx / n, vy = syy - sy * sy / n, r = n >= 15 && vx > 0 && vy > 0 ? (sxy - sx * sy / n) / Math.sqrt(vx * vy) : NaN;
+      R.push(r);
+      if (r === r && (!best || r > best.r)) best = { i: R.length - 1, r: r, n: n };
+    }
+    if (!best) return;
+    let est = best.i * 25;
+    const r0 = R[best.i - 1], r2 = R[best.i + 1]; // parabel gjennom toppen
+    if (r0 === r0 && r2 === r2) { const den = r0 - 2 * best.r + r2; if (den < 0) est += 12.5 * (r0 - r2) / den; }
+    const ok = best.r >= 0.8 && est < 1975;
+    est = clamp(est, LAG_MIN, LAG_MAX);
+    // Stort sprang fra dagens verdi: krever to målinger på rad som er enige, ellers kan ett rart vindu flytte den
+    let use = ok;
+    if (ok && Math.abs(est - S.lag) > 400) { use = S.lagPend !== null && Math.abs(est - S.lagPend) < 250; S.lagPend = est; }
+    else if (ok) S.lagPend = null;
+    if (use) { S.lag = clamp(S.lag + (est - S.lag) * 0.3, LAG_MIN, LAG_MAX); S.lagN++; S.lagOk = true; }
+    recEv('lag', { est: Math.round(est), r: Math.round(best.r * 100) / 100, n: best.n, use: use ? 1 : 0, lag: Math.round(S.lag) });
+  }
+  function lagFix(now, v) { // fra onGps, hvert gode punkt
+    S.lagF.push({ t: now, v: v });
+    while (S.lagF[0].t < now - 45000) S.lagF.shift();
+    if (now - S.lagT >= 10000) lagEst(now);
+  }
+
   // Felles fusjon: langsgående akselerasjon -> fart, gass og brems. held: telefonen rykkes/løftes, frys gass og brems.
   function fuse(aLong, dt, h, held) {
     // Rygging: integral av rå akselerasjon langs "fremover" (fortegnet), og når den sist var upålitelig.
     if (held || !h || !S.fwd) S.heldT = performance.now(); else S.rI += aLong * dt;
     const sg = S.dir === 'R' ? -1 : 1; // i revers peker fartsretningen bakover
+    lagRec(performance.now(), held || !h || !S.fwd || sg < 0 ? null : aLong, dt);
     S.aF += ((held ? 0 : sg * aLong) - S.aF) * Math.min(1, dt / 0.035);
     let v = S.vEst + S.aF * dt;
     if (st.tunGps || st.tunMap) v += (S.vHold - v) * dt / 25; // uten GPS: ikke la integrasjonen drive av gårde
-    // GPS sier stopp: hold farten på null, men ikke når akselerometeret ser at vi kjører av gårde (GPS er et sekund bak)
+    // GPS sier stopp: hold farten på null, men ikke når akselerometeret ser at vi kjører av gårde (GPS-farten er litt gammel)
     if (S.gpsV !== null && S.gpsV < 0.3 && performance.now() - S.lastGood < 2500 && S.aF < 0.4) v = 0;
     S.vEst = v = clamp(v, 0, 90);
     // revers bremset til null (fart eller sensorintegral), eller urimelig lenge: neste start er fremover til det motsatte er vist
@@ -2115,10 +2185,13 @@ registerProcessor('m4-engine', M4Proc);`;
     // Bakke: tyngdekraftens bidrag langs veien. Opp: trengs gass for å holde farten; ned: holde farten er å slippe.
     const aEff = S.aF + (v > 2 ? 9.81 * S.grade * sg : 0);
     let t;
+    // elbil: regenerering ved slipp = motorbrems. Slipp under -0,35 m/s², ut av slipp over -0,2 (hysterese mot støy).
+    S.lift = v >= 0.5 && (aEff < -0.35 || (S.lift && aEff < -0.2));
     if (v < 0.5) t = clamp(S.aF / 4, 0, 1);
-    else if (aEff < -0.35) t = 0; // elbil: regenerering ved slipp = motorbrems
-    // +0.04: jevn fart (gass ~0.04-0.05) skal ligge godt over motorens slipp-terskel 0.05, ellers girjakt 2<->3 med sensorstøy
-    else t = Math.pow(clamp(1.3 * (aEff + aDrag) / aAvail + 0.04, 0, 1), 0.8);
+    else if (S.lift) t = 0;
+    // Ellers minst 0,1: gassen skal aldri ligge rundt motorens slipp-terskler (0,05 inn, 0,08 ut). I bykjøring med
+    // -0,35..0 m/s² ga den gamle formelen 0,03-0,10 og girjakt (kjøreloggen: 2>3>2 ved 9 m/s); +0.04: jevn fart.
+    else t = Math.max(0.1, Math.pow(clamp(1.3 * (aEff + aDrag) / aAvail + 0.04, 0, 1), 0.8));
     const b = v > 0.5 ? clamp((-S.aF - 2.0) / 5, 0, 1) : 0; // hardere enn vanlig regen regnes som brems
     if (!held) {
       S.thr += (t - S.thr) * Math.min(1, dt / (t > S.thr ? 0.03 : 0.08));
@@ -2148,14 +2221,18 @@ registerProcessor('m4-engine', M4Proc);`;
     return null;
   }
   function dirFix(v, now) {
-    const tP = now - GPS_LAG, p = histAt(tP), prev = S.rvP;
+    // Før forsinkelsen er målt (eller lest fra lagret kalibrering): den gamle antakelsen 1,0 s, som reverslogikken tåler
+    // 0,5-1,6 s rundt. Startverdien 0,12 s gir feil fortegn i korte parkeringsmanøvrer hvis telefonen har 1,5 s.
+    const lag = S.lagOk ? S.lag : 1000;
+    const tP = now - lag, p = histAt(tP), prev = S.rvP;
     S.rvP = p ? { t: tP, r: p.r, v: v } : null;
     if (!p) { S.rv0 = null; if (S.dir === 'R') setDir('F'); return; }
     const live = S.motionSeen && now - S.motionT < 600 && !!S.fwd;
     if (v < 0.3) { // stillstand: retningen kan bare skifte her
       if (S.dir === 'R') setDir('F');
-      // Anker = siste rolige øyeblikk (fart null) 0,5-1,6 s tilbake: tåler at den ekte GPS-forsinkelsen avviker fra 1 s.
-      const r0 = S.rv0, a0 = quietAt(now - 1600, now - 500);
+      // Anker = siste rolige øyeblikk (fart null) fra 1,6 s (eller forsinkelsen + 0,6 s) tilbake til forsinkelsen - 0,5 s:
+      // tåler at forsinkelsen avviker noe fra den som brukes.
+      const r0 = S.rv0, a0 = quietAt(now - Math.max(1600, lag + 600), now - lag + 500);
       if (!a0) return; // ingen rolig stund i vinduet (GPS-støy i lav fart): behold forrige anker
       if (r0 && live && S.heldT < r0.t && a0.t - r0.t > 500) { // nullpunkt i ro; vinduer med bevegelse forkastes
         const b = (a0.r - r0.r) / ((a0.t - r0.t) / 1000);
@@ -2193,15 +2270,16 @@ registerProcessor('m4-engine', M4Proc);`;
     recGps(c, pos.timestamp, good, now);
     if (good) {
       if (acc < 30) S.accBase += (acc - S.accBase) * 0.1;
-      const v = c.speed, tPast = now - GPS_LAG;
+      const v = c.speed, tPast = now - S.lag;
       dirFix(v, now);
+      lagFix(now, v);
       const learn = S.dir !== 'R' && !(S.rv0 && v >= 0.3); // ikke lær akse/skjevhet i revers eller før retningen er avgjort
       if (S.gpsV !== null) {
         const dt = t - S.gpsT;
         if (dt > 0.3 && dt < 3) {
           S.aGps = (v - S.gpsV) / dt; S.aGpsT = now;
           // Sammenlign med det sensorene målte i det samme (forsinkede) tidsrommet.
-          const w = histWin(S.fixNow - GPS_LAG, tPast);
+          const w = histWin(S.fixNow - S.lag, tPast);
           if (w.n > 5 && w.ok && learn) {
             if (S.fwd) S.bias = clamp(S.bias + (w.a - S.aGps) * 0.08, -1, 1);
             // Lær retningen "fremover" i telefonens akser fra GPS-akselerasjonens fortegn, fortløpende.
@@ -2309,6 +2387,8 @@ registerProcessor('m4-engine', M4Proc);`;
     $('#dpMot').textContent = S.motionDenied ? 'Avslått. Bruker bare GPS (tregere).' : !S.motionSeen ? 'Venter …' : !motionLive ? 'Stoppet' : now < S.rotHold ? 'Telefonen beveges, gass holdes' : S.fwd ? 'Kalibrert' : 'Kalibrerer: gi gass rett frem';
     $('#dpV').textContent = Math.round(S.vEst * 3.6) + ' km/t';
     $('#dpT').textContent = Math.round(S.thr * 100) + ' % / ' + Math.round(S.brk * 100) + ' %';
+    const lagS = 'ca. ' + (S.lag / 1000).toFixed(2).replace('.', ',') + ' s' + (S.lagOk ? '' : ' (ikke målt ennå)');
+    if ($('#dpLag').textContent !== lagS) $('#dpLag').textContent = lagS;
   }
 
   function askMotion() {
@@ -2431,7 +2511,7 @@ registerProcessor('m4-engine', M4Proc);`;
     if (MAP.qLat !== null) { const p = toXY(S.lat, S.lon, MAP.qLat, MAP.qLon); moved = Math.hypot(p[0], p[1]); }
     if (!MAP.busy && now - MAP.qT > MAP.wait && (moved > 600 || now - MAP.qT > 180000) && (S.vEst > 2 || MAP.qLat === null)) mapFetch(S.lat, S.lon, S.vEst > 3 ? S.hdg : null);
     const hdg = S.vEst > 3 ? S.hdg : null, tol = clamp(S.acc || 15, 15, 40);
-    // se litt frem: GPS-posisjonen er rundt ett sekund gammel, og klangen skal være på når vi kjører inn
+    // se litt frem: GPS-posisjonen er litt gammel, og klangen skal være på når vi kjører inn
     const p = hdg != null ? ahead(S.lat, S.lon, hdg, S.vEst * 1.5) : [S.lat, S.lon];
     const m = mapMatch(p[0], p[1], hdg, tol) || mapMatch(S.lat, S.lon, hdg, tol);
     if (m) { MAP.remain = wayRemain(m) + S.vEst * 1.5; MAP.lost = 0; if (!st.tunMap) { st.tunMap = true; S.vHold = S.vEst; applyTunnel(); } }
@@ -2578,7 +2658,7 @@ registerProcessor('m4-engine', M4Proc);`;
   requestAnimationFrame(draw);
 
   // for automatisk test
-  window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, onMotion: onMotion, calReset: calReset, sysTick: sysTick, driveTick: driveTick, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate,
+  window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, onMotion: onMotion, calReset: calReset, sysTick: sysTick, driveTick: driveTick, lagEst: lagEst, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate,
     BUILD: BUILD, REC: REC, recSet: recSet, logData: logData, recPersist: recPersist, recLoad: recLoad, effVol: effVol, vcTick: vcTick, VC_DB: VC_DB, TUN: TUN, TUN_PK: TUN_PK, PEAK_MAX: PEAK_MAX,
     buildGraph: buildGraph, setMuted: setMuted, SW: SW, cleanCfg: cleanCfg, importCfg: importCfg, setCar: setCar, saveCfg: saveCfg, store: store };
 })();

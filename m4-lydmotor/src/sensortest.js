@@ -1,6 +1,7 @@
 // Syntetisk kjøretur gjennom sensorfusjonen i main.js, i hodeløs Chrome over http://localhost.
 // Bruk: node m4-lydmotor/src/sensortest.js [sti til html, standard ../index.html]
-// Simulerer akselerometer (60 Hz, støy, skjevhet) og GPS-fart som kommer ett sekund for sent, og sjekker
+// Simulerer akselerometer (60 Hz, støy, skjevhet) og GPS-fart som kommer 0,11 s for sent (målt på iPhone; andre forsinkelser i egne
+// turer, som appen måler selv), og sjekker
 // fartsestimat (ingen sagtann), stigning, rykk i telefonen og at siden starter uten konsollfeil.
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
@@ -46,7 +47,7 @@ async function sim(page, lag) {
         M.onMotion({ acceleration: { x: lin[0], y: lin[1], z: lin[2] },
           accelerationIncludingGravity: { x: lin[0] + 9.81 * up[0], y: lin[1] + 9.81 * up[1], z: lin[2] + 9.81 * up[2] }, rotationRate: rot });
         let jump = null;
-        if (T >= nextFix) { // GPS: farten fra ett sekund siden, levert nå
+        if (T >= nextFix) { // GPS: farten fra LAG ms siden, levert nå
           nextFix += 1000;
           const old = truth.find((x) => x.t >= T - LAG) || truth[0];
           const before = S.vEst;
@@ -57,7 +58,7 @@ async function sim(page, lag) {
       }
     }
     return out;
-  }, [PROFILE, lag || 1000]);
+  }, [PROFILE, lag || 110]);
 }
 
 // ---- revers: syntetiske turer med fortegnet fart. Segment: [varighet s, akselerasjon langs bilen m/s², valg] ----
@@ -79,18 +80,26 @@ const REV = [
   { name: 'parkering, GPS 1,6 s forsinket', segs: CAL.concat(PARK), lag: 1600 },
   { name: 'kø, skjevhet 0,6 m/s², annet frø', segs: CAL.concat(QUEUE), bias: 0.6, seed: 4242 },
   { name: 'revers fra stillstand, skjevhet 0,6, GPS 1,4 s', segs: CAL.concat([[2, -1.2], [4, 0], [2, 1.2], [3, 0]]), bias: 0.6, lag: 1400, seed: 99 },
+  // målt forsinkelse på eierens iPhone: 0,11 s. Umålt bruker reverslogikken 1,0 s; målt (lagret) den målte verdien.
+  { name: 'parkering, GPS 0,11 s, ikke målt ennå', segs: CAL.concat(PARK), lag: 110 },
+  { name: 'parkering, GPS 0,11 s, målt', segs: CAL.concat(PARK), lag: 110, known: 110, seed: 515 },
+  { name: 'stopp og kjør med retningsskifte, GPS 0,11 s, målt', segs: CAL.concat([[4, 1.5], [3, 0], [4, -1.5], [2, 0], [2, -1], [3, 0], [2, 1], [2, 0], [4, 2], [3, 0]]), lag: 110, known: 110 },
+  { name: 'kø, GPS 0,11 s, målt', segs: CAL.concat(QUEUE), lag: 110, known: 110, seed: 616 },
+  { name: 'parkering, GPS 1,0 s, målt', segs: CAL.concat(PARK), lag: 1000, known: 1000 },
   { name: 'revers før kalibrering', segs: [[2, 0], [2, -1.5], [3, 0], [2, 1.5], [2, 0]].concat(CAL, [[5, 2], [3, 0]]), noCal: true }
 ];
 
 async function simRev(page, sc) {
-  return page.evaluate(([segs, LAG, BIAS, seed]) => {
+  return page.evaluate(([segs, LAG, BIAS, seed, FIX, KNOWN]) => {
     const M = window.__m4, S = M.S, st = M.st;
     let rs = seed; const rnd = () => { rs = (rs * 1103515245 + 12345) % 2147483648; return rs / 2147483648; };
     const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
     let sent = null; st.core = { msg: (m) => { sent = m; } }; st.mode = 'drive'; // fang det motoren får
     // Telefonen står skrått i holderen: bilens fremover er en blanding av -z og x. y = opp.
     const f = [0.3, 0, -0.954], lat = [0.954, 0, 0.3];
-    let T = 0, v = 0, nextFix = 1000, wob = 0, latA = 0, last = null; const truth = [], out = [];
+    let T = 0, v = 0, nextFix = 1000, wob = 0, latA = 0, last = null, jump = null; const truth = [], out = [];
+    if (FIX) S.lag = FIX;
+    if (KNOWN) { S.lag = KNOWN; S.lagOk = true; } // som lest fra lagret kalibrering
     for (let si = 0; si < segs.length; si++) {
       const [dur, acc, o] = segs[si], op = o || {};
       const sd = v !== 0 ? Math.sign(v) : Math.sign(acc); // innen et segment skifter bilen aldri retning
@@ -112,14 +121,18 @@ async function simRev(page, sc) {
           nextFix += 1000;
           const old = (truth.find((x) => x.t >= T - LAG) || truth[0]).v, sp = Math.abs(old);
           const speed = sp < 0.3 ? (rnd() < 0.7 ? 0 : -1) : Math.max(0, sp + gauss() * (sp < 2 ? 0.2 : 0.1));
+          if (FIX) S.lag = FIX;
+          const before = S.vEst;
           M.onGps({ timestamp: T - LAG, coords: { speed: speed, accuracy: 6, heading: null, latitude: 59.9, longitude: 10.7 } });
-        }
-        out.push({ t: T / 1000, v, dir: S.dir, est: S.vEst, sv: sent ? sent.v : 0, sthr: sent ? sent.thr : 0,
+          if (FIX) S.lag = FIX;
+          jump = S.vEst - before;
+        } else jump = null;
+        out.push({ t: T / 1000, v, dir: S.dir, est: S.vEst, sv: sent ? sent.v : 0, sthr: sent ? sent.thr : 0, jump, lag: S.lag,
           fwdOk: S.fwd ? S.fwd[0] * f[0] + S.fwd[2] * f[2] : null, dec: S.rvLast !== last ? (last = S.rvLast) : null });
       }
     }
     return out;
-  }, [sc.segs, sc.lag || 1000, sc.bias == null ? 0.2 : sc.bias, sc.seed || 777]);
+  }, [sc.segs, sc.lag || 1000, sc.bias == null ? 0.2 : sc.bias, sc.seed || 777, sc.fix || 0, sc.known || 0]);
 }
 
 function revReport(rv) {
@@ -166,6 +179,113 @@ function revReport(rv) {
   }
 }
 
+// ---- GPS-forsinkelsen måles fortløpende (S.lag): bykjøring med ekte forsinkelse 0,1-1,5 s ----
+// Bykjøringen er syntetisk, med omtrent samme statistikk som eierens første tur (iPhone, 6,4 min): fart median ~6 m/s,
+// maks ~16 m/s, akselerasjon opptil ~2,8 m/s², hyppige stopp og nesten-stopp. Ingen data fra loggen er med.
+function city(seed, dur) {
+  let rs = seed; const rnd = () => { rs = (rs * 1103515245 + 12345) % 2147483648; return rs / 2147483648; };
+  const segs = CAL.slice(); let v = 0, T = 0;
+  while (T < dur) {
+    const vt = 6 + rnd() * 10, a = 1.2 + rnd() * 1.6, d1 = Math.max(0.5, (vt - v) / a);
+    segs.push([d1, a]); v = Math.max(v, vt); T += d1;
+    const c = 3 + rnd() * 7; segs.push([c, 0, { wob: 0.5 + rnd() * 0.6 }]); T += c;
+    const stop = rnd() < 0.4, vb = stop ? 0 : 2.5 + rnd() * 3.5, b = 0.8 + rnd() * 1.7, d2 = (v - vb) / b;
+    segs.push([d2 + (stop ? 0.5 : 0), -b]); v = vb; T += d2;
+    if (stop) { const w = 2 + rnd() * 4; segs.push([w, 0]); T += w; }
+  }
+  return segs;
+}
+async function lagRuns(browser, url, watch) {
+  const ctx = await browser.newContext(); const res = [];
+  for (const lag of [100, 500, 1000, 1500]) for (const fix of [0, 1000]) {
+    const pg = await ctx.newPage(); watch(pg);
+    await pg.addInitScript(() => { window.__T = 0; performance.now = () => window.__T; try { localStorage.clear(); } catch (e) {} });
+    await pg.goto(url);
+    const o = await simRev(pg, { segs: city(4000 + lag, 200), lag: lag, seed: 31 + lag, fix: fix });
+    // kalibreringen (med forsinkelsen) lagres hvert 30. s fra driveTick; en ny side leser den inn igjen
+    const cal = await pg.evaluate(() => { const M = window.__m4; M.st.mode = 'drive'; M.S.saveT = -1e9; M.driveTick(); return JSON.parse(localStorage.getItem('m4cal') || 'null'); });
+    const pg2 = await ctx.newPage(); await pg2.goto(url); const back = await pg2.evaluate(() => window.__m4.S.lag); await pg2.close();
+    await pg.close();
+    res.push({ lag, fix, o, cal, back });
+  }
+  await ctx.close();
+  return res;
+}
+function lagReport(res) {
+  console.log('\nGPS-FORSINKELSE (bykjøring 200 s, målt fortløpende; "fast 1,0 s" = den gamle antakelsen):');
+  const st = (o, t0) => { const a = o.filter((x) => x.t >= t0), j = a.filter((x) => x.jump !== null && x.v > 2).map((x) => Math.abs(x.jump));
+    return { rms: Math.sqrt(a.reduce((s, x) => s + (x.est - x.v) ** 2, 0) / a.length), jump: j.reduce((s, x) => s + x, 0) / j.length }; };
+  for (const lag of [100, 500, 1000, 1500]) {
+    const ad = res.find((r) => r.lag === lag && !r.fix), fx = res.find((r) => r.lag === lag && r.fix), o = ad.o;
+    const fin = o[o.length - 1].lag, conv = o.find((x, i) => o.slice(i).every((y) => Math.abs(y.lag - lag) <= 100));
+    const A = st(o, 0), A2 = st(o, 100), B = st(fx.o, 0), B2 = st(fx.o, 100);
+    const ser = []; for (let t = 30; t <= 200; t += 20) { const x = o.find((y) => y.t >= t); if (x) ser.push(Math.round(x.lag)); }
+    console.log('INFO ekte ' + lag + ' ms: målt ' + Math.round(fin) + ' ms' + (conv ? ', innen ±0,1 s fra ' + conv.t.toFixed(0) + ' s' : '') + ' (hvert 20. s: ' + ser.join(' ') + ')' +
+      '; fartsfeil rms ' + A.rms.toFixed(2) + ' (fra 100 s ' + A2.rms.toFixed(2) + '), sprang ved GPS ' + A.jump.toFixed(2) + ' m/s; fast 1,0 s: rms ' + B.rms.toFixed(2) + ' (' + B2.rms.toFixed(2) + '), sprang ' + B.jump.toFixed(2));
+    check('gps-forsinkelse: ekte ' + lag + ' ms måles innen ±0,1 s (' + Math.round(fin) + ' ms) og lagres med kalibreringen', Math.abs(fin - lag) <= 100 && ad.cal && Math.abs(ad.cal.lag - fin) <= 1 && Math.abs(ad.back - fin) <= 1, 'lagret ' + (ad.cal ? ad.cal.lag : '–') + ', lest inn ' + Math.round(ad.back));
+    check('gps-forsinkelse: ekte ' + lag + ' ms: fartsfeil som den faste 1,0 s eller bedre (fra 100 s, +0,05 m/s slingring)', A2.rms <= B2.rms + 0.05, A2.rms.toFixed(2) + ' mot ' + B2.rms.toFixed(2));
+    check('gps-forsinkelse: ekte ' + lag + ' ms: ingen falsk revers', o.every((x) => !(x.dir === 'R' && x.v > 0.05)));
+    // motoren regner slipp etter 0,15 s under 0,05 og avslutter over 0,08: gass som blir liggende 0,015-0,09 lenger enn 0,2 s
+    // (ikke bare passerer på vei til eller fra slipp) gir girjakt
+    let run = 0, hov = 0; const mv = o.filter((x) => x.t > 20 && x.v > 1);
+    for (const x of mv) { run = x.sthr > 0.015 && x.sthr < 0.09 ? run + 1 : 0; if (run > 12) hov++; }
+    check('gass: i bykjøring blir gassen ikke liggende rundt motorens slipp-terskler (> 0,2 s i 0,015-0,09: ' + (100 * hov / mv.length).toFixed(1) + ' % av tiden)', hov / mv.length < 0.01);
+  }
+}
+
+// ---- ekte kjørelogg (valgfri): DRIVELOG=<fil> spilles gjennom fusjonen, med målt og med fast 1,0 s forsinkelse ----
+// Loggen ligger aldri i repoet; uten DRIVELOG hoppes dette over. Posisjoner sendes ikke inn (bredde/lengde 0).
+async function replayLog(browser, url, watch, L, fix) {
+  const s = L.s, g = L.gps, T = s.t, n = T.length, i0 = s.aLin.findIndex((x) => x != null);
+  if (i0 < 0) return null;
+  const t0 = T[i0] - 1000, rows = [], fixes = [], gb = (L.state && L.state.gBase) || 0;
+  for (let i = i0; i < n; i++) rows.push([T[i] - t0, s.aLin[i] == null ? 0 : s.aLin[i], s.rot[i] || 0, s.grade[i] || 0]);
+  for (let i = 0; i < g.t.length; i++) if (g.t[i] - t0 > 0 && g.t[i] <= T[n - 1]) fixes.push([g.t[i] - t0, g.ts[i] - t0, g.spd[i], g.acc[i], g.hdg[i]]);
+  const ctx = await browser.newContext(); const pg = await ctx.newPage(); watch(pg);
+  await pg.addInitScript((gb) => { window.__T = 0; performance.now = () => window.__T; try { localStorage.clear();
+    localStorage.setItem('m4cal', JSON.stringify({ t: Date.now(), F: [0, 0, -10], g: [0, 1, 0], gb: gb, b: 0 })); } catch (e) {} }, gb); // kalibrert: fremover = -z
+  await pg.goto(url);
+  const r = await pg.evaluate(([rows, fixes, FIX, gb]) => {
+    const M = window.__m4, S = M.S, st = M.st; let sent = null;
+    st.core = { msg: (m) => { if (m.k === 'drive') sent = m; } }; st.mode = 'drive';
+    const out = [], fx = []; let fi = 0, ri = 0;
+    if (FIX) S.lag = FIX;
+    for (let t = rows[0][0]; t < rows[rows.length - 1][0]; t += 1000 / 60) { // 10 Hz-loggen interpolert til 60 Hz
+      while (ri + 1 < rows.length && rows[ri + 1][0] <= t) ri++;
+      const a = rows[ri], b = rows[Math.min(ri + 1, rows.length - 1)], k = b[0] > a[0] ? Math.min(1, (t - a[0]) / (b[0] - a[0])) : 0;
+      const al = a[1] + (b[1] - a[1]) * k, th = Math.asin(Math.max(-0.2, Math.min(0.2, a[3] + gb)));
+      while (fi < fixes.length && fixes[fi][0] <= t) {
+        const f = fixes[fi++], before = S.vEst; window.__T = f[0];
+        M.onGps({ timestamp: f[1], coords: { speed: f[2] == null ? NaN : f[2], accuracy: f[3] == null ? 999 : f[3], heading: f[4], latitude: 0, longitude: 0 } });
+        if (FIX) S.lag = FIX;
+        fx.push([f[0], f[2], S.vEst - before, S.lag]);
+      }
+      window.__T = t;
+      M.onMotion({ acceleration: { x: 0, y: 0, z: -al }, accelerationIncludingGravity: { x: 0, y: 9.81 * Math.cos(th), z: -al - 9.81 * Math.sin(th) }, rotationRate: { alpha: a[2], beta: 0, gamma: 0 } });
+      if (sent) out.push([t, S.vEst, sent.v, sent.thr, sent.brake || 0]);
+    }
+    return { out, fx };
+  }, [rows, fixes, fix, gb]);
+  await ctx.close();
+  // fartsfeil mot GPS ved loggens målte forsinkelse (loganalyze), sagtann, og motoren (M4, Sport) på det den fikk
+  const { analyze } = require('./loganalyze.js'), lagT = (analyze(L).lagSensor || { lag: 110 }).lag, O = r.out;
+  const at = (t) => { let lo = 0, hi = O.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (O[m][0] <= t) lo = m; else hi = m; } return O[lo][1]; };
+  const err = [], jumps = [];
+  for (const f of r.fx) if (f[1] != null && f[1] >= 0 && f[0] > O[0][0] + 2000) { err.push(at(f[0] - lagT) - f[1]); if (f[1] > 2) jumps.push(Math.abs(f[2])); }
+  const EngineCore = require('./engine.js'), e = new EngineCore(48000);
+  e.msg({ k: 'out', o: EngineCore.outputs().i4hk, now: true }); e.msg({ k: 'profile', p: EngineCore.profiles().m4csl, now: true });
+  e.msg({ k: 'cfg', vol: 0.8, burble: 0.7, exMode: 1, auto: true, idleOn: true }); e.msg({ k: 'start' }); e.msg({ k: 'mode', drive: true });
+  const Lb = new Float32Array(128), Rb = new Float32Array(128), ev = []; let oi = 0;
+  e.onEv = (x) => { if (x.k === 'up' || x.k === 'blip' || x.k === 'kick') ev.push([x.t, Math.sign(x.b - x.a)]); };
+  for (let t = O[0][0]; t < O[O.length - 1][0]; t += 128 / 48) {
+    while (oi + 1 < O.length && O[oi + 1][0] <= t) oi++;
+    e.msg({ k: 'drive', v: O[oi][2], thr: O[oi][3], brake: O[oi][4] }); e.render(Lb, Rb, 128);
+  }
+  let hunt = 0; for (let k = 1; k < ev.length; k++) if (ev[k][1] !== ev[k - 1][1] && ev[k][0] - ev[k - 1][0] < 3) hunt++;
+  return { rms: Math.sqrt(err.reduce((a, b) => a + b * b, 0) / err.length), jump: jumps.reduce((a, b) => a + b, 0) / jumps.length,
+    lag: r.fx[r.fx.length - 1][3], lagT: lagT, shifts: ev.length, hunt: hunt, min: (O[O.length - 1][0] - O[0][0]) / 60000 };
+}
+
 // ---- kjørelogg: syntetisk tur gjennom den ekte fusjonen med opptak på, så loganalyze.js på loggen ----
 async function logSim(browser, url, watch, lag) {
   const ctx = await browser.newContext(); const page = await ctx.newPage(); watch(page);
@@ -186,12 +306,16 @@ function logChecks(r, lag) {
   const { analyze, report } = require('./loganalyze.js');
   const L = r.log, A = analyze(L);
   console.log('\nKJØRELOGG (syntetisk tur, GPS ' + lag + ' ms forsinket, ' + (r.bytes / 1e6).toFixed(2) + ' MB JSON):\n' + report(A));
-  check('logg: format, kolonner og 10 rader i sekundet', L.format === 'lydmotor-logg' && L.version === 1 && A.rows > 1500 && Math.abs(A.rowMs - 100) <= 17 && ['aRaw', 'aLin', 'rot', 'vEst', 'thr', 'brk', 'dir', 'grade', 'rpm', 'gear', 'volDb'].every((k) => Array.isArray(L.s[k]) && L.s[k].length === A.rows), A.rows + ' rader, median ' + A.rowMs + ' ms');
+  check('logg: format, kolonner og 10 rader i sekundet', L.format === 'lydmotor-logg' && L.version === 2 && A.rows > 1500 && Math.abs(A.rowMs - 100) <= 17 && ['aRaw', 'aLin', 'rot', 'vEst', 'thr', 'brk', 'dir', 'grade', 'rpm', 'gear', 'volDb'].every((k) => Array.isArray(L.s[k]) && L.s[k].length === A.rows), A.rows + ' rader, median ' + A.rowMs + ' ms');
   check('logg: hvert GPS-punkt er med, uten posisjon som standard', A.fixes >= 150 && L.gps.lat.every((x) => x === null) && L.pos === false, A.fixes + ' punkter');
   check('logg: lagret i IndexedDB og lest inn igjen etter omlasting', r.n1 > 0 && r.n2 === r.n1, r.n1 + ' -> ' + r.n2);
+  const v1 = JSON.parse(JSON.stringify(L)); v1.version = 1; v1.ev = v1.ev.filter((e) => e[1] !== 'lag'); delete v1.state.lag; let A1 = null;
+  try { A1 = analyze(v1); } catch (e) {}
+  check('loganalyze: versjon 2 har appens målte GPS-forsinkelse (hendelser og tilstand), versjon 1 leses fortsatt', A.version === 2 && A.lagApp.length > 0 && typeof L.state.lag === 'number' && L.gpsLag === L.state.lag && A1 && A1.lagApp.length === 0 && A1.rows === A.rows, A.lagApp.length + ' målinger');
+  check('loganalyze: forsinkelse per vindu og gjennom filtrene', A.lagWin.length > 2 && A.path.thr && A.path.thr.d > 10 && A.path.thr.d < 200, A.path.thr ? Math.round(A.path.thr.d) + ' ms' : '–');
   const ls = A.lagSensor, lf = A.lagFused;
   check('loganalyze: GPS-forsinkelse fra akselerometeret innen ±0,15 s', ls && Math.abs(ls.lag - lag) <= 150, ls ? Math.round(ls.lag) + ' ms' : '–');
-  if (lag === 1000) {
+  if (lag === 110) {
     check('loganalyze: GPS-forsinkelse fra fusjonert fart innen ±0,25 s', lf && Math.abs(lf.lag - lag) <= 250, lf ? Math.round(lf.lag) + ' ms' : '–');
     check('loganalyze: fartsfeil liten (rms < 0,6 m/s), ingen girjakt i data uten motor', A.speedErr.rms < 0.6 && A.dirChanges === 0, 'rms ' + A.speedErr.rms.toFixed(2));
   }
@@ -416,6 +540,11 @@ async function peaks(browser, url, watch) {
     const a = await p.evaluate(() => ({ state: window.__m4.st.ctx && window.__m4.st.ctx.state, sys: document.querySelector('#stSys').textContent }));
     await p.click('#mDrive'); await p.waitForTimeout(800);
     const b = await p.evaluate(() => ({ on: window.__m4.S.on, btn: document.querySelector('#sensBtn').hidden, sys: document.querySelector('#stSys').textContent }));
+    // kjørepanelet viser GPS-forsinkelsen: først startverdien (ikke målt), så en målt verdi
+    const lagTxt = await p.evaluate(() => { const M = window.__m4, r = [], e = () => document.querySelector('#dpLag').textContent;
+      M.S.tickT = 0; M.driveTick(); r.push(e()); M.S.lag = 110; M.S.lagOk = true; M.driveTick(); r.push(e()); return r; });
+    check('side: kjørepanelet viser GPS-forsinkelsen', lagTxt[0] === 'ca. 0,12 s (ikke målt ennå)' && lagTxt[1] === 'ca. 0,11 s', lagTxt.join(' | '));
+    if (process.env.SHOTS) { await p.setViewportSize({ width: 393, height: 852 }); await p.waitForTimeout(300); await p.locator('#dpLag').scrollIntoViewIfNeeded(); await p.screenshot({ path: path.join(process.env.SHOTS, 'kjorepanel-393x852.png') }); }
     const c = await p.evaluate(() => { const M = window.__m4; M.S.dir = 'R'; M.sysTick(); const t = document.querySelector('#stSys').textContent; M.S.dir = 'F'; M.sysTick(); return t; });
     check('side: statuslinjen viser "Rygger" i revers', /Rygger/.test(c), c);
     await p.click('summary'); await p.click('#calReset');
@@ -438,7 +567,7 @@ async function peaks(browser, url, watch) {
     await c2.close();
     await features(browser, url, watch, server.address().port);
     await peaks(browser, url, watch);
-    for (const lag of [1000, 1500]) logChecks(await logSim(browser, url, watch, lag), lag);
+    for (const lag of [110, 1500]) logChecks(await logSim(browser, url, watch, lag), lag);
   }
   // 2) Syntetisk kjøretur med falsk klokke
   const ctx = await browser.newContext(); const page = await ctx.newPage(); watch(page);
@@ -456,8 +585,21 @@ async function peaks(browser, url, watch) {
     await pg.close();
   }
   check('revers: ingen konsollfeil', errs.length === 0, errs.slice(0, 3).join(' | '));
+  // 4) GPS-forsinkelsen: bykjøring med kjent forsinkelse, og (valgfritt) eierens ekte logg
+  const lr = await lagRuns(browser, url, watch);
+  const dl = process.env.DRIVELOG && fs.existsSync(process.env.DRIVELOG) ? JSON.parse(fs.readFileSync(process.env.DRIVELOG, 'utf8')) : null;
+  const rl = dl ? [await replayLog(browser, url, watch, dl, 0), await replayLog(browser, url, watch, dl, 1000)] : null;
+  check('gps-forsinkelse: ingen konsollfeil', errs.length === 0, errs.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   revReport(rv);
+  lagReport(lr);
+  if (!rl) console.log('INFO ekte kjørelogg: hoppet over (sett DRIVELOG=<fil>)');
+  else if (!rl[0]) console.log('INFO ekte kjørelogg: ingen kalibrerte rader');
+  else {
+    const f = (r) => 'fartsfeil rms ' + r.rms.toFixed(2) + ' m/s, sprang ved GPS ' + r.jump.toFixed(2) + ' m/s, girskift ' + r.shifts + ', girjakt ' + r.hunt + ' (' + (r.hunt / r.min * 60).toFixed(0) + ' per time)';
+    console.log('INFO ekte kjørelogg (' + rl[0].min.toFixed(1) + ' min, loggens forsinkelse ' + Math.round(rl[0].lagT) + ' ms): målt forsinkelse ' + Math.round(rl[0].lag) + ' ms: ' + f(rl[0]) + ' | fast 1,0 s: ' + f(rl[1]));
+    check('ekte kjørelogg: målt forsinkelse innen ±0,1 s av loggens, fartsfeil og sagtann lavere enn med fast 1,0 s', Math.abs(rl[0].lag - rl[0].lagT) <= 100 && rl[0].rms < rl[1].rms && rl[0].jump < rl[1].jump);
+  }
 
   const segs = {}; o.forEach((x) => (segs[x.seg] = segs[x.seg] || []).push(x));
   const tail = (si, sec) => { const a = segs[si]; return a.slice(Math.max(0, a.length - sec * 60)); };
