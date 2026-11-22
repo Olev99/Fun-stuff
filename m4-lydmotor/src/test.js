@@ -101,17 +101,19 @@ function shelf(x, f, gdB, hi) { // enkel 1.-ordens hylle (tilnærmer BiquadFilte
   return y;
 }
 function softClip(x) { const a = Math.abs(x); return a < 0.8 ? x : Math.sign(x) * (0.8 + 0.2 * Math.tanh((a - 0.8) / 0.2)); }
-function applyTunnel(s, amount) {
+// k (valgfri): sidens tunneldemping (main.js tunK) på tørr vei og klangsending
+function applyTunnel(s, amount, k) {
+  k = k === undefined ? 1 : k;
   const ir = EngineCore.tunnelIR(SR, TUN.irDur), n = s.L.length;
   const g = new Float32Array(n); let cur = 0;
   for (let i = 0; i < n; i++) { const tg = s.tunnel[Math.min(s.tunnel.length - 1, (i / N) | 0)]; cur += (tg - cur) * (1 - Math.exp(-1 / (SR * (tg > cur ? TUN.tauIn : TUN.tauOut)))); g[i] = cur; }
   const out = [new Float32Array(n), new Float32Array(n)]; let wetE = 0, clipN = 0;
   [s.L, s.R].forEach((ch, c) => {
-    const snd = new Float32Array(n); for (let i = 0; i < n; i++) snd[i] = ch[i] * g[i] * TUN.send;
+    const snd = new Float32Array(n); for (let i = 0; i < n; i++) snd[i] = ch[i] * g[i] * TUN.send * (1 + (k - 1) * g[i]);
     let wet = convolve(snd, ir[c]); wet = shelf(shelf(wet, 250, 4, false), 3000, -6, true);
     for (let i = 0; i < n; i++) {
       const w = wet[i] * g[i] * TUN.wet * amount; wetE += w * w;
-      const y = ch[i] * (1 + (TUN.dryBoost - 1) * g[i]) + w; if (Math.abs(y) > 0.8) clipN++;
+      const y = ch[i] * (1 + (TUN.dryBoost - 1) * g[i]) * (1 + (k - 1) * g[i]) + w; if (Math.abs(y) > 0.8) clipN++;
       out[c][i] = softClip(y);
     }
   });
@@ -162,8 +164,64 @@ function cityPops(p, o, seed) {
   return n / (t / 60);
 }
 
+// ---- lydstyrke som kringkasting måler den: ITU-R BS.1770 (K-veiing, porting), korttid 3 s, sann topp (4x) ----
+// Kontrollert mot ffmpeg ebur128 (samme integrerte LUFS og sanne topp på en kjøring); 997 Hz sinus 0 dBFS i to kanaler = 0,0 LUFS.
+const KW48 = [[1.53512485958697, -2.69169618940638, 1.19839281085285, -1.69065929318241, 0.73248077421585], [1, -2, 1, -1.99004745483398, 0.99007225036621]];
+function kPow(chs) { // løpende sum av K-veid effekt over kanalene (L og R vekt 1), 48 kHz
+  const n = chs[0].length, c = new Float64Array(n + 1), ys = chs.map((x) => {
+    let y = Float64Array.from(x);
+    for (const [b0, b1, b2, a1, a2] of KW48) { let x1 = 0, x2 = 0, y1 = 0, y2 = 0; const o = new Float64Array(n); for (let i = 0; i < n; i++) { const v = b0 * y[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = y[i]; y2 = y1; y1 = v; o[i] = v; } y = o; }
+    return y;
+  });
+  for (let i = 0; i < n; i++) { let q = 0; for (const y of ys) q += y[i] * y[i]; c[i + 1] = c[i] + q; }
+  return c;
+}
+const lufsOf = (ms) => -0.691 + 10 * Math.log10(ms + 1e-30);
+const kBlocks = (c, len) => { const o = [], w = Math.round(len * SR), h = Math.round(0.1 * SR); for (let i = 0; i + w <= c.length - 1; i += h) o.push((c[i + w] - c[i]) / w); return o; };
+function loudness(L, R) {
+  const c = kPow([L, R]), mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const z = kBlocks(c, 0.4).filter((m) => lufsOf(m) > -70), z2 = z.length ? z.filter((m) => lufsOf(m) > lufsOf(mean(z)) - 10) : [];
+  const S = kBlocks(c, 3).map(lufsOf);
+  return { I: z2.length ? lufsOf(mean(z2)) : -Infinity, S: S.length ? Math.max(...S) : -Infinity };
+}
+function truePeak(chs) {
+  const T = 12, h = [1, 2, 3].map((p) => { const r = []; for (let k = -T; k < T; k++) { const t = k - p / 4; r.push(Math.sin(Math.PI * t) / (Math.PI * t) * (0.5 + 0.5 * Math.cos(Math.PI * t / (T + 1)))); } return r; });
+  let pk = 0;
+  for (const x of chs) for (let i = T; i < x.length - T; i++) {
+    const a = Math.abs(x[i]); if (a > pk) pk = a; if (a < pk * 0.6) continue;
+    for (const r of h) { let q = 0; for (let k = -T; k < T; k++) q += r[k + T] * x[i - k]; if (Math.abs(q) > pk) pk = Math.abs(q); }
+  }
+  return pk;
+}
+// Standardscenarier for lydstyrke (sidens standard: volum 0,8, Sport, burble 0,7; verste fall: Bane, full burble, volum 1, sperre og smell).
+// E = motorklassen (så samme måling kan kjøres mot en eldre engine.js), O = utgangsprofil. LUFS av L og R, uten sidens mykklipper.
+function loudScen(E, p, O) {
+  const rr = (x) => x * p.redline / 7200, bl = new Float32Array(N), br = new Float32Array(N), r = {};
+  const mk = (cfg) => { const e = new E(SR); e.msg({ k: 'out', o: O, now: true }); e.msg({ k: 'profile', p, now: true }); e.msg(Object.assign({ k: 'cfg', vol: 0.8, burble: 0.7, exMode: 1, auto: true }, cfg || {})); return e; };
+  const rec = (e, sec, fn, L, R, G) => { for (let t = 0; t < sec; t += N / SR) { fn(t); e.render(bl, br, N); if (L) for (let i = 0; i < N; i++) { L.push(bl[i]); R.push(br[i]); } if (G) G.push(e.levDb || 0); } };
+  let e = mk(), L = [], R = [];
+  rec(e, 1, () => e.msg({ k: 'in', thr: 0, brake: 0 })); rec(e, 10, () => e.msg({ k: 'in', thr: 1, brake: 0 }), L, R);
+  r.wot = loudness(L, R); r.wot.tp = dB(truePeak([L, R]));
+  e = mk(); L = []; R = []; rec(e, 6, () => e.msg({ k: 'in', thr: 0, brake: 0 }), L, R); r.idle = loudness(L.slice(2 * SR), R.slice(2 * SR));
+  for (const [k, thr] of [['light', 0.12], ['coast', 0]]) {
+    e = mk({ auto: false }); e.msg({ k: 'mode', drive: true }); const v = rr(2000) / (e.ratios[3] * e.finalDrive) * 2 * Math.PI * e.wheelR / 60; L = []; R = [];
+    rec(e, 8, () => { e.msg({ k: 'drive', v, thr, brake: 0 }); e.gear = 3; }, L, R); r[k] = loudness(L.slice(3 * SR), R.slice(3 * SR));
+  }
+  e = mk({ exMode: 2, burble: 1, vol: 1, auto: false }); L = []; R = [];
+  rec(e, 0.5, () => e.msg({ k: 'in', thr: 0, brake: 0 }), L, R); rec(e, 6, () => e.msg({ k: 'in', thr: 1, brake: 0 }), L, R); rec(e, 3, () => e.msg({ k: 'in', thr: 0, brake: 0 }), L, R);
+  r.worst = loudness(L, R); r.worst.tp = dB(truePeak([L, R])); r.worst.pk = Math.max(stats(L).peak, stats(R).peak);
+  // lett gass (0,15) i kjøremodus, så slipp: utjevnerens løft over tid (pumping)
+  e = mk(); e.msg({ k: 'mode', drive: true }); const G = []; const v0 = rr(2000) / (e.ratios[3] * e.finalDrive) * 2 * Math.PI * e.wheelR / 60;
+  rec(e, 6, (t) => e.msg({ k: 'drive', v: v0, thr: 0.15, brake: 0 }), null, null, G); const i0 = G.length;
+  rec(e, 6, (t) => e.msg({ k: 'drive', v: Math.max(0, v0 - 0.6 * t), thr: 0, brake: 0 }), null, null, G);
+  rec(e, 3, (t) => e.msg({ k: 'drive', v: v0 - 3.6, thr: 0.3, brake: 0 }), null, null, G);
+  const w = Math.round(0.1 * SR / N); let up = 0, dn = 0; for (let i = w; i < G.length; i++) { const sl = (G[i] - G[i - w]) / 0.1; if (sl > up) up = sl; if (sl < dn) dn = sl; }
+  r.pump = { up, dn, d03: G[i0 + Math.round(0.3 * SR / N)] - G[i0], d2: G[i0 + Math.round(2 * SR / N)] - G[i0], max: Math.max(...G) };
+  return r;
+}
+
 Sess.prof = null; Sess.out = null;
-module.exports = { Sess, stats, spectrum, bandPct, linePow, dB, applyTunnel, writeWav, SR, N, TUN, EngineCore, opPoint, cityPops };
+module.exports = { Sess, stats, spectrum, bandPct, linePow, dB, applyTunnel, writeWav, SR, N, TUN, EngineCore, opPoint, cityPops, loudness, truePeak, loudScen };
 
 // =====================================================================
 if (require.main === module) {
@@ -508,7 +566,7 @@ if (require.main === module) {
     const O = EngineCore.outputs().i4hk, lt = opPoint(p, O, rr(2000), 0.12, 3), co = opPoint(p, O, rr(2000), 0, 3), w = opPoint(p, O, rr(5000), 1, 4);
     check('lett last (i4 HK, 0,12 last, ' + rr(2000) + ' o/min): tone over støy (A-veid støy mellom ordenene <= -13 dB), rulling <= -4 dB',
       lt.tn <= -13 && co.tn <= -4, 'lett last ' + f1(lt.tn) + ' dB (1,5-6 kHz ' + f1(lt.hi) + ' dB av alt), rulling ' + f1(co.tn) + ' dB');
-    const lim = pid === 'm4csl' ? -14 : -20, d = lt.lvA - w.lvA;
+    const lim = pid === 'm4csl' ? -16 : -20, d = lt.lvA - w.lvA; // M4 -14 -> -16: den K-veide utjevneren (LUFS) løfter lett last mindre i A-veiing enn den gamle 300 Hz-detektoren
     check('lett last (i4 HK): A-veid nivå ' + (-lim) + ' til 6 dB under full gass ved ' + rr(5000) + ' o/min', d >= lim && d <= -6, f1(d) + ' dB');
     // bykjøring med små slipp fra lett gass og nedgir på lavt turtall: få smell (før: 2,6-6,2 per minutt), median av tre frø
     const pm = [0x1234567, 99, 777].map((sd) => cityPops(p, O, sd)).sort((a, b) => a - b);
@@ -646,7 +704,8 @@ if (require.main === module) {
     for (const id of ids) {
       Sess.prof = PROFS[id];
       const s = new Sess({ exMode: 2, burble: 1 }); s.run(0.5, 0).run(10, 1).run(2, 0).run(4, 0, 1);
-      const tu = new Sess({ exMode: 2, burble: 1 }); tu.inTunnel = 1; tu.run(0.5, 0).run(8, 1).run(2, 0).run(3, 0, 1); const to = applyTunnel(tu, 1), tp = Math.max(stats(to.L).peak, stats(to.R).peak), tc = to.clipFrac;
+      // tunnel med sidens demping (main.js tunK: TUN_PK 2,0; vol × tak × TUN_PK over PEAK_MAX 0,79 dempes tørr vei og klang sammen)
+      const tu = new Sess({ exMode: 2, burble: 1 }); tu.inTunnel = 1; tu.run(0.5, 0).run(8, 1).run(2, 0).run(3, 0, 1); const to = applyTunnel(tu, 1, Math.min(1, 0.79 / (O.lim * 2.0))), tp = Math.max(stats(to.L).peak, stats(to.R).peak), tc = to.clipFrac;
       const z = new Sess({ auto: false, exMode: 2, burble: 1 }); z.run(0.5, 0).run(4, 1);
       const st = Math.max(stats(s.L).peak, stats(s.R).peak, stats(z.L).peak), bad = stats(s.L).bad;
       const w = new Sess(); w.run(8, 0); const sub = bandRel(w.seg(2, 8), 0, 25), hf = bandRel(s.L.slice(48000, 480000), 16000, 24000);
@@ -656,8 +715,38 @@ if (require.main === module) {
       // taket er eksakt (begrenserens hylle faller aldri under dagens topp): Float32-utgangen når høyst fround(lim)
       if (st > Math.fround(O.lim) || tp > 0.95 || tc > 0.005 || bad || sub > -25 || hf > -25 || 10 * Math.log10(sd / md) > -12) pk = 9;
     }
-    check0('utgang i4 HK: topper <= -3 dBFS i verste fall uten tunnel (Bane, full burble, sperre), i tunnel < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= Math.fround(O.lim), '\n      ' + info.join('\n      '));
+    check0('utgang i4 HK: topper <= taket (-1,5 dBFS ved volum 1) i verste fall uten tunnel (Bane, full burble, sperre), i tunnel (med sidens demping) < -0.5 dBFS og nesten ingen mykklipp, < 25 Hz under -25 dB, > 16 kHz under -25 dB, stereo mono-vennlig (side < -12 dB av mid)', pk <= Math.fround(O.lim), '\n      ' + info.join('\n      '));
     Sess.out = null; Sess.prof = null;
+  }
+  // ---- 14. lydstyrke (i4 HK, LUFS etter ITU-R BS.1770) ----
+  // Eieren: "appen var veldig lav, og radioen veldig, veldig høy". Mål ved sidens standard (volum 0,8, Sport, burble 0,7):
+  // full gass korttid (3 s) maks -15,5 til -12,5 LUFS (norsk DAB normaliseres til -15 LUFS, Spotify -14), lett last -24 til -18,5,
+  // tomgang -26 til -19 og minst 5 LU under full gass, rulling uten gass ikke under -36; sann topp i verste fall (volum 1) <= -1 dBTP;
+  // utjevneren stiger høyst 4,1 dB/s og høyst 1,5 dB de første 0,3 s etter et slipp (slippet skal høres, ikke pumpe).
+  // Regresjonsport: FØR = origin/main før lydstyrkeendringen (samme måling): ingen scenario blir lavere, ingen løft over 6/10/16 LU
+  // (full gass/lett last/rulling), støy mot tone (opPoint) ikke verre enn før (+0,5 dB).
+  {
+    // [full gass S maks, full gass sann topp, lett last I, rulling I, tomgang I, verste sann topp, støy/tone lett, støy/tone rulling]
+    const FOR = { m4csl: [-18.6, -7.8, -22.7, -35.9, -25.4, -5.5, -14.4, -9.9], vanqs: [-18.6, -10.8, -30.1, -49.6, -27.2, -8.6, -21.2, -5.1],
+      v12vs: [-15.1, -7.4, -29, -47.1, -28.6, -5.4, -17.2, -11.1], f12: [-17.7, -10.5, -28.3, -44.9, -25.9, -8.4, -24.1, -16.1],
+      gt3: [-17.9, -8.7, -26, -40.6, -25.5, -5.8, -23.4, -16.6], lfa: [-15.8, -7.5, -26.8, -38.5, -26.3, -5.6, -31.3, -19.9],
+      cgt: [-18.2, -9.4, -27.8, -43.1, -23.1, -5.9, -24.3, -19.4], f812: [-16.5, -9.9, -26.7, -41.7, -25.5, -7.4, -26.5, -19.5],
+      gt3rs4: [-18.6, -8.8, -24.3, -38, -25, -5.2, -19.8, -13] };
+    const O = EngineCore.outputs().i4hk, tab = [];
+    for (const id of ids) {
+      const p = PROFS[id], R = p.redline / 7200, rr = (x) => Math.round(x * R), r = loudScen(EngineCore, p, O), pre = '[' + p.short + '] ';
+      const lt = opPoint(p, O, rr(2000), 0.12, 3), co = opPoint(p, O, rr(2000), 0, 3);
+      const now = [r.wot.S, r.wot.tp, r.light.I, r.coast.I, r.idle.I, r.worst.tp, lt.tn, co.tn], b = FOR[id];
+      check0(pre + 'lydstyrke: full gass ' + f1(r.wot.S) + ', lett last ' + f1(r.light.I) + ', tomgang ' + f1(r.idle.I) + ', rulling ' + f1(r.coast.I) + ' LUFS innenfor målene',
+        r.wot.S >= -15.5 && r.wot.S <= -12.5 && r.light.I >= -24 && r.light.I <= -18.5 && r.idle.I >= -26 && r.idle.I <= -19 && r.idle.I <= r.wot.S - 5 && r.coast.I >= -36);
+      check0(pre + 'sann topp: full gass ' + f1(r.wot.tp) + ' dBTP, verste fall (volum 1) ' + f1(r.worst.tp) + ' dBTP (<= -1), utvalgstopp <= taket', r.worst.tp <= -1 && r.wot.tp <= -1 && r.worst.pk <= Math.fround(O.lim));
+      check0(pre + 'utjevner: stiger høyst 4,1 dB/s (' + f1(r.pump.up) + '), +' + f1(r.pump.d03) + ' dB 0,3 s og +' + f1(r.pump.d2) + ' dB 2 s etter slipp (maks ' + f1(r.pump.max) + ' dB)', r.pump.up <= 4.1 && r.pump.d03 <= 1.5 && r.pump.max <= O.lev[2] + 0.01);
+      const dl = now.map((x, i) => x - b[i]);
+      check0(pre + 'regresjonsport mot før: ingen scenario lavere, løft innenfor 6/10/16 LU, støy mot tone ikke verre',
+        [0, 2, 3, 4].every((i) => dl[i] >= -0.3) && dl[0] <= 6 && dl[2] <= 10 && dl[3] <= 16 && dl[6] <= 0.5 && dl[7] <= 0.5);
+      tab.push(p.short.padEnd(16) + ['full gass', 'topp', 'lett', 'rulling', 'tomgang', 'verste topp', 'støy lett', 'støy rull'].map((k, i) => k + ' ' + f1(b[i]) + '>' + f1(now[i])).join(' | '));
+    }
+    console.log('\nLYDSTYRKE (LUFS/dBTP, før > nå, volum 0,8, i4 HK):\n' + tab.join('\n'));
   }
   console.log(results.join('\n'));
   console.log(fails ? '\n' + fails + ' FEIL' : '\nALT OK');

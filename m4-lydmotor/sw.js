@@ -1,7 +1,7 @@
 // Lydmotor service worker. build.py writes ../sw.js from this file: VERSION is a content hash of the build,
 // FILES the precache list (relative to the worker, so it works under /Fun-stuff/m4-lydmotor/ on GitHub Pages).
 // index.html: network first (3 s), then cache. Icons and manifest: cache first. Other origins: never touched.
-const VERSION = 'f33abf6cf786', CACHE = 'lydmotor-' + VERSION, FILES = ["index.html", "manifest.webmanifest", "apple-touch-icon.png", "favicon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"], NET_MS = 3000;
+const VERSION = 'e81632e6828c', CACHE = 'lydmotor-' + VERSION, FILES = ["index.html", "manifest.webmanifest", "apple-touch-icon.png", "favicon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"], NET_MS = 3000;
 
 self.addEventListener('install', (e) => {
   // no skipWaiting: a new version takes over on the next launch (or when the page asks for it)

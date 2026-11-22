@@ -351,19 +351,21 @@ async function features(browser, url, watch, port) {
     M.vcTick(T);
     const run = (sec) => { for (let i = 0; i < sec * 4; i++) { T += 250; M.vcTick(T); } };
     document.querySelector('#vol').value = 0.8; st.vc = 2; st.mode = 'drive'; S.on = true; S.vEst = 120 / 3.6;
-    run(1); r.after1 = st.vcDb; run(9); r.db120 = st.vcDb; r.vol = st.volSent;
+    run(1); r.after1 = st.vcDb; run(9); r.db120 = st.vcDb; r.vol = st.volSent; r.gain = st.gainSent;
     S.vEst = 60 / 3.6; run(10); r.db60 = st.vcDb;
-    S.vEst = 200 / 3.6; st.vc = 3; document.querySelector('#vol').value = 1; run(10); r.capVol = st.volSent;
-    st.tunOn = true; run(1); r.tunVol = st.volSent; st.tunOn = false;
-    st.mode = 'test'; run(10); r.testDb = st.vcDb; r.testVol = st.volSent;
+    S.vEst = 200 / 3.6; st.vc = 3; document.querySelector('#vol').value = 1; run(10); r.capGain = st.gainSent; r.capVol = M.effVol();
+    st.tunOn = true; r.tunK = M.tunK(); document.querySelector('#vol').value = 0.3; r.tunK3 = M.tunK(); document.querySelector('#vol').value = 1; st.tunOn = false;
+    st.mode = 'test'; run(10); r.testDb = st.vcDb; r.testGain = st.gainSent;
     S.on = false; document.querySelector('#vol').value = 0.8; st.vc = 2; run(1);
     r.lim = M.store && 0; return r;
   });
   console.log('INFO veistøy: ' + JSON.stringify(vc));
   check('veistøy: Normal = +3,5 dB ved 120 km/t, +1,75 ved 60, glattet (63 % etter 1 s)', Math.abs(vc.db120 - 3.5) < 0.01 && Math.abs(vc.db60 - 1.75) < 0.02 && vc.after1 > 0.55 * 3.5 && vc.after1 < 0.7 * 3.5, vc.db120.toFixed(2) + ' / ' + vc.db60.toFixed(2) + ' / ' + vc.after1.toFixed(2));
-  check('veistøy: volum 0,8 -> 1,20 ved 120 km/t (cfg vol)', Math.abs(vc.vol - 0.8 * Math.pow(10, 3.5 / 20)) < 0.003, vc.vol.toFixed(3));
-  check('veistøy: taket holder i4hk under -2 dBFS (vol 1, Høy, 200 km/t: ' + (20 * Math.log10(vc.capVol * 0.53)).toFixed(2) + ' dBFS), i tunnel intet løft', vc.capVol * 0.53 <= 0.7943 && Math.abs(vc.tunVol - 1) < 1e-6, vc.capVol.toFixed(3) + ' / ' + vc.tunVol.toFixed(3));
-  check('veistøy: testmodus går tilbake til 0 dB', vc.testDb < 0.01 && Math.abs(vc.testVol - 1) < 0.003, vc.testDb.toFixed(3));
+  check('veistøy: +3,5 dB ved 120 km/t går som cfg gain 1,50 (før begrenseren), volumet 0,8 urørt', Math.abs(vc.gain - Math.pow(10, 3.5 / 20)) < 0.003 && vc.vol === 0.8, vc.gain.toFixed(3) + ' / ' + vc.vol);
+  // i4hk: tak 0,84; i tunnel dempes tørr vei og klang så vol × tak × TUN_PK <= PEAK_MAX (TUN_PK 2,0; vol 1: 0,79 / (0,84 × 2,0) = 0,470), ingen demping når det er plass
+  check('veistøy: Høy ved 200 km/t gir gain 1,78 og volum 1 (toppene holdes av begrenseren), tunneldemping 0,470 ved volum 1, 1 ved volum 0,3',
+    Math.abs(vc.capGain - Math.pow(10, 5 / 20)) < 0.003 && vc.capVol === 1 && Math.abs(vc.tunK - 0.79 / (0.84 * 2.0)) < 1e-6 && vc.tunK3 === 1, vc.capGain.toFixed(3) + ' / ' + vc.capVol + ' / ' + vc.tunK.toFixed(3) + ' / ' + vc.tunK3);
+  check('veistøy: testmodus går tilbake til 0 dB', vc.testDb < 0.01 && Math.abs(vc.testGain - 1) < 0.003, vc.testDb.toFixed(3));
 
   // skjermbilder av de nye delene: statusrad med brikker, innstillinger
   await p.evaluate(() => { const M = window.__m4; M.recSet(true); M.REC.dur = 754000; M.SW.ready = {}; M.setMuted(true); });
@@ -495,6 +497,12 @@ async function peaks(browser, url, watch) {
       const n = sr * 6, L = new Float32Array(n), R = new Float32Array(n);
       for (let i = 0; i < n; i += 128) { const t = i / sr; e.msg({ k: 'in', thr: t < 3 || t > 4.5 ? 1 : 0, brake: 0 }); e.render(L.subarray(i, i + 128), R.subarray(i, i + 128), 128); }
       const r = { car: car, o: o, lim: O[o].lim };
+      // samme kjøring med største veistøyløft (Høy, +5 dB før begrenseren): toppene skal ikke øke
+      { const e2 = new EngineCore(sr); e2.msg({ k: 'out', o: O[o], now: true }); e2.msg({ k: 'profile', p: P[car], now: true });
+        e2.msg({ k: 'cfg', vol: 1, gain: Math.pow(10, 5 / 20), burble: 1, exMode: 2, auto: false, idleOn: true }); e2.msg({ k: 'start' });
+        const a = new Float32Array(128), b = new Float32Array(128); let pk = 0;
+        for (let i = 0; i < n; i += 128) { const t = i / sr; e2.msg({ k: 'in', thr: t < 3 || t > 4.5 ? 1 : 0, brake: 0 }); e2.render(a, b, 128); for (let j = 0; j < 128; j++) pk = Math.max(pk, Math.abs(a[j]), Math.abs(b[j])); }
+        r.boost = pk / O[o].lim; }
       for (const amt of [0, 1.5]) {
         const oac = new OfflineAudioContext(2, n, sr), b = oac.createBuffer(2, n, sr); b.getChannelData(0).set(L); b.getChannelData(1).set(R);
         const src = oac.createBufferSource(); src.buffer = b; M.buildGraph(oac, src); st.shaper.curve = null; // lineært: mål før klipperen
@@ -503,27 +511,24 @@ async function peaks(browser, url, watch) {
         for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) { const a = Math.abs(d[i]); if (a > pk) pk = a; } }
         r[on ? 'tun' : 'dry'] = pk / O[o].lim;
       }
-      // sidens egen effVol med største løft (Høy, 5 dB), for volum 0,2-1, tørt og i tunnel
-      st.outId = o; st.vcDb = M.VC_DB[3]; let worst = -99, ok = true;
-      for (const tun of [false, true]) {
-        st.tunOn = tun;
-        for (let v = 0.2; v <= 1.0001; v += 0.05) {
-          document.querySelector('#vol').value = v;
-          const ratio = tun ? r.tun : r.dry, pk = M.effVol() * O[o].lim * ratio, base = v * O[o].lim * ratio;
-          if (pk > Math.max(base, Math.pow(10, -2 / 20)) * 1.0005) ok = false;
-          if (pk > base * 1.0001) worst = Math.max(worst, 20 * Math.log10(pk)); // bare der løftet virker
-        }
+      // sidens volum og tunneldemping (tunK) for volum 0,2-1: tørt = vol × tak × topp/tak, i tunnel × tunK; verste tunneltopp
+      st.outId = o; let worst = -99, ok = true; st.tunOn = true;
+      for (let v = 0.2; v <= 1.0001; v += 0.05) {
+        document.querySelector('#vol').value = v;
+        const pk = M.effVol() * O[o].lim * M.tunK() * r.tun, base = v * O[o].lim * r.tun;
+        if (pk > Math.min(base, M.PEAK_MAX) * 1.0005) ok = false;
+        worst = Math.max(worst, 20 * Math.log10(pk));
       }
-      st.tunOn = false; st.vcDb = 0; r.worstBoostDb = worst; r.ok = ok; out.push(r);
+      st.tunOn = false; document.querySelector('#vol').value = 0.8; r.worstBoostDb = worst; r.ok = ok; out.push(r);
     }
     return { out: out, TUN_PK: M.TUN_PK };
   });
   await ctx.close();
   console.log('\nVEISTØY-TAK (topp/tak ved vol 1, Bane, full burble, sperre; verste topp med løft):');
-  for (const r of res.out) console.log('INFO ' + r.car + '/' + r.o + ': tørt ' + r.dry.toFixed(4) + ', tunnel ' + r.tun.toFixed(3) + ', verste topp med løft ' + (r.worstBoostDb > -99 ? r.worstBoostDb.toFixed(2) + ' dBFS' : 'ingen løft'));
-  check('veistøy: motorens begrenser holder tørre topper på taket (≤ +0,05 %)', res.out.every((r) => r.dry <= 1.0005), res.out.map((r) => r.dry.toFixed(4)).join(' '));
+  for (const r of res.out) console.log('INFO ' + r.car + '/' + r.o + ': tørt ' + r.dry.toFixed(4) + ' (med +5 dB løft ' + r.boost.toFixed(4) + '), tunnel ' + r.tun.toFixed(3) + ', verste tunneltopp med demping ' + r.worstBoostDb.toFixed(2) + ' dBFS');
+  check('veistøy: motorens begrenser holder tørre topper på taket (≤ +0,05 %), også med største løft (+5 dB før begrenseren)', res.out.every((r) => r.dry <= 1.0005 && r.boost <= 1.0005), res.out.map((r) => r.dry.toFixed(4) + '/' + r.boost.toFixed(4)).join(' '));
   check('veistøy: tunnelklangens toppfaktor under TUN_PK (' + res.TUN_PK + ')', res.out.every((r) => r.tun <= res.TUN_PK), 'maks ' + Math.max(...res.out.map((r) => r.tun)).toFixed(3));
-  check('veistøy: med løft aldri over -2 dBFS før mykklipperen (og aldri over toppen uten løft)', res.out.every((r) => r.ok && r.worstBoostDb <= -1.99));
+  check('tunnel: med sidens demping aldri over -2 dBFS før mykklipperen (volum 0,2-1, klang 1,5), og aldri høyere enn uten demping', res.out.every((r) => r.ok && r.worstBoostDb <= -1.99), 'verste ' + Math.max(...res.out.map((r) => r.worstBoostDb)).toFixed(2) + ' dBFS');
 }
 
 (async () => {

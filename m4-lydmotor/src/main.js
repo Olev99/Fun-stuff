@@ -16,7 +16,7 @@
     thrPed: 0, thrKey: 0, brake: 0, keyGas: false,
     tele: { rpm: 780, gear: 1, v: 0, load: 0, lim: false, shift: 0, ev: [] }, rpmD: 780, vD: 0,
     evText: '', evT: 0, tunManual: false, tunGps: false, tunMap: false, tunOn: false, wake: null, wakeT: -1e9,
-    resT: -1e9, resN: 0, drawT: 0, sys: '', vc: 2, vcDb: 0, vcT: 0, volSent: -1, muted: false, frames: 0, moveT: 0, touchT: 0,
+    resT: -1e9, resN: 0, drawT: 0, sys: '', vc: 2, vcDb: 0, vcT: 0, volSent: -1, gainSent: 1, muted: false, frames: 0, moveT: 0, touchT: 0,
     cars: {}, audioSt: '' };
 
   // ---------- bilprofiler og lydanlegg ----------
@@ -532,28 +532,32 @@ registerProcessor('m4-engine', M4Proc);`;
   $('#startTest').addEventListener('click', () => startAudio('test'));
 
   function pushCfg() {
-    st.volSent = effVol();
-    send({ k: 'cfg', vol: st.volSent, burble: +$('#bur').value, idleOn: $('#idle').checked, auto: st.mode === 'drive' ? true : st.auto, exMode: st.exMode });
+    st.volSent = effVol(); st.gainSent = vcGain();
+    send({ k: 'cfg', vol: st.volSent, gain: st.gainSent, burble: +$('#bur').value, idleOn: $('#idle').checked, auto: st.mode === 'drive' ? true : st.auto, exMode: st.exMode });
     saveCfg();
+    if (st.tunOn) applyTunnel(); // tunneldempingen følger volumet
   }
 
   // ---------- veistøykompensasjon ----------
-  // Volumet løftes med farten (lineært 0 dB i ro til VC_DB ved 120 km/t, glattet ~1 s) via cfg vol, før motorens
-  // begrenser er utgangen vol × tak (i4hk 0,53). Løftet stopper der verste topp ville passert ca. -2 dBFS
-  // (PEAK_MAX, mykklipperen starter på 0,8); i tunnel regnes klangens ekstra topp med (TUN_PK, målt i sensortest).
-  // Aldri lavere enn brukerens eget volum. Bare i kjøremodus med sensorer; testmodus får 0 dB.
-  const VC_DB = [0, 2, 3.5, 5], PEAK_MAX = 0.79, TUN_PK = 1.9;
+  // Løftet øker med farten (lineært 0 dB i ro til VC_DB ved 120 km/t, glattet ~1 s) og sendes som cfg gain: motoren legger det
+  // på før begrenseren, så toppene holder seg på taket (vol × lim, i4hk 0,84 = -1,5 dBFS ved vol 1) uansett løft; jevn
+  // kjøring blir høyere, bare full gass blir begrenset mer. Bare i kjøremodus med sensorer; testmodus får 0 dB.
+  // vol (glidebryteren) virker etter begrenseren. I tunnel dempes tørr vei og klangsending slik at summens verste topp
+  // (TUN_PK × tak, målt i sensortest) holder seg under PEAK_MAX (ca. -2 dBFS; mykklipperen starter på 0,8).
+  const VC_DB = [0, 2, 3.5, 5], PEAK_MAX = 0.79, TUN_PK = 2.0;
   const vcTarget = (v) => VC_DB[st.vc] * clamp(v * 3.6 / 120, 0, 1);
-  function effVol() {
-    const vol = +$('#vol').value, o = OUTS[st.outId], pk = ((o && o.lim) || 0.86) * (st.tunOn ? TUN_PK : 1);
-    return Math.min(vol * Math.pow(10, st.vcDb / 20), Math.max(vol, PEAK_MAX / pk));
+  const effVol = () => +$('#vol').value;
+  const vcGain = () => Math.pow(10, st.vcDb / 20);
+  function tunK() {
+    const o = OUTS[st.outId], pk = effVol() * ((o && o.lim) || 0.86) * TUN_PK;
+    return pk > PEAK_MAX ? PEAK_MAX / pk : 1;
   }
   function vcTick(now) {
     const dt = st.vcT ? clamp((now - st.vcT) / 1000, 0, 1) : 0.25; st.vcT = now;
     const tgt = st.mode === 'drive' && S.on ? vcTarget(S.vEst) : 0;
     st.vcDb += (tgt - st.vcDb) * (1 - Math.exp(-dt / 1.0));
-    const v = effVol();
-    if (Math.abs(v - st.volSent) > 0.002) { st.volSent = v; send({ k: 'cfg', vol: v }); }
+    const g = vcGain();
+    if (Math.abs(g - st.gainSent) > 0.002) { st.gainSent = g; send({ k: 'cfg', gain: g }); }
   }
   function setVc(m) {
     st.vc = m;
@@ -609,12 +613,12 @@ registerProcessor('m4-engine', M4Proc);`;
     b.textContent = on && !st.tunManual ? 'TUNNEL · AUTO' : 'TUNNEL';
     if (st.tunOn !== on) recEv('tun', on ? why : 0);
     st.tunOn = on;
-    if (st.ctx) vcTick(performance.now()); // taket for veistøyløftet er lavere i tunnel
     if (!st.ctx || !st.tunReady) return;
     const t = st.ctx.currentTime, amt = +$('#tunAmt').value, tau = on ? TUN.tauIn : TUN.tauOut;
-    st.sendG.gain.setTargetAtTime(on ? TUN.send : 0, t, on ? TUN.tauIn : 0.05);
+    const k = on ? tunK() : 1; // demper tørr vei og klang sammen i tunnel, så summen ikke går inn i mykklipperen
+    st.sendG.gain.setTargetAtTime(on ? TUN.send * k : 0, t, on ? TUN.tauIn : 0.05);
     st.wet.gain.setTargetAtTime(on ? TUN.wet * amt : 0, t, tau);
-    st.dry.gain.setTargetAtTime(on ? 1 + (TUN.dryBoost - 1) * Math.min(1, amt) : 1, t, tau);
+    st.dry.gain.setTargetAtTime(on ? (1 + (TUN.dryBoost - 1) * Math.min(1, amt)) * k : 1, t, tau);
   }
   $('#tun').addEventListener('click', () => { st.tunManual = !st.tunManual; applyTunnel(); });
 
@@ -1298,6 +1302,6 @@ registerProcessor('m4-engine', M4Proc);`;
 
   // for automatisk test
   window.__m4 = { st: st, S: S, MAP: MAP, fuse: fuse, onGps: onGps, onMotion: onMotion, calReset: calReset, sysTick: sysTick, driveTick: driveTick, lagEst: lagEst, mapMatch: mapMatch, wayRemain: wayRemain, mapUpdate: mapUpdate,
-    BUILD: BUILD, REC: REC, recSet: recSet, logData: logData, recPersist: recPersist, recLoad: recLoad, effVol: effVol, vcTick: vcTick, VC_DB: VC_DB, TUN: TUN, TUN_PK: TUN_PK, PEAK_MAX: PEAK_MAX,
+    BUILD: BUILD, REC: REC, recSet: recSet, logData: logData, recPersist: recPersist, recLoad: recLoad, effVol: effVol, vcGain: vcGain, tunK: tunK, vcTick: vcTick, VC_DB: VC_DB, TUN: TUN, TUN_PK: TUN_PK, PEAK_MAX: PEAK_MAX,
     buildGraph: buildGraph, setMuted: setMuted, SW: SW, cleanCfg: cleanCfg, importCfg: importCfg, setCar: setCar, saveCfg: saveCfg, store: store };
 })();
