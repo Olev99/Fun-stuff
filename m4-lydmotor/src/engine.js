@@ -43,7 +43,8 @@ class EngineCore {
       // rom for tunnelklangen (ca. +2.5 dB) slik at toppene også i tunnel holder seg under -3 dBFS.
       // lp2 10 kHz: mot en 192 kHz-referanse hadde 48 kHz-utgangen 3-4 dB for mye over 8 kHz (speiling, én-polsfiltre nær Nyquist);
       // andre pol gir ca. -2,5 dB der og koster 0,8 dB i 4-8 kHz.
-      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, lp2: 10000, pre: 0.6, lim: 0.53, side: 0.6 }
+      i4hk: { id: 'i4hk', name: 'BMW i4 M50 Harman Kardon', hp: 18, hp2: 18, eq: [60, 3, 0.8], lp: 12000, lp2: 10000, pre: 0.6, lim: 0.53, side: 0.6,
+        lowLd: 1.5, lev: [-27, 2, 5, 0.04, 1.5, 300] }
     };
   }
 
@@ -52,6 +53,7 @@ class EngineCore {
     const A = Math.pow(10, o.eq[1] / 40), w0 = 2 * Math.PI * o.eq[0] / sr, al = Math.sin(w0) / (2 * o.eq[2]), c = Math.cos(w0), a0 = 1 + al / A;
     this.cb0 = (1 + al * A) / a0; this.cb1 = -2 * c / a0; this.cb2 = (1 - al * A) / a0; this.ca1 = -2 * c / a0; this.ca2 = (1 - al / A) / a0;
     this.hp = 0; this.hp2 = 0; this.cz1 = 0; this.cz2 = 0; this.tl = 0; this.tl2 = 0; this.limEnv = 0;
+    this.levG = 1; this.levT = 1; this.levLp = 0; this.levE = o.lev ? Math.pow(10, o.lev[0] / 10) : 0;
   }
 
   // ---------- bilprofiler (rene data, JSON-kopierbare) ----------
@@ -62,6 +64,8 @@ class EngineCore {
       dnMax: 0.8333, dnC: 0.1597, dnS: 0.1875, dnK: 0.1806, brk0: 0.5, brkC: 0.375, brkS: 0.7222, brkT: 0.7917,
       upC0: 0.2361, upCK: 0.625, upS0: 0.3194, upSK: 0.6667, liftC: 0.3194, liftS: 0.5, guard: 0.0347, manDn: 0.1319, hardDn: 0.3194, hardUp: 0.4444,
       liftDnC: 0.0208, liftDnS: 0.0764 };
+    // mellomgass ved lavt måltall (bykjøring): mykere blipp og sjeldnere smell under ca. 3 800 o/min (skalert med rødsonen)
+    const blipLo = (red) => [Math.round(2300 * red / 7200), Math.round(3800 * red / 7200), 0.35];
     const m4 = {
       id: 'm4csl', name: 'BMW M4 CSL', short: 'M4 CSL',
       blurb: 'Rekkesekser med to turboer, åttetrinns girkasse, mellomgass og burble.',
@@ -84,7 +88,8 @@ class EngineCore {
       pipe: { DA: [4.2, 540], DB: [0.50, 470], SA: [0.55, 620], SB: [0.66, 620] },
       snd: { modeG: [0.85, 1.0, 1.1], motor: 0.045, cyc: [0.05, 0.13], dec: [46, 34], fc: [240, 2300, 0.07],
         rasp: [0.35, 0.65, 0.6, 1.0, 1.25, 0.2, 0.95, 2300], refl: [0.46, 0.14, 0.26, 0.24], muff: [260, 240],
-        intake: [0.10, 0.012, 185, 430, 0.6], mech: [0.012, 0.05, 0.25, 0.5], ex: 0.52, side: 0.07, dc: 22 }
+        intake: [0.10, 0.012, 185, 430, 0.6], mech: [0.012, 0.05, 0.25, 0.5], ex: 0.52, side: 0.07, dc: 22, nz: [0.4, 0.5] },
+      blipLo: blipLo(7200)
     };
     // snd: modeG = nivå per eksosmodus; motor = mekanisk grunnpuls; cyc = syklusvariasjon [fast, ved lav last];
     // dec = pulsens forfall i veivgrader [min, + ved lav last]; fc = pulsens lysstyrke [Hz, + Hz ved full last, Hz per o/min];
@@ -119,6 +124,7 @@ class EngineCore {
       // ZF-oppgir under last: ingen tenningskutt (cut 0), turtallet glir ned over ca. 0,3 s som i opptak (300-600 ms, nesten ingen
       // nivådipp); kickdown like raskt som før (kick 0,16)
       box: { hardT: [0.38, 0.38, 0.32], softT: [0.26, 0.36], manual: 0.06, shuf: 0.8, slip: [2300, 1900, 850], stopV: 1.5, cut: 0, kick: 0.16 },
+      blipLo: blipLo(7000),
       turbo: false,
       fuelCut: 1150, idleLd: [1350, 500],
       ovr: { k0: 2600, kR: 2200, o0: 2000, oR: 1300, mode: [0.05, 0.7, 0.8], decay: [0.8, 0.8, 1.2], rate: 6 }, popK: 0.3,
@@ -126,7 +132,7 @@ class EngineCore {
       pipe: { DA: [4.8, 560], DB: [0.55, 470], SA: [0.42, 640], SB: [0.45, 640] },
       snd: { modeG: [0.85, 1.0, 1.08], motor: 0.035, cyc: [0.02, 0.05], dec: [50, 30], fc: [300, 2600, 0.085],
         rasp: [0.3, 0.5, 0.4, 0.75, 0.95, 0.06, 0.7, 2800], refl: [0.46, 0.14, 0.26, 0.24], muff: [220, 260],
-        intake: [0.20, 0.004, 165, 520, 0.7], mech: [0.004, 0.035, 0.06, 0.3], ex: 0.40, side: 0.10, dc: 35 }
+        intake: [0.20, 0.004, 165, 520, 0.7], mech: [0.004, 0.035, 0.06, 0.3], ex: 0.40, side: 0.10, dc: 35, nz: [0.4, 0.5] }
     };
     const vant = {
       id: 'v12vs', name: 'Aston Martin V12 Vantage S', short: 'V12 Vantage S',
@@ -142,6 +148,7 @@ class EngineCore {
       gears: [0, 3.29, 2.16, 1.61, 1.27, 1.03, 0.85, 0.70], fd: 3.73, wheel: 0.33, mass: 1700, grip: 8.3, vmax: 91.7,
       torque: [[1000, 360], [3000, 500], [5750, 620], [6750, 596]], tMin: 200, acc100: 3.9,
       box: { hardT: [0.22, 0.18, 0.14], softT: [0.45, 0.55], manual: 0.08, shuf: 1.8, slip: [2600, 2200, 1000], stopV: 1.5, cut: 0.6 },
+      blipLo: blipLo(7000),
       turbo: false,
       fuelCut: 1150, idleLd: [1400, 500],
       ovr: { k0: 2300, kR: 2000, o0: 1800, oR: 1200, mode: [0.2, 1.0, 1.25], decay: [1.0, 1.2, 1.7], rate: 10 }, popK: 0.8,
@@ -168,6 +175,7 @@ class EngineCore {
       gears: [0, 3.08, 2.19, 1.63, 1.29, 1.03, 0.84, 0.69], fd: 4.38, wheel: 0.355, mass: 1705, grip: 9.6, vmax: 94.4,
       torque: [[1000, 380], [3000, 560], [6000, 690], [8250, 630]], tMin: 200, acc100: 3.1,
       box: { hardT: [0.07, 0.07, 0.05], softT: [0.14, 0.2], manual: 0.03, shuf: 0.6, slip: [3000, 2400, 1000], stopV: 1.5, cut: 0.5 },
+      blipLo: blipLo(8700),
       turbo: false,
       fuelCut: 1350, idleLd: [1600, 500],
       ovr: { k0: 2800, kR: 2600, o0: 2200, oR: 1500, mode: [0.1, 0.8, 0.95], decay: [0.9, 0.9, 1.3], rate: 8 }, popK: 0.4,
@@ -192,6 +200,7 @@ class EngineCore {
       gears: [0, 3.75, 2.38, 1.72, 1.34, 1.11, 0.96, 0.84], fd: 3.97, wheel: 0.338, mass: 1430, grip: 9.0, vmax: 88.3,
       torque: [[1000, 250], [3000, 390], [6000, 460], [8250, 426]], tMin: 150, acc100: 3.4,
       box: { hardT: [0.08, 0.065, 0.045], softT: [0.15, 0.22], manual: 0.03, shuf: 0.5, slip: [3200, 2400, 1000], stopV: 1.5, cut: 0.4 },
+      blipLo: blipLo(9000),
       turbo: false,
       fuelCut: 1300, idleLd: [1450, 500],
       ovr: { k0: 3000, kR: 2800, o0: 2400, oR: 1600, mode: [0.05, 0.7, 0.8], decay: [0.7, 0.75, 1.0], rate: 7 }, popK: 0.3,
@@ -223,6 +232,7 @@ class EngineCore {
       gears: [0, 3.231, 2.188, 1.609, 1.233, 0.970, 0.795], fd: 4.302, wheel: 0.337, mass: 1480, grip: 9.0, vmax: 90.3,
       torque: [[1000, 250], [3000, 370], [6800, 480], [8700, 452]], tMin: 150, acc100: 3.7,
       box: { hardT: [0.2, 0.15, 0.15], softT: [0.4, 0.5], manual: 0.06, shuf: 1.4, slip: [3000, 2400, 1000], stopV: 1.5 },
+      blipLo: blipLo(9000),
       turbo: false,
       fuelCut: 1400, idleLd: [1750, 500],
       ovr: { k0: 3000, kR: 2800, o0: 2400, oR: 1600, mode: [0.05, 0.9, 1.0], decay: [0.6, 0.75, 0.95], rate: 10 }, popK: 0.85,
@@ -250,6 +260,7 @@ class EngineCore {
       gears: [0, 3.20, 1.87, 1.36, 1.07, 0.90, 0.75], fd: 4.44, wheel: 0.345, mass: 1380, grip: 8.5, vmax: 91.7,
       torque: [[1000, 330], [3000, 480], [5750, 590], [8000, 537]], tMin: 180, acc100: 3.9,
       box: { hardT: [0.2, 0.17, 0.15], softT: [0.36, 0.42], manual: 0.05, shuf: 1.6, slip: [3200, 2600, 1100], stopV: 1.5 },
+      blipLo: blipLo(8400),
       turbo: false,
       fuelCut: 1300, idleLd: [1600, 500],
       ovr: { k0: 2600, kR: 2400, o0: 2000, oR: 1400, mode: [0.1, 0.85, 1.0], decay: [0.8, 0.9, 1.2], rate: 11 }, popK: 0.7,
@@ -268,7 +279,7 @@ class EngineCore {
       id: 'f812', name: 'Ferrari 812 Superfast', short: '812 Superfast',
       blurb: 'V12 på 6,5 liter uten turbo, 800 hk som drar til 8 900 o/min. Sjutrinns dobbeltclutch med enda raskere skift enn F12.',
       tach: { max: 10000, red: 8900, warn: 8400 },
-      redline: 8900,
+      redline: 8900, blipLo: blipLo(8900),
       lim: { max: 8915, on: 8885, off: 8800, deny: 8850, period: 0.06, cut: 0.03, dip: 110, pop: 0.25, keep: 0.4 },
       gears: [0, 3.334, 2.285, 1.728, 1.369, 1.115, 0.904, 0.703], fd: 4.375, mass: 1705, grip: 9.8, vmax: 94.4,
       torque: [[1000, 400], [3500, 575], [7000, 718], [8500, 661]], acc100: 2.9,
@@ -288,7 +299,7 @@ class EngineCore {
       blurb: 'Mezger-boksersekser på 4,0 liter uten turbo, 500 hk til 8 500 o/min. Sekstrinns manuell (appen skifter selv): rått, mekanisk og uten filter.',
       tach: { max: 10000, red: 8500, warn: 8000 },
       gain: [1.0, 0.97, 1.03, 0.98, 1.02, 0.97], runner: [0.00030, 0.00024, 0.00033, 0.00026, 0.00031, 0.00025],
-      idle: 850, redline: 8500,
+      idle: 850, redline: 8500, blipLo: blipLo(8500),
       lim: { max: 8515, on: 8485, off: 8400, deny: 8450, period: 0.055, cut: 0.028, dip: 120, pop: 0.2, keep: 0.45 },
       gears: [0, 3.82, 2.26, 1.64, 1.29, 1.06, 0.88], fd: 3.88, wheel: 0.33, mass: 1360, grip: 8.1, vmax: 86.1,
       torque: [[1000, 260], [3000, 400], [5750, 460], [8250, 426]], acc100: 3.9,
@@ -435,6 +446,10 @@ class EngineCore {
       if (s.coast) {
         let tb = 0.065 + (gN - this.rpm) * 0.00003; if (tb < 0.075) tb = 0.075; if (tb > 0.125) tb = 0.125;
         s.Tb = tb; s.T = tb + 0.08;
+        // blipLo = [o/min fra, o/min full, minste blipp] (valgfri): mellomgass ved lavt måltall er mykere og smeller sjeldnere
+        const bq = this.pr.blipLo; let bx2 = 1;
+        if (bq) { bx2 = (gN - bq[0]) / (bq[1] - bq[0]); if (bx2 < 0) bx2 = 0; if (bx2 > 1) bx2 = 1; }
+        s.bk = bx2; s.bl = bq ? bq[2] + (1 - bq[2]) * bx2 : 1;
         this.ev('blip', from, to);
       } else {
         // kickdown-tid følger girkassen (Sport-oppgirtiden mot M4s 0,145 s): dobbeltclutch raskere, AMT tregere
@@ -490,7 +505,10 @@ class EngineCore {
       let upR = m === 0 ? K.upC0 + K.upCK * Math.pow(tU, 1.5) : K.upS0 + K.upSK * Math.pow(tU, 1.25);
       if (thr > 0.9 || upR > K.wot) upR = K.wot;
       if (thr < 0.05 || this.lift) upR = this.liftT < (sport ? 3 : 1.2) ? 1e9 : (sport ? K.liftS : K.liftC);
-      const guard = Math.max(dnR, thr > 0.45 ? tipR : 0) + K.guard;
+      // vakten regner med slippterskelen (rullenedgir), ellers lander et oppgir ved avtagende gass under den og gires straks ned igjen
+      // når føreren slipper (kjøreloggen: 2>3 ved ca. 3 000 o/min, så 3>2 et sekund senere)
+      const dnL = (sport ? K.dnS + K.liftDnS : K.dnC + K.liftDnC); // slippterskelen (gass 0)
+      const guard = Math.max(dnR, dnL, thr > 0.45 ? tipR : 0) + K.guard;
       if (rp > upR && wr * r[g + 1] > guard) this.startShift(g + 1, wr, false);
     }
   }
@@ -563,16 +581,16 @@ class EngineCore {
         if (s.t < s.Tb) {
           const p = s.t / s.Tb, q = p * p * (3 - 2 * p);
           this.rpm = s.rpm0 + (Math.max(geared, this.idle) * 1.028 - s.rpm0) * q;
-          loadOv = s.hard ? (0.8 + 0.1 * m) * Math.min(1, p * 4) : 0.15;
+          loadOv = s.hard ? (0.8 + 0.1 * m) * Math.min(1, p * 4) * s.bl : 0.15;
           this.blipK = s.hard ? 1 : 0;
         } else {
           let p = (s.t - s.Tb) / 0.08; if (p > 1) p = 1; const q = p * p * (3 - 2 * p);
           this.rpm = Math.max(geared, this.idle) * (1 + 0.028 * (1 - q));
-          loadOv = s.hard ? (0.8 + 0.1 * m) * (1 - p) * (1 - p) : 0;
+          loadOv = s.hard ? (0.8 + 0.1 * m) * (1 - p) * (1 - p) * s.bl : 0;
           if (!s.banged) {
             s.banged = true;
-            if (s.hard && m > 0 && this.burble > 0.05) {
-              const k = Math.min(1, (geared - 2300) / 2000);
+            if (s.hard && m > 0 && this.burble > 0.05 && (s.bk === 1 || this.rnd() < s.bk)) {
+              const k = Math.min(1, (geared - 2300) / 2000) * s.bk;
               this.ovr = Math.max(this.ovr, 0.75 * k);
               this.addPop((0.3 + 0.35 * this.burble) * (0.5 + 0.5 * k), 0.01 + 0.03 * this.rnd());
               if (this.rnd() < 0.7 * this.burble) this.addPop(0.2 + 0.3 * this.rnd(), 0.07 + 0.08 * this.rnd());
@@ -694,8 +712,13 @@ class EngineCore {
     this.blipK *= Math.exp(-dt / 0.05);
     const Lb = pr.turbo ? Ld * (0.62 + 0.38 * Math.max(this.boost, this.blipK)) : Ld;
     const modeG = X.modeG[m];
-    P.combAmp = Ld > 0.002 ? (0.10 + 0.90 * Math.pow(Lb, 0.8)) * (0.5 + 0.5 * Math.pow(rn, 0.7)) * modeG : 0;
-    P.motorAmp = X.motor * (0.4 + 0.6 * rn);
+    // out.lowLd (valgfri): tonen (forbrenning og grunnpuls) løftes ved lav last, 1 + g·(1 - last)², uendret ved full last
+    const lowK = this.out.lowLd ? 1 + this.out.lowLd * (1 - Math.min(1, Lb)) * (1 - Math.min(1, Lb)) : 1;
+    P.combAmp = Ld > 0.002 ? (0.10 + 0.90 * Math.pow(Lb, 0.8)) * (0.5 + 0.5 * Math.pow(rn, 0.7)) * modeG * lowK : 0;
+    P.motorAmp = X.motor * (0.4 + 0.6 * rn) * lowK;
+    // snd.nz = [andel ved last 0, last der gulvene er fulle] (valgfri): støygulvene (rasp, mekanisk sus, innsug) kommer opp med lasten
+    let nzK = 1;
+    if (X.nz) { let q = Lb / X.nz[1]; if (q > 1) q = 1; nzK = X.nz[0] + (1 - X.nz[0]) * q * q * (3 - 2 * q); }
     let cv = 1.5 - rn * 2.2; if (cv < 0.2) cv = 0.2; if (cv > 1) cv = 1;
     P.cycVar = X.cyc[0] + X.cyc[1] * (1 - Lb) * (1 - Lb) * cv;
     P.pLate = Ld < 0.1 ? Math.min(0.6, ovEff * 0.7) : 0;
@@ -705,13 +728,13 @@ class EngineCore {
     const fc = X.fc[0] + X.fc[1] * Math.pow(Lb, 1.3) + X.fc[2] * rs;
     P.kb = 1 - Math.exp(-TWO_PI * fc / sr);
     const R = X.rasp;
-    P.gRasp = (R[0] + R[1] * this.flap) * R[2 + m] * (R[5] + R[6] * Math.pow(Lb, 1.4) * Math.pow(rn, 1.1));
+    P.gRasp = (R[0] + R[1] * this.flap) * R[2 + m] * (R[5] * nzK + R[6] * Math.pow(Lb, 1.4) * Math.pow(rn, 1.1));
     P.r1 = X.refl[0] + X.refl[1] * this.flap; P.r2 = X.refl[2] + X.refl[3] * this.flap;
     P.km = 1 - Math.exp(-TWO_PI * (X.muff[0] + X.muff[1] * this.flap) / sr);
-    P.gInt = X.intake[0] * Math.pow(Ld, 1.3) * (0.3 + 0.7 * rn) + X.intake[1];
+    P.gInt = X.intake[0] * Math.pow(Ld, 1.3) * (0.3 + 0.7 * rn) + X.intake[1] * nzK;
     P.gMech = (X.mech[0] + X.mech[1] * Math.pow(rn, 1.7)) * (0.4 + 0.6 * Ld);
     P.tick = 0.9;
-    P.mechFloor = X.mech[2] + X.mech[3] * rn;
+    P.mechFloor = (X.mech[2] + X.mech[3] * rn) * nzK;
     P.gWhoosh = 0.02 * this.boost * (0.4 + 0.6 * rn);
     let fl2 = 1; if (this.flut > 0) { const z = this.flutPh - Math.floor(this.flutPh); fl2 = z < 0.45 ? 1 : 0.15; }
     P.gBov = 0.3 * this.bov * fl2 * (m === 0 ? 0.5 : 1);
@@ -776,6 +799,12 @@ class EngineCore {
     let th1 = this.th1, th2 = this.th2;
     let hp = this.hp, hp2 = this.hp2, cz1 = this.cz1, cz2 = this.cz2, tl = this.tl, tl2 = this.tl2, limEnv = this.limEnv;
     let thImp = this.thImp; this.thImp = 0;
+    // out.lev = [terskel dB, forhold, maks løft dB, angrep s, slipp s, detektor-høypass Hz] (valgfri): langsom nivåutjevner før
+    // begrenseren. Effekten i midtkanalen over høypasset (grovt som øret: grunntonene under ca. 300 Hz teller lite) følges per blokk;
+    // under terskelen løftes nivået (forhold 2 = halve avstanden), toppene tar begrenseren.
+    const lev = O.lev; let levMs = 0, levG = this.levG, levD = 0, levLp = this.levLp;
+    const klev = lev ? 1 - Math.exp(-6.283185307179586 * lev[5] / sr) : 0;
+    if (lev) levD = (this.levT - levG) / n;
 
     for (let i = 0; i < n; i++) {
       dph += ddph; ph += dph;
@@ -857,6 +886,7 @@ class EngineCore {
       sdLP += ko * ((yA - yB) - sdLP);
       const sd = sdLP * gSide * pre;
       let l = ty + sd, r = ty - sd;
+      if (lev) { levLp += klev * (ty - levLp); const q = ty - levLp; levMs += q * q; levG += levD; l *= levG; r *= levG; }
       let pk = l < 0 ? -l : l; const pr = r < 0 ? -r : r; if (pr > pk) pk = pr;
       // hylle som aldri faller under dagens topp, ellers kunne utgangen gå litt over taket (0,5301 mot 0,53)
       limEnv = limEnv * lrel; if (pk > limEnv) limEnv = pk;
@@ -880,6 +910,12 @@ class EngineCore {
     this.wl = wl; this.wb = wb; this.bl = bl; this.bb = bb; this.wc = wc; this.ws = ws;
     this.th1 = th1; this.th2 = th2;
     this.hp = hp; this.hp2 = hp2; this.cz1 = cz1; this.cz2 = cz2; this.tl = tl; this.tl2 = tl2; this.limEnv = limEnv;
+    if (lev) {
+      const ms = levMs / n, e = this.levE;
+      this.levE = e + (ms - e) * (1 - Math.exp(-dt / (ms > e ? lev[3] : lev[4])));
+      let gd = (lev[0] - 10 * Math.log10(this.levE + 1e-12)) * (1 - 1 / lev[1]); if (gd < 0) gd = 0; if (gd > lev[2]) gd = lev[2];
+      this.levG = levG; this.levLp = levLp; this.levT = Math.pow(10, gd / 20);
+    }
 
     this.teleT += dt;
     if (this.teleT >= 0.03) {
