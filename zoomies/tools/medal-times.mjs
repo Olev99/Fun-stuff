@@ -1,6 +1,6 @@
 // Measures a Hard computer racer's best Time Trial time on every track with
 // the stock Zoom Classic, and prints the reference table for src/medals.js.
-//   node tools/medal-times.mjs [runs=3] [trackIds,comma]   (an id may carry a speed class: glacier:zoom,cloud:turbo)
+//   node tools/medal-times.mjs [runs=3] [trackIds,comma]   (an id may carry a speed class and a body: glacier:zoom,coral:chill:buggy)
 // Needs playwright-core (cd tests && npm install). Serves zoomies/ itself.
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -31,13 +31,13 @@ await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { tim
 const ids = process.argv[3] ? process.argv[3].split(',') : await p.evaluate(async () => (await import('./src/tracks.js')).TRACKS.map((t) => t.id));
 const out = {};
 for (const spec of ids) {
-  const [tid, cls = 'zoom'] = spec.split(':');
-  const times = await p.evaluate(async ({ tid, runs, cls }) => {
+  const [tid, cls = 'zoom', body = 'classic'] = spec.split(':');
+  const times = await p.evaluate(async ({ tid, runs, cls, body }) => {
     const app = window.zoomies;
     const { AIDriver, DIFFICULTY } = await import('./src/ai.js');
     const res = [];
     for (let i = 0; i < runs; i++) {
-      app.startRace({ mode: 'tt', trackId: tid, reverse: false, player: 'mochi', speedClass: cls, playerLoadout: { body: 'classic' }, ...(cls === 'zoom' ? {} : { careerEv: { id: 'measure' } }) }); // a dummy careerEv lifts the free Time Trial's Zoom lock
+      app.startRace({ mode: 'tt', trackId: tid, reverse: false, player: 'mochi', speedClass: cls, playerLoadout: { body }, ...(cls === 'zoom' ? {} : { careerEv: { id: 'measure' } }) }); // a dummy careerEv lifts the free Time Trial's Zoom lock
       app.paused = true; // we step the race ourselves
       const race = app.race;
       race.player.ai = new AIDriver(race.player, race, 1, DIFFICULTY.hard);
@@ -45,7 +45,7 @@ for (const spec of ids) {
       res.push(race.player.finished ? +race.player.finishTime.toFixed(2) : null);
     }
     return res;
-  }, { tid, runs, cls });
+  }, { tid, runs, cls, body });
   const ok = times.filter((t) => t);
   out[spec] = ok.length ? Math.min(...ok) : null;
   console.error(spec, times.join(' '));
