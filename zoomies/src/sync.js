@@ -267,6 +267,7 @@ export class Sync {
   }
 
   _reset() {
+    clearTimeout(this.waitT);
     if (this.t) this.t.close();
     this.t = null;
     this.peer = null;
@@ -322,9 +323,14 @@ export class Sync {
   _hostMsg(id, m) {
     if (!m || id !== this.peer) return;
     const app = this.app;
+    // Handshake first: the guest sends its save only to a host with the same save format, so an
+    // older game never merges a new save its own way. A different format is refused, never half-merged.
+    if (m.t === 'hello' || (m.t === 'sync' && m.fmt !== FMT)) {
+      if (m.fmt === FMT) this.t.send(id, { t: 'ready', fmt: FMT });
+      else { this.t.send(id, { t: 'refuse', fmt: FMT, ver: VERSION }); this._say(SKEW); }
+      return;
+    }
     if (m.t === 'sync' && isObj(m.career)) {
-      // A different save format (an older or newer game) is refused, never half-merged.
-      if (m.fmt !== FMT) { this.t.send(id, { t: 'refuse', fmt: FMT, ver: VERSION }); this._say(SKEW); return; }
       const merged = mergeCareer(app.career, m.career);
       const records = mergeRecords(app.records, cleanRecords(m.records));
       const ok = this._apply(merged, records);
@@ -363,13 +369,20 @@ export class Sync {
       return;
     }
     this._say('Connected. Syncing…');
-    saveCareer(this.app.career); // bring the ledger up to date before it leaves this device
-    this.t.send('host', { t: 'sync', v: 2, fmt: FMT, ver: VERSION, career: this.app.career, records: this.app.records, ghosts: ghostTimes() });
+    this.t.send('host', { t: 'hello', fmt: FMT, ver: VERSION });
+    // An older game does not answer the handshake.
+    this.waitT = setTimeout(() => this._say(SKEW), 10000);
   }
 
   _guestMsg(m) {
     if (!m) return;
-    if (m.t === 'refuse' || (m.t === 'synced' && m.fmt !== FMT)) { this._say(SKEW); return; }
+    if (m.t === 'ready' || m.t === 'refuse' || m.t === 'synced') clearTimeout(this.waitT);
+    if (m.t === 'refuse' || (m.t === 'synced' && m.fmt !== FMT) || (m.t === 'ready' && m.fmt !== FMT)) { this._say(SKEW); return; }
+    if (m.t === 'ready') {
+      saveCareer(this.app.career); // bring the ledger up to date before it leaves this device
+      this.t.send('host', { t: 'sync', v: 2, fmt: FMT, ver: VERSION, career: this.app.career, records: this.app.records, ghosts: ghostTimes() });
+      return;
+    }
     if (m.t === 'synced' && isObj(m.career)) {
       // Merging again here is safe (merging is idempotent) and keeps this device's own state if the reply was cut short.
       const ok = this._apply(mergeCareer(this.app.career, m.career), mergeRecords(this.app.records, cleanRecords(m.records)));

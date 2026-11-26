@@ -35,6 +35,7 @@ const SUITES = {
   racers: ['racers.mjs', [], 6],
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
+  syncflow: ['syncflow.mjs', [], 8],
   events: ['events.mjs', [], 25],
   eventsint: ['eventsint.mjs', [], 20],
   shortcuts: ['shortcuts.mjs', [], 25],
