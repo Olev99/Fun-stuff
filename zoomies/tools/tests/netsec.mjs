@@ -94,6 +94,145 @@ if (parts.includes('leak')) {
   await ctx.close();
 }
 
+// ---- wire: long messages travel in pieces; too long fails loudly ----
+if (parts.includes('wire')) {
+  const { ctx, A, B } = await lobby('?net=local');
+  // Watch the host's incoming messages and the guest's outgoing pieces.
+  await A.evaluate(() => { const s = window.zoomies.session, m0 = s._message.bind(s); window.got = []; s._message = (f, m, z) => { if (m && m.t === 'ghost') window.got.push([m.k, m.g, z]); m0(f, m, z); }; });
+  const res = await B.evaluate(() => {
+    const T = window.zoomies.session.transport, post = T.ch.postMessage.bind(T.ch);
+    const frames = [];
+    T.ch.postMessage = (m) => { if (m.kind === 'msg') frames.push([m.data.length, new TextEncoder().encode(m.data).length, m.data.isWellFormed ? m.data.isWellFormed() : true]); post(m); };
+    // The ghost of a 200 s run (10 samples a second, 8 bytes each, base64), as sync.js sends it.
+    const b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let data = ''; for (let i = 0; i < Math.ceil((200 * 10 * 8) / 3) * 4; i++) data += b64[(i * 7919) % 64];
+    const g = JSON.stringify({ time: 200.123, splits: [66.1, 133.2, 200.1], char: 'mochi', body: 'classic', paint: null, hat: null, data });
+    T.send('host', { t: 'ghost', k: 'magma-r', g });
+    // Emoji across a piece boundary (an odd start puts a surrogate pair on the cut).
+    const e = 'x' + '\u{1F3CE}'.repeat(9000);
+    T.send('host', { t: 'ghost', k: 'emoji', g: e });
+    const n1 = frames.length;
+    T.send('host', { t: 'ghost', k: 'huge', g: 'A'.repeat(300 * 1024) }); // over the cap
+    return { size: JSON.stringify({ t: 'ghost', k: 'magma-r', g }).length, g, e, frames, n1, after: frames.length };
+  });
+  await A.waitForTimeout(800);
+  const got = await A.evaluate(() => window.got.map(([k, g, z]) => [k, g.length, z, g]));
+  const ghost = got.find((x) => x[0] === 'magma-r'), emoji = got.find((x) => x[0] === 'emoji');
+  console.log(`ghost message ${res.size} characters went in ${res.n1} pieces (largest ${Math.max(...res.frames.map((f) => f[1]))} bytes)`);
+  check(res.size > 16300 && ghost && ghost[3] === res.g, `a ${(res.size / 1024).toFixed(1)} KB ghost message round-trips`);
+  check(emoji && emoji[3] === res.e && res.frames.every((f) => f[2]), 'emoji split across pieces arrive intact (every piece is well-formed text)');
+  check(res.frames.every((f) => f[1] < 16300), 'no single piece reaches 16 KB');
+  check(res.after === res.n1 && !got.some((x) => x[0] === 'huge'), 'an over-the-cap message is not sent');
+  const err = await B.textContent('#lobby-error');
+  check(/too big/i.test(err), `...and the player is told ("${err}")`);
+  // The test transport refuses one oversized unchunked piece (so no suite can miss the real limit).
+  const refused = await B.evaluate(() => { try { window.zoomies.session.transport._postFrame('host', 'x'.repeat(17000)); return 'sent'; } catch (e) { return e.message; } });
+  check(/Unchunked/.test(refused), `the test transport refuses a 17 KB single piece (${refused})`);
+  await ctx.close();
+}
+
+// ---- trust: what a guest (or a stranger with the room code) can and cannot do ----
+if (parts.includes('trust')) {
+  const { ctx, A, B } = await lobby('?net=local');
+  // The lobby broadcast a guest sees carries nobody's private id.
+  await B.evaluate(() => { const s = window.zoomies.session, m0 = s._message.bind(s); window.raw = []; s._message = (f, m, z) => { if (m && m.t === 'lobby') window.raw.push(JSON.stringify(m.players)); m0(f, m, z); }; });
+  await A.evaluate(() => window.zoomies.session.broadcastLobby());
+  await B.waitForTimeout(400);
+  const raw = await B.evaluate(() => window.raw);
+  check(raw.length > 0 && !raw.some((x) => x.includes('cid')), `lobby broadcast holds no cid (${raw.length ? raw[raw.length - 1].slice(0, 90) : 'none seen'})`);
+  // A stranger with a made-up cid can't take a seat from anyone.
+  const bId = await A.evaluate(() => window.zoomies.session.players[1].id);
+  const bCid = await B.evaluate(() => window.zoomies.session.cid);
+  await A.evaluate(() => window.zoomies.session._message('gStranger', { t: 'hello', cid: 'abcdefgh', char: 'pip' }, 50));
+  check(await A.evaluate((id) => window.zoomies.session.players.some((p) => p.id === id), bId), 'a hello with a guessed cid kicks nobody');
+  await A.evaluate(() => window.zoomies.session._drop('gStranger'));
+  // Race.
+  await A.tap('#scr-lobby [data-go="start"]');
+  for (let i = 0; i < 80; i++) {
+    const sa = await tick(A, 6); const sb = await tick(B, 6);
+    await A.waitForTimeout(60);
+    if (sa.startsWith('mp race') && sb.startsWith('mp race') && parseFloat(sa.split(' ')[2]) > 2) break;
+  }
+  const r = await A.evaluate(async ([bId, bCid]) => {
+    const a = window.zoomies, s = a.session, race = a.race, it = race.items;
+    const out = {};
+    // Mid-race, a joiner replaying B's real cid is turned away and B keeps its seat.
+    s._message('gLate', { t: 'hello', cid: bCid, char: 'pip' }, 50);
+    out.lateKick = !s.players.some((p) => p.id === bId);
+    out.lateIn = s.players.some((p) => p.id === 'gLate');
+    // ...and cannot pop boxes or gems.
+    const bi = it.boxes.findIndex((b) => b.active), gi = it.gems.findIndex((g) => g.active);
+    s._message('gLate', { t: 'box', i: bi, want: true }, 30);
+    if (gi >= 0) s._message('gLate', { t: 'gem', i: gi }, 30);
+    out.boxSafe = bi < 0 || it.boxes[bi].active;
+    out.gemSafe = gi < 0 || it.gems[gi].active;
+    // B's kart can't use an item the host never gave it.
+    const k = race.karts[race.peerSlot.get(bId)];
+    const n0 = it.projectiles.length + it.hazards.length;
+    s._message(bId, { t: 'use', it: 'bomb', aim: 0, x: k.pos.x, z: k.pos.z, yaw: k.yaw, sp: 10 }, 60);
+    out.unheld = it.projectiles.length + it.hazards.length - n0;
+    // A real box claim gets a grant, which it can then use once.
+    const bj = it.boxes.findIndex((b) => b.active);
+    s._message(bId, { t: 'box', i: bj, want: true }, 30);
+    out.held = (k.netHeld || []).map((g) => `${g.it}x${g.n}`).join(',');
+    const g = k.netHeld && k.netHeld[0];
+    if (g) for (let i = 0; i < g.n; i++) s._message(bId, { t: 'use', it: g.it, aim: 0, x: k.pos.x, z: k.pos.z, yaw: k.yaw, sp: 10 }, 60);
+    out.spent = (k.netHeld || []).length;
+    s._message(bId, { t: 'box', i: bj, want: true }, 30); // the same box again: it is gone
+    out.again = (k.netHeld || []).length;
+    // Finishing: not before the laps, and not faster than the host's clock.
+    s._message(bId, { t: 'finish', time: 1, laps: [1] }, 30);
+    out.earlyFinish = k.finished;
+    k.laps = race.laps;
+    race.raceTime = 100; // as if 100 s in
+    s._message(bId, { t: 'finish', time: 0.5, laps: [0.2, 0.2, 0.1] }, 30);
+    out.finish = [k.finished, +k.finishTime.toFixed(2), +race.raceTime.toFixed(2)];
+    // A flood: 1000 messages at once, only about a burst's worth get through.
+    let n = 0; const ol = s.onLobby; s.onLobby = () => { n++; };
+    for (let i = 0; i < 1000; i++) s._message(bId, { t: 'pick', char: 'pip' }, 30);
+    s.onLobby = ol;
+    out.flood = n;
+    s._message(bId, { t: 'pick', char: 'bruno' }, 70000); // over the size cap
+    return out;
+  }, [bId, bCid]);
+  console.log('trust:', JSON.stringify(r));
+  check(!r.lateKick && !r.lateIn, 'a joiner mid-race replaying a cid is refused and kicks nobody');
+  check(r.boxSafe && r.gemSafe, 'a joiner mid-race cannot pop boxes or gems');
+  check(r.unheld === 0, 'an item that was never granted cannot be used');
+  check(r.held !== '' && r.spent === 0 && r.again === 0, `a granted item (${r.held}) can be used, then it is gone; a popped box grants nothing`);
+  check(!r.earlyFinish, 'a finish before the laps are done is rejected');
+  check(r.finish[0] && r.finish[1] >= r.finish[2] - 3.01, `a finish faster than the host's clock gets the host's (${r.finish[1]} at ${r.finish[2]})`);
+  check(r.flood > 0 && r.flood <= 130, `a flood of 1000 messages is cut to ${r.flood}`);
+  await ctx.close();
+}
+
+// ---- loss: 20% of the fast messages lost, remote karts keep moving ----
+if (parts.includes('loss')) {
+  const { ctx, A, B } = await racing('?net=local&lag=40&loss=20');
+  // Give B's kart a computer driver so it moves.
+  await B.evaluate(async () => { const { AIDriver } = await import('./src/ai.js'); const r = window.zoomies.race; r.player.ai = new AIDriver(r.player, r, 0.9, r.diff); });
+  const seen = { a: [], b: [] };
+  for (let i = 0; i < 25; i++) {
+    await tick(B, 6); await tick(A, 6);
+    await A.waitForTimeout(80);
+    seen.a.push(await A.evaluate(() => { const r = window.zoomies.race, k = r.karts.find((q) => q.remote); return [k.pos.x, k.pos.z, (performance.now() - (k.net ? k.net.t : 0)) / 1000]; }));
+    seen.b.push(await B.evaluate(() => { const r = window.zoomies.race, k = r.karts.find((q) => q.remote && !q.human); return [k.pos.x, k.pos.z, (performance.now() - (k.net ? k.net.t : 0)) / 1000]; }));
+  }
+  const moved = (s) => s.slice(1).filter((p, i) => Math.hypot(p[0] - s[i][0], p[1] - s[i][1]) > 0.3).length;
+  const fresh = (s) => s.filter((p) => p[2] < 1).length;
+  console.log(`host sees the guest's kart move in ${moved(seen.a)}/24 steps (fresh ${fresh(seen.a)}/25); guest sees a computer kart move in ${moved(seen.b)}/24 (fresh ${fresh(seen.b)}/25)`);
+  check(moved(seen.a) >= 18 && fresh(seen.a) >= 22, 'host: the guest\'s kart keeps moving under 20% loss');
+  check(moved(seen.b) >= 18 && fresh(seen.b) >= 22, 'guest: the host\'s karts keep moving under 20% loss');
+  // A late or repeated fast message is dropped.
+  const stale = await B.evaluate(() => {
+    const ib = window.zoomies.session.transport.inbox;
+    const last = ib.last.get('host|snap');
+    return [last > 1, ib.take('host', JSON.stringify({ t: 'snap', q: last, rt: 0, k: [] })), ib.take('host', JSON.stringify({ t: 'snap', q: 1, rt: 0, k: [] })), !!ib.take('host', JSON.stringify({ t: 'snap', q: last + 1, rt: 0, k: [] }))];
+  });
+  check(stale[0] && stale[1] === null && stale[2] === null && stale[3], 'stale and repeated snapshots are dropped, the next one is taken');
+  await ctx.close();
+}
+
 // ---- clock: the guest's event clock never runs backwards (host snaps jitter and step back) ----
 if (parts.includes('clock')) {
   const { ctx, A, B } = await racing('?net=local', 'frost'); // a blizzard (ice marks) and an avalanche (warning bands)

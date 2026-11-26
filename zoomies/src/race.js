@@ -1126,7 +1126,10 @@ export class Race {
     const pathId = a[20];
     const want = pathId >= 0 ? this.track.shortcuts[pathId] : this.track;
     if (want && k.path !== want) { k.path = want; k.seg = -1; }
-    if (f & 32 && !k.finished) { k.finished = true; k.finishTime = a[21]; }
+    if (f & 32 && !k.finished) {
+      if (this.net.isHost) this._netFinish(k, a[21]);
+      else { k.finished = true; k.finishTime = a[21]; }
+    }
     k.invuln = f & 2048 ? 0.2 : 0;
     if (this.battle) this.battle.applyNet(k, a[22], !!(f & 512), !!(f & 1024), !!(f & 4096));
   }
@@ -1154,12 +1157,42 @@ export class Race {
     if (this.net.isHost) {
       if (this._netAcc < 1 / SNAP_HZ) return;
       this._netAcc = 0;
-      this.session.send({ t: 'snap', rt: this.raceTime, k: this.karts.map(kartState), it: this.items.snapshot() });
+      this.session.send({ t: 'snap', rt: this.raceTime, k: this.karts.map(kartState), it: this.items.snapshot() }, true);
     } else {
       if (this._netAcc < 1 / STATE_HZ) return;
       this._netAcc = 0;
-      if (this.player) this.session.send({ t: 'st', s: kartState(this.player) });
+      if (this.player) this.session.send({ t: 'st', s: kartState(this.player) }, true);
     }
+  }
+
+  // A kart by its index in a message (null unless a whole number in range).
+  kartAt(i) {
+    return Number.isInteger(i) ? this.karts[i] || null : null;
+  }
+
+  // Host: a friend's kart finished. Only once it has done the laps, and never with a time
+  // better than the host's own clock allows (a phone that froze for a while gets the host's).
+  // (Its last kart state, which carries the laps, can arrive just after the finish message;
+  // the state's finish flag comes through here too.)
+  _netFinish(k, time) {
+    if (k.finished || this.battle || !(time > 0) || k.laps < this.laps) return;
+    k.finished = true;
+    k.finishTime = Math.max(time, this.raceTime - 3);
+  }
+
+  // Host: the items granted to a friend's kart; it can only use what it was given.
+  _granted(k, item) {
+    const [it, n] = item === 'chili3' ? ['chili', 3] : [item, 1];
+    (k.netHeld ||= []).push({ it, n });
+    if (k.netHeld.length > 3) k.netHeld.shift();
+  }
+
+  _spend(k, it) {
+    const h = k.netHeld || [];
+    const i = h.findIndex((g) => g.it === it);
+    if (i < 0) return false;
+    if (--h[i].n <= 0) h.splice(i, 1);
+    return true;
   }
 
   onNet(msg, from) {
@@ -1167,6 +1200,7 @@ export class Race {
     if (this.net.isHost) {
       const slot = this.peerSlot.get(from);
       const k = slot !== undefined ? this.karts[slot] : null;
+      if (!k) return; // only the friends racing here
       switch (msg.t) {
         case 'st': {
           const a = cleanState(msg.s);
@@ -1175,16 +1209,22 @@ export class Race {
         }
         case 'box': {
           if (!Number.isInteger(msg.i)) break;
-          const b = items.boxes[msg.i];
-          if (b && b.active) items._popBox(msg.i);
-          if (k && msg.want) this.session.sendTo(from, { t: 'grant', item: items.roll(k) });
+          // A box that is there right now, or (i = -1) the Spook Mask's surprise, at most every 10 s.
+          if (msg.i === -1 ? this.raceTime - (k.surpriseAt ?? -99) < 10 : !(items.boxes[msg.i] && items.boxes[msg.i].active)) break;
+          if (msg.i === -1) k.surpriseAt = this.raceTime;
+          else items._popBox(msg.i);
+          if (msg.want) {
+            const item = items.roll(k);
+            this._granted(k, item);
+            this.session.sendTo(from, { t: 'grant', item });
+          }
           break;
         }
         case 'gem':
           if (Number.isInteger(msg.i) && items.gems[msg.i]) items._popGem(msg.i);
           break;
         case 'use': {
-          if (!k || !isItem(msg.it)) break;
+          if (!isItem(msg.it) || !this._spend(k, msg.it)) break;
           // Spawn where the guest says, unless that is far from where its kart is.
           const near = fin(msg.x, msg.z, msg.yaw, msg.sp) && (msg.x - k.pos.x) ** 2 + (msg.z - k.pos.z) ** 2 < 40 * 40;
           const src = near ? { x: msg.x, z: msg.z, yaw: msg.yaw, speed: clamp(msg.sp, 0, 200) } : { x: k.pos.x, z: k.pos.z, yaw: k.yaw, speed: Math.max(0, k.fwdSpeed) };
@@ -1204,7 +1244,7 @@ export class Race {
         case 'ram': {
           // A friend's kart k rammed kart v: decide it here if v is ours,
           // otherwise pass the claim on to v's phone.
-          const v = Number.isInteger(msg.v) ? this.karts[msg.v] : null;
+          const v = this.kartAt(msg.v);
           if (!this.battle || !k || !v || v === k) break;
           if (v.remote) this.net.sendRam(k, v);
           else this.battle.claimRam(v, k);
@@ -1213,7 +1253,7 @@ export class Race {
         case 'stole': {
           // A ram popped friend k's balloon on their phone: k's rammer gets
           // the steal (at most one a second per victim, and only up close).
-          const att = Number.isInteger(msg.by) ? this.karts[msg.by] : null;
+          const att = this.kartAt(msg.by);
           if (!this.battle || !k || !att || att === k || !Number.isInteger(msg.n)) break;
           if (this.time - (k.stoleAt ?? -9) < 1 || (att.pos.x - k.pos.x) ** 2 + (att.pos.z - k.pos.z) ** 2 > 400) break;
           k.stoleAt = this.time;
@@ -1221,11 +1261,9 @@ export class Race {
           break;
         }
         case 'finish':
-          if (k && !k.finished && Number.isFinite(msg.time) && msg.time > 0) {
-            k.finished = true;
-            k.finishTime = msg.time;
-            k.lapTimes = Array.isArray(msg.laps) ? msg.laps.filter(Number.isFinite).slice(0, 99) : [];
-          }
+          if (k.finished || !Number.isFinite(msg.time)) break;
+          if (Array.isArray(msg.laps)) k.lapTimes = msg.laps.filter(Number.isFinite).slice(0, 99);
+          this._netFinish(k, msg.time);
           break;
       }
       return;
@@ -1248,13 +1286,13 @@ export class Race {
         break;
       case 'blast':
         if (!fin(msg.x, msg.y, msg.z, msg.r) || typeof msg.kind !== 'string') break;
-        items.blast(msg.x, msg.y, msg.z, clamp(msg.r, 0, 40), msg.kind, this.karts[msg.o] || null, !!msg.sp, false);
+        items.blast(msg.x, msg.y, msg.z, clamp(msg.r, 0, 40), msg.kind, this.kartAt(msg.o), !!msg.sp, false);
         break;
       case 'hit':
         if (this.player && typeof msg.kind === 'string') this.player.hit(msg.kind);
         break;
       case 'ram':
-        if (this.battle && this.player && Number.isInteger(msg.by)) this.battle.claimRam(this.player, this.karts[msg.by]);
+        if (this.battle && this.player && this.kartAt(msg.by)) this.battle.claimRam(this.player, this.kartAt(msg.by));
         break;
       case 'steal':
         if (this.battle && this.player && typeof msg.id === 'string' && msg.id.length <= 24) this.battle.grant(this.player, msg.id);

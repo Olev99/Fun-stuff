@@ -1102,7 +1102,13 @@ class App {
       this.ui.lobby('start', reason || 'Disconnected.');
     };
     ses.onError = (e) => {
-      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', (e && e.message) || 'Connection problem.');
+      const msg = ((e && e.message) || 'Connection problem.').slice(0, 140);
+      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', msg);
+      else if (performance.now() - (this._netErrAt ?? -1e9) > 8000) { // say it, but not every frame
+        this._netErrAt = performance.now();
+        if (this.ui.current === 'lobby') document.getElementById('lobby-error').textContent = msg;
+        else this.hud.toast(`Connection problem: ${msg}`);
+      }
     };
     ses.onStart = (cfg) => this.startNetRace(cfg);
     ses.onToLobby = () => this.returnToLobbyView();
