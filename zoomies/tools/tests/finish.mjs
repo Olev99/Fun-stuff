@@ -1,7 +1,8 @@
 // The four finishing jobs: reversed Dune Surf, Balloon Battle results with a racer who is down,
 // sell-then-sync (sold counts), and Workshop parts in the quick modes. Screenshots go to fin/.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const KEY = 'zoomies-career-v1';
 const errs = [];
 let fails = 0;
@@ -12,7 +13,7 @@ const open = async (w, h, mobile) => {
   const p = await ctx.newPage();
   p.setDefaultTimeout(90000);
   p.on('pageerror', (e) => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 500)); });
-  await p.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await p.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
   await p.evaluate(() => { window.zoomies.paused = true; });
   return p;

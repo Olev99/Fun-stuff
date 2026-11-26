@@ -1,5 +1,6 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
 const ctx = await b.newContext({ viewport: { width: 640, height: 300 }, isMobile: true, hasTouch: true });
 ctx.setDefaultTimeout(120000); // building a battle on a busy machine can take a while
 await ctx.addInitScript(() => { try { localStorage.setItem('zoomies.settings.v1', JSON.stringify({ quality: 'low' })); } catch (e) {} });
@@ -8,7 +9,7 @@ const errs = [];
 for (const [n, p] of [['A', A], ['B', B]]) {
   p.on('pageerror', e => { errs.push(e.message); console.log(`[${n} pageerror]`, e.message, e.stack?.slice(0, 500)); });
 }
-const url = 'http://localhost:8000/index.html?net=local&lag=40';
+const url = 'http://localhost:' + (process.env.ZPORT || 8000) + '/index.html?net=local&lag=40';
 // Load A first and freeze its menu demo race before B loads: a running software-rendered demo
 // starves the second page's load (it took ~28 s of the 30 s limit once the world got richer).
 await A.goto(url); await A.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });

@@ -2,7 +2,8 @@
 // saves; a League event paying coins and drops; Legend Rank maths and rewards;
 // merging saves; hostile and old saves; screenshots at 852x393 and 1470x860.
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true });
 let p = await ctx.newPage();
 const errs = [];
@@ -19,7 +20,7 @@ const boot = async (save) => {
   await p.close();
   p = await ctx.newPage();
   watch(p);
-  await p.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await p.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.evaluate(([k, s]) => { localStorage.removeItem(k); if (s) localStorage.setItem(k, JSON.stringify(s)); }, [KEY, save || null]);
   await p.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
@@ -447,7 +448,7 @@ const dctx = await b.newContext({ viewport: { width: 1470, height: 860 } });
 const d = await dctx.newPage();
 d.on('pageerror', (e) => { errs.push(e.message); console.log('[pageerror desktop]', e.message); });
 d.setDefaultTimeout(90000);
-await d.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+await d.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
 const dsave = storyDone({ seen: { ...storyDone().seen, 'L1-intro': true, 'L2-intro': true }, stars: { 'L1-1': 3, 'L1-2': 3, 'L1-3': 2, 'L1-4': 1, 'L1-5': 2, 'L1-6': 3 } });
 dsave.done = { ...dsave.done, 'L1-1': true, 'L1-2': true, 'L1-3': true, 'L1-4': true, 'L1-5': true, 'L1-6': true };
 await d.evaluate(([k, s]) => localStorage.setItem(k, JSON.stringify(s)), [KEY, dsave]);
