@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { CHROME_PATH } from './chrome.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
@@ -31,7 +32,7 @@ export const DEFAULT_TRACKS = ['sprout', 'coral', 'dunes', 'frost', 'candy', 'ne
 // Runs the races and returns one record per race.
 export async function runRaces({ tracks = DEFAULT_TRACKS, diffs = ['normal', 'hard'], n = 3, seed = 1, kit = null, events = 'off', log = () => {} } = {}) {
   const srv = await serve();
-  const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
   p.on('pageerror', (e) => console.log('[pageerror]', e.message));
   await p.goto(`http://localhost:${srv.port}/index.html`);

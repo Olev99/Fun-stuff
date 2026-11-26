@@ -1,11 +1,12 @@
 import { chromium } from 'playwright-core';
+import { CHROME_PATH } from './chrome.mjs';
 const out = 'items'; const fs = await import('fs'); fs.mkdirSync(out, { recursive: true });
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
 const p = await b.newPage({ viewport: { width: 852, height: 393 } });
 const errs = [];
 p.on('pageerror', e => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 600)); });
 p.on('console', m => { if (m.type() === 'error' && !m.text().includes('Failed to load')) { errs.push(m.text()); console.log('[err]', m.text().slice(0, 300)); } });
-await p.goto('http://localhost:8000/index.html');
+await p.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html');
 await p.waitForTimeout(3500);
 const log = await p.evaluate(() => {
   const a = window.zoomies;

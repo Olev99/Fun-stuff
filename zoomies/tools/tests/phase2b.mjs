@@ -1,7 +1,8 @@
 // Phase 2b: the Weekly Cup and Mastery (maths, save migration, merging, hostile saves, screens).
 //   node run.mjs phase2b
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true });
 let p = await ctx.newPage();
 let fails = 0;
@@ -12,7 +13,7 @@ const watch = (pg) => {
   pg.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('Failed to load resource')) console.log('[console]', m.text().slice(0, 300)); });
 };
 watch(p);
-const URL = 'http://localhost:8000/index.html';
+const URL = 'http://localhost:' + (process.env.ZPORT || 8000) + '/index.html';
 const KEY = 'zoomies-career-v1';
 const boot = async (save) => {
   await p.close();

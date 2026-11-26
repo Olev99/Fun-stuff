@@ -3,7 +3,8 @@
 // Driving School replay. Screenshots land in test-out/onb/.
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 await mkdir('onb', { recursive: true });
 let fails = 0;
 const check = (name, ok, extra = '') => { if (!ok) fails++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${extra ? ' ' + extra : ''}`); };
@@ -16,7 +17,7 @@ const open = async (touch) => {
   const ctx = await b.newContext(touch ? { viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true } : { viewport: { width: 1470, height: 860 } });
   const p = await ctx.newPage();
   watch(p);
-  await p.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await p.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
   await p.waitForTimeout(800);
   return p;

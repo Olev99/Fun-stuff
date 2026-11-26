@@ -6,11 +6,12 @@
 import { chromium } from 'playwright-core';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { CHROME_PATH } from './chrome.mjs';
 const arg = process.argv[2];
 const tag = process.argv[3] || '';
 const OUT = 'audit/';
 await mkdir(OUT, { recursive: true });
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
 p.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`);

@@ -1,9 +1,10 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
 const errs = [];
 p.on('pageerror', e => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 300)); });
-await p.goto('http://localhost:8000/index.html');
+await p.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html');
 await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
 await p.tap('#scr-title [data-go="quick"]');
 await p.waitForTimeout(700);

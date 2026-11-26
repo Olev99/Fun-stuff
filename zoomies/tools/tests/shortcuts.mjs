@@ -1,8 +1,9 @@
 import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+import { CHROME_PATH } from './chrome.mjs';
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
 const p = await b.newPage({ viewport: { width: 400, height: 200 } });
 p.on('pageerror', e => console.log('[pageerror]', e.message, e.stack?.slice(0, 400)));
-await p.goto('http://localhost:8000/index.html');
+await p.goto('http://localhost:' + (process.env.ZPORT || 8000) + '/index.html');
 await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 60000 });
 // `node shortcuts.mjs ai [tracks] [difficulties] [races]`: full races of
 // computer racers, counting how often they take each shortcut and how long

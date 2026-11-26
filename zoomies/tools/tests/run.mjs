@@ -63,7 +63,7 @@ function serve() {
       }
     });
     srv.once('error', () => ok(null)); // port taken: use the server already there
-    srv.listen(8000, () => ok(srv));
+    srv.listen(+process.env.ZPORT || 8000, () => ok(srv));
   });
 }
 
