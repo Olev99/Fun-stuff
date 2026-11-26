@@ -7,9 +7,12 @@
 //   trust   cid not broadcast, no kick by cid, no joining mid-race, unheld items, implausible
 //           finishes, floods
 //   loss    20% loss on the unreliable channel: remote karts keep moving, stale packets dropped
+//   rtc     the real PeerTransport over two WebRTC connections in one page (no broker): the fast
+//           channel opens unordered with no retransmits, carries fast messages, and a peer
+//           without it falls back to the reliable channel
 // node netsec.mjs [part,part...]   (all parts by default)
 import { chromium } from 'playwright-core';
-const parts = (process.argv[2] || 'leak,crash,wire,clock,trust,loss').split(',');
+const parts = (process.argv[2] || 'leak,crash,wire,clock,trust,loss,rtc').split(',');
 const PORT = process.env.ZPORT || 8000;
 const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 let fails = 0;
@@ -261,6 +264,69 @@ if (parts.includes('loss')) {
     return [last > 1, ib.take('host', JSON.stringify({ t: 'snap', q: last, rt: 0, k: [] })), ib.take('host', JSON.stringify({ t: 'snap', q: 1, rt: 0, k: [] })), !!ib.take('host', JSON.stringify({ t: 'snap', q: last + 1, rt: 0, k: [] }))];
   });
   check(stale[0] && stale[1] === null && stale[2] === null && stale[3], 'stale and repeated snapshots are dropped, the next one is taken');
+  await ctx.close();
+}
+
+// ---- rtc: PeerTransport's channels over real WebRTC (loopback, no broker) ----
+if (parts.includes('rtc')) {
+  const ctx = await lowCtx();
+  const p = await page(ctx, 'rtc');
+  const res = await p.evaluate(async () => {
+    const { PeerTransport } = await import('./src/net.js');
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    // Two RTCPeerConnections joined by hand, with one reliable channel like PeerJS makes.
+    async function pair() {
+      const pa = new RTCPeerConnection(), pb = new RTCPeerConnection();
+      pa.onicecandidate = (e) => e.candidate && pb.addIceCandidate(e.candidate);
+      pb.onicecandidate = (e) => e.candidate && pa.addIceCandidate(e.candidate);
+      const da = pa.createDataChannel('dc', { ordered: true });
+      const dbP = new Promise((r) => { pb.ondatachannel = (e) => r(e.channel); });
+      await pa.setLocalDescription(await pa.createOffer()); await pb.setRemoteDescription(pa.localDescription);
+      await pb.setLocalDescription(await pb.createAnswer()); await pa.setRemoteDescription(pb.localDescription);
+      const db = await dbP;
+      await Promise.all([da, db].map((c) => c.readyState === 'open' || new Promise((r) => { c.onopen = r; })));
+      return [pa, da, pb, db];
+    }
+    // A stand-in for a PeerJS DataConnection in raw mode around a channel; counts what it sends.
+    const fake = (pc, dc) => { const h = {}; dc.onmessage = (e) => h.data && h.data(e.data); const c = { peerConnection: pc, sent: 0, get open() { return dc.readyState === 'open'; }, send: (s) => { c.sent++; dc.send(s); }, on: (ev, fn) => { h[ev] = fn; } }; return c; };
+    const got = { a: [], b: [], c: [] };
+    const mk = (who) => new PeerTransport({ message: (id, m) => got[who].push(m), leave() {}, join() {}, error: (e) => got[who].push({ t: 'err', e: e.message }) });
+    const [pa, da, pb, db] = await pair();
+    const A = mk('a'), B = mk('b');
+    const ca = fake(pa, da), cb = fake(pb, db);
+    A.conns.set('b', ca); A._wire(ca, 'b');
+    B.conns.set('host', cb); B._wire(cb, 'host');
+    for (let i = 0; i < 50 && !(ca.fast && cb.fast); i++) await wait(100);
+    const out = { fast: !!(ca.fast && cb.fast), ordered: ca.fast && ca.fast.ordered, rtx: ca.fast && ca.fast.maxRetransmits };
+    const s0 = ca.sent;
+    for (let i = 0; i < 20; i++) A.send('b', { t: 'snap', rt: i, k: [] }, true);
+    B.send('host', { t: 'st', s: [1] }, true);
+    A.send('b', { t: 'ghost', g: 'x'.repeat(40000) }); // long: pieces on the reliable channel
+    await wait(500);
+    out.reliableSends = ca.sent - s0;
+    out.snaps = got.b.filter((m) => m.t === 'snap').length;
+    out.ghost = (got.b.find((m) => m.t === 'ghost') || { g: '' }).g.length;
+    out.st = got.a.filter((m) => m.t === 'st').length;
+    // A peer that never opens the fast channel: fast messages ride the reliable one.
+    const [pc, dc, pd, dd] = await pair();
+    const C = mk('c'), cc = fake(pc, dc);
+    C.conns.set('x', cc); C._wire(cc, 'x');
+    const plain = [];
+    dd.onmessage = (e) => plain.push(e.data);
+    await wait(1200);
+    C.send('x', { t: 'snap', rt: 1, k: [] }, true);
+    await wait(300);
+    out.fallback = [!cc.fast, plain.filter((s) => s.includes('"snap"')).length];
+    out.errors = [...got.a, ...got.b, ...got.c].filter((m) => m.t === 'err').map((m) => m.e);
+    for (const x of [pa, pb, pc, pd]) x.close();
+    return out;
+  });
+  console.log('rtc:', JSON.stringify(res));
+  check(res.fast && res.ordered === false && res.rtx === 0, 'the fast channel opens both ways, unordered, no retransmits');
+  check(res.snaps >= 18 && res.st === 1 && res.reliableSends === 9, `fast messages use it (${res.snaps}/20 snaps arrived, reliable sends only for the 40 KB message's ${res.reliableSends} pieces)`);
+  check(res.ghost === 40000, 'a 40 KB message arrives whole over the reliable channel');
+  check(res.fallback[0] && res.fallback[1] === 1, 'without the other side\'s fast channel, fast messages ride the reliable one');
+  check(!res.errors.length, `no transport errors ${res.errors.join(' ')}`);
   await ctx.close();
 }
 
