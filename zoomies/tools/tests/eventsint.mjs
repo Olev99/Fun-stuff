@@ -139,8 +139,9 @@ const sv = await p.evaluate(async () => {
   out.old = C.cleanCareer({ v: 1, coins: 5 }).evSeen.length; // a save from before the field
   out.saveRound = JSON.stringify(C.cleanCareer(JSON.parse(JSON.stringify(mk({ evSeen: known })))).evSeen);
   // merge: union of seen events, the better dodge race, surfs add
-  const A = mk({ evSeen: ['blizzard'], stats: { dodgeBest: 4, surfs: 3 } }), B = mk({ evSeen: ['sandstorm', 'blizzard'], stats: { dodgeBest: 9, surfs: 5 } });
-  const m = S.mergeCareer(A, B), m2 = S.mergeCareer(B, A);
+  // Two devices' saves (each credited to its own device in the ledger, see sync.js).
+  const A = C.cleanCareer(mk({ evSeen: ['blizzard'], stats: { dodgeBest: 4, surfs: 3 } }), 'devA'), B = C.cleanCareer(mk({ evSeen: ['sandstorm', 'blizzard'], stats: { dodgeBest: 9, surfs: 5 } }), 'devB');
+  const m = S.mergeCareer(A, B, null), m2 = S.mergeCareer(B, A, null);
   out.merge = [m.evSeen.slice().sort().join(), m2.evSeen.slice().sort().join(), m.stats.dodgeBest, m2.stats.dodgeBest, m.stats.surfs];
   out.mergeBad = S.mergeCareer(mk({ evSeen: ['nonsense', 'blizzard'] }), mk({ evSeen: 'x' })).evSeen.join();
   // trophies: each pays once
@@ -190,7 +191,7 @@ console.log('saves', JSON.stringify(sv));
 check('hostile evSeen: not a list, junk, proto names, unknown ids, duplicates all cleaned', JSON.stringify(sv.junk) === JSON.stringify([[], [], [], [], [], ['blizzard', 'sandstorm']]), JSON.stringify(sv.junk));
 check('evSeen is bounded and a new or old save starts empty', sv.big <= 60 && sv.fresh === 0 && sv.old === 0, `${sv.big}`);
 check('hostile stats stay whole numbers', sv.stats.dodgeBest === 0 && sv.stats.eyes === 1e9 && sv.stats.surfs === undefined, JSON.stringify(sv.stats));
-check('merging two saves: seen events are united, the better dodge race wins, surf counts take the higher without a shared sync base', sv.merge.join('|') === 'blizzard,sandstorm|blizzard,sandstorm|9|9|5', sv.merge.join('|'));
+check('merging two devices: seen events are united, the better dodge race wins, surf counts add up', sv.merge.join('|') === 'blizzard,sandstorm|blizzard,sandstorm|9|9|8', sv.merge.join('|'));
 check('merging a hostile list keeps only known ids', sv.mergeBad === 'blizzard', sv.mergeBad);
 check('Storm Surfer is awarded once, at 10 gust or crest boosts', JSON.stringify(sv.surfer) === JSON.stringify(['', 'surf10', '', '']), JSON.stringify(sv.surfer));
 check('Dodge Master needs 10 dodges in ONE race, and is awarded once', sv.dodge[0] === '' && sv.dodge[1] === 'dodge10' && sv.dodge[2] === '' && sv.dodge[3] === 12, JSON.stringify(sv.dodge));

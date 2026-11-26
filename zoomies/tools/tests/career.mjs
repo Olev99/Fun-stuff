@@ -370,16 +370,18 @@ const merged = await p.evaluate(async () => {
   const B = newCareer(); B.xp = 400; B.bodies = ['buggy']; B.body = 'buggy';
   B.parts = { engine1: 3, armor1: 1, bogus: 4, turbo3: 1 }; B.bought = { engine1: 2 }; B.drops = { 'c1-1': 'tyres1', 'c1-2': 'nothing' }; B.sockets = { classic: 1 };
   B.loadouts = { buggy: { cur: ['armor1', 'engine1', 'turbo3'], pre: [[], ['armor1'], []] }, tank: { cur: ['engine1'], pre: [] } };
-  const m = mergeCareer(A, B);
-  const rev = mergeCareer(B, A);
+  // Two devices' saves (each credited to its own device in the ledger, see sync.js).
+  const a = cleanCareer(A, 'devA'), b = cleanCareer(B, 'devB');
+  const m = mergeCareer(a, b, null);
+  const rev = mergeCareer(b, a, null);
   // hostile input is cleaned: counts bounded, unknown ids and bodies dropped, long arrays cut
   const hostile = cleanCareer({ ...newCareer(), parts: { engine1: 1e12, nope: 5, __proto__: 3 }, loadouts: { buggy: { cur: new Array(50).fill('engine1'), pre: [[], [], [], ['x']] }, ['x'.repeat(100)]: { cur: [] } }, sockets: { buggy: 99 }, drops: { a: 'engine1', b: 7 } });
   return { m: { parts: m.parts, bought: m.bought, sockets: m.sockets, drops: m.drops, load: m.loadouts, body: m.body, pv: m.pv, up: m.upgrades }, rev: { parts: rev.parts, load: rev.loadouts }, hostile: { parts: hostile.parts, load: hostile.loadouts, sockets: hostile.sockets, drops: hostile.drops } };
 });
 console.log('merged', JSON.stringify(merged));
-check('merge: higher count of each part, unknown ids dropped', merged.m.parts.engine1 === 3 && merged.m.parts.tyres2 === 2 && merged.m.parts.armor1 === 1 && merged.m.parts.turbo3 === 1 && merged.m.parts.driftSpring === 1 && !('bogus' in merged.m.parts), JSON.stringify(merged.m.parts));
+check('merge: parts held on two devices add up (a drop counts once), unknown ids dropped', merged.m.parts.engine1 === 4 && merged.m.parts.tyres2 === 2 && merged.m.parts.armor1 === 1 && merged.m.parts.turbo3 === 1 && merged.m.parts.driftSpring === 1 && !('bogus' in merged.m.parts), JSON.stringify(merged.m.parts));
 check('merge: sockets and earned drops combined', merged.m.sockets.buggy === 1 && merged.m.sockets.classic === 1 && merged.m.drops['c1-0'] === 'engine1' && merged.m.drops['c1-1'] === 'tyres1' && !('c1-2' in merged.m.drops), JSON.stringify([merged.m.sockets, merged.m.drops]));
-check('merge: loadouts from the more played save, other vehicles kept', JSON.stringify(merged.m.load.classic.cur) === '["engine1","tyres2"]' && merged.m.load.buggy.cur.join() === 'tyres2' && !merged.m.load.tank, JSON.stringify(merged.m.load));
+check('merge: loadouts from the save that changed them last (here the more played one)', JSON.stringify(merged.m.load.classic.cur) === '["engine1","tyres2"]' && merged.m.load.buggy.cur.join() === 'tyres2' && !merged.m.load.tank, JSON.stringify(merged.m.load));
 check('merge: more fitted than sockets are trimmed, presets kept', merged.rev.load.buggy.cur.length <= 3 && merged.m.load.classic.pre[0].join() === 'engine1', JSON.stringify(merged.rev.load));
 const sortKeys = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]));
 check('merge: both orders keep the same parts', sortKeys(merged.m.parts) === sortKeys(merged.rev.parts));

@@ -98,8 +98,8 @@ const lateGame = await A.page.evaluate(async () => {
   app2.records = { sprout: { tt: 61.5, lap: 20.1 }, 'cup:mushroom': '1st', found: { sprout: ['a', 'b'] } };
   // 40 best-lap ghosts of about 90 seconds
   let n = 0;
-  for (const t of ['sprout', 'dunes', 'crater', 'harbor', 'alpine', 'neon', 'swamp', 'candy', 'ruins', 'sky']) {
-    for (const r of ['', '-r', '-x', '-y']) {
+  for (const t of (await import('./src/tracks.js')).TRACKS.map((x) => x.id)) {
+    for (const r of ['', '-r']) {
       const s = new Int16Array(900 * 4);
       let x = 0, z = 0, yaw = 0;
       for (let i = 0; i < 900; i++) { yaw += (Math.random() - 0.5) * 300; x += Math.cos(yaw / 5000) * 14; z += Math.sin(yaw / 5000) * 14; s.set([x, 0, z, yaw], i * 4); }
@@ -139,7 +139,8 @@ const merged = await B.page.evaluate(async (code) => {
   const c = app.career;
   return { coins: c.coins, stats: c.stats.races, done: Object.keys(c.done).length, ghosts: Object.keys(localStorage).filter((k) => k.startsWith('zoomies.ghost.v1.')).length, saved: JSON.parse(localStorage.getItem('zoomies-career-v1')).coins };
 }, built.full);
-check('merge keeps the best of both', merged.coins === 123456 && merged.stats === 5000 && merged.done > 20 && merged.ghosts === built.fullGhosts && merged.saved === 123456, JSON.stringify(merged));
+// Merge adds what this device earned on its own (50 coins, 5000 races) to the backup's (sync.js ledger).
+check('merge keeps both devices\' progress', merged.coins === 123456 + 50 && merged.stats === 1234 + 5000 && merged.done > 20 && merged.ghosts === built.fullGhosts && built.fullGhosts >= 10 && merged.saved === 123456 + 50, JSON.stringify(merged));
 const replaced = await B.page.evaluate(async (code) => {
   const { readBackup, applyBackup } = await import('./src/backup.js');
   const app = window.zoomies;
