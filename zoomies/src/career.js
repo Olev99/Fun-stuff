@@ -330,7 +330,7 @@ export function newCareer() {
     pv: 2, upgrades: {}, parts: {}, bought: {}, sold: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
-    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0, pity: 0, dayMax: '', // pity: paid prize spins since a legendary; dayMax: latest day seen (clock-back guard)
     missions: { day: '', prog: {}, done: [], streak: 0, last: '' }, // daily missions (missions.js)
     weekly: emptyWeekly(), // Weekly Cup (weekly.js)
     mastery: emptyMastery(), // racer and ride mastery (mastery.js)
@@ -404,6 +404,8 @@ export function cleanCareer(saved) {
   for (const k of ['racer', 'body', 'paint', 'hat', 'trail', 'horn']) if (isStr(saved[k])) c[k] = saved[k];
   for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) if (Array.isArray(saved[k])) c[k] = strList(saved[k]);
   c.champion = !!saved.champion;
+  c.pity = count(saved.pity, 100);
+  c.dayMax = typeof saved.dayMax === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(saved.dayMax) ? saved.dayMax : '';
   // Parts (see workshop.js). Old saves (no pv) had 4 upgrade levels per kart: they become parts.
   c.parts = mapObj(saved.parts, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));
   c.bought = mapObj(saved.bought, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));

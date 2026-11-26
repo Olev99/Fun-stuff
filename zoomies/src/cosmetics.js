@@ -7,7 +7,7 @@ export const RARITY = {
   common: { name: 'Common', weight: 60, refund: 40, color: '#9ee7ff' },
   rare: { name: 'Rare', weight: 28, refund: 80, color: '#7dff9a' },
   epic: { name: 'Epic', weight: 10, refund: 150, color: '#c77dff' },
-  legendary: { name: 'Legendary', weight: 2, refund: 300, color: '#ffd23f' },
+  legendary: { name: 'Legendary', weight: 4, refund: 300, color: '#ffd23f' },
   // Real prizes (racers, rides, paint, parts, coins): rolled first, see prizes.js.
   jackpot: { name: 'Jackpot', weight: 0, refund: 0, color: '#ff5ad8' },
   // Legends League rank rewards (league.js): never in the machine, owned when the rank is reached.
@@ -316,15 +316,16 @@ export const COSMETIC_TOTAL = GUM.length - STARTER.length;
 export const LEAGUE_COSMETICS = ALL.filter((it) => it.rarity === 'league');
 
 // One turn of the gumball machine. Costs a free capsule if you have one,
-// otherwise CAPSULE_PRICE coins. Duplicates pay back coins. `jackpot` may
+// otherwise CAPSULE_PRICE coins. Duplicates pay back coins on paid turns only. `jackpot` may
 // return a real prize instead of a cosmetic (see prizes.js).
+export const PITY_SPINS = 40;
 export function spinGumball(c, rnd = Math.random, jackpot = null) {
   const free = (c.freeCaps || 0) > 0;
   if (!free && c.coins < CAPSULE_PRICE) return null;
   if (free) c.freeCaps--;
   else c.coins -= CAPSULE_PRICE;
   c.stats = c.stats || {};
-  const jp = jackpot && jackpot(c, rnd);
+  const jp = jackpot && jackpot(c, rnd, free);
   if (jp) {
     c.stats.capsules = (c.stats.capsules || 0) + 1;
     c.stats.jackpots = (c.stats.jackpots || 0) + 1;
@@ -337,17 +338,20 @@ export function spinGumball(c, rnd = Math.random, jackpot = null) {
   for (const [k, v] of tiers) {
     if ((r -= v.weight) < 0) { rarity = k; break; }
   }
-  // Prefer something new within the rolled rarity, but duplicates can happen.
+  // Pity: 40 paid spins without a legendary guarantee a new one (while any is left).
+  if ((c.pity || 0) >= PITY_SPINS && pool.some((it) => it.rarity === 'legendary' && !owns(c, it.id))) rarity = 'legendary';
+  // Always prefer something new within the rolled rarity; duplicates only once the tier is complete.
   const tier = pool.filter((it) => it.rarity === rarity);
   const fresh = tier.filter((it) => !owns(c, it.id));
-  const list = fresh.length && rnd() < 0.7 ? fresh : tier;
+  const list = fresh.length ? fresh : tier;
   const item = list[Math.floor(rnd() * list.length)];
   const dup = owns(c, item.id);
   let refund = 0;
-  if (dup) {
+  if (!free) c.pity = item.rarity === 'legendary' ? 0 : (c.pity || 0) + 1;
+  if (dup && !free) { // free capsules never mint coins
     refund = RARITY[item.rarity].refund;
     c.coins += refund;
-  } else {
+  } else if (!dup) {
     c.cos = c.cos || [];
     c.cos.push(item.id);
   }

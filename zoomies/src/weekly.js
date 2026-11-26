@@ -1,6 +1,7 @@
 import { TRACKS } from './tracks.js';
 import { DAILY_MODS, CLASSIC_MODS, grant } from './profile.js';
 import { rng } from './util.js';
+import { clockBack } from './missions.js';
 
 // Weekly Cup: one special Grand Prix per ISO week (UTC), the same for everyone,
 // with one twist from the Daily list. Retry it all week; the best placing counts.
@@ -88,6 +89,7 @@ export const weeklyBest = (c, week = weekOf()) => (c.weekly && c.weekly.week ===
 // Record a finished cup (place 1-8). Pays XP only for the part of this week's
 // maximum not yet earned, so retries cannot farm. Returns the summary.
 export function weeklyFinish(c, place, week = weekOf()) {
+  if (clockBack(c)) { const w = c.weekly || emptyWeekly(); return { ...grant(c, 0, 0), place, improved: false, was: w.best, trophy: false, capsule: false, streak: w.streak, best: w.best }; } // clock turned back: nothing re-paid
   const w = weeklyState(c, week);
   const was = w.best;
   const improved = !was || place < was;

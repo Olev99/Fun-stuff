@@ -726,7 +726,7 @@ class App {
     const lines = [];
     let title = pass ? 'Challenge complete!' : 'Not quite!';
     if (pass) {
-      const dr = completeDaily(this.career);
+      const dr = completeDaily(this.career, d.day);
       if (dr) {
         lines.push(`🔥 ${dr.streak}-day streak! Daily reward: a free prize capsule 🍬 · +${dr.xp} XP`);
         sum.coins += dr.coins;

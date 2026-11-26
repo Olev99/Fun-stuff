@@ -71,6 +71,7 @@ export function mergeCareer(A, B) {
   m.lvlPaid = Math.max(...[A, B].map((x) => (x && x.lvlPaid) || oldLevel(num(x && x.xp))));
   for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) m[k] = union(a[k], b[k]);
   m.champion = !!(a.champion || b.champion);
+  m.dayMax = [a.dayMax, b.dayMax].sort().pop() || ''; // latest day seen (ISO strings sort); pity (prize spins) comes from `main`, the sync agent may merge it by min
   // Parts (Gramps's Workshop): the higher count of each part, extra sockets
   // from Chassis Mods, earned drops combined. Loadouts (what is fitted and the
   // saved presets) come from the more played save, with the other save's
