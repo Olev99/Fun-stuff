@@ -97,14 +97,11 @@ export class Inbox {
   constructor() {
     this.parts = new Map(); // peer -> the long message coming in (pieces arrive in order)
     this.last = new Map(); // `${peer}|${type}` -> newest sequence number
-    this.dec = null;
   }
 
   // One string from a peer -> [message, size] once whole, else null.
   take(from, d) {
-    if (typeof d !== 'string') { // bytes from a phone on an older version (PeerJS JSON mode)
-      try { d = (this.dec ||= new TextDecoder()).decode(d); } catch (e) { return null; }
-    }
+    if (typeof d !== 'string') return null; // shortcut: a phone on an older version (PeerJS JSON mode) is not understood; both must update
     if (d[0] === '~') {
       const m = /^~(\d{1,6}):(\d{1,3}):(\d{1,3}):/.exec(d);
       if (!m) return null;
