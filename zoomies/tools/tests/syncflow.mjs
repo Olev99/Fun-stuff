@@ -55,7 +55,7 @@ let coins = await sync();
 await A.screenshot({ path: 'sync-host.png' });
 await B.screenshot({ path: 'sync-guest.png' });
 check('first sync: both devices hold 1000 + 300', coins.join() === '1300,1300', coins.join());
-const ghosts = await A.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('zoomies.ghost.v1.')).sort().join());
+const ghosts = await A.evaluate(() => Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).filter((k) => k.startsWith('zoomies.ghost.v1.')).sort().join());
 check('the real track ghost came over, the made-up key did not', ghosts === 'zoomies.ghost.v1.sprout', ghosts);
 coins = await sync();
 check('syncing again changes nothing', coins.join() === '1300,1300', coins.join());
