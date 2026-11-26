@@ -32,7 +32,7 @@ import { NetSession } from './net.js';
 import { PostFX } from './post.js';
 import { installHeightFog } from './env.js';
 import {
-  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult, evPlan, evSeedFor,
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, paintById, aiLoadouts, applyResult, evPlan, evSeedFor,
 } from './career.js';
 import { kitOf } from './workshop.js';
 
@@ -343,7 +343,7 @@ class App {
   // such as a career rival), the player in the middle of the pack.
   makeGrid(player, gpOrder = null, must = []) {
     if (gpOrder) return gpOrder;
-    const req = must.filter((id) => id && id !== player);
+    const req = [...new Set(must.filter((id) => id && id !== player))]; // a rival can also be on the returning list: one seat each
     const pool = shuffle(CHARACTERS.map((c) => c.id).filter((id) => id !== player && !req.includes(id)));
     const others = shuffle([...req, ...pool.slice(0, 7 - req.length)]);
     others.splice(5, 0, player);
@@ -392,7 +392,8 @@ class App {
     const id = this.settings.vehicle;
     const lvl = levelOf((this.career && this.career.xp) || 0).level;
     const body = BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic';
-    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body) } : { body };
+    const paint = this.career ? paintById(this.career.paint).color : null; // bought, jackpot and League paints show in every mode
+    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body), paint } : { body, paint };
   }
 
   // The Settings toggle 'Use Workshop parts in quick modes' (default on).

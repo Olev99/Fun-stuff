@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PAINTS, paintById } from './career.js';
 
 // Things to win from the gumball machine: hats for your racer, colours for
 // your boost flames, and the horn you honk when you pass someone.
@@ -297,12 +298,15 @@ export function addHat(B, ch, hatId) {
 // Validate a look sent by another phone.
 export function cleanLook(l) {
   if (!l || typeof l !== 'object') return null;
-  return { hat: hatById(l.hat).id, trail: trailById(l.trail).id, horn: hornById(l.horn).id, body: l.body === 'bike' ? 'bike' : 'classic' };
+  return { hat: hatById(l.hat).id, trail: trailById(l.trail).id, horn: hornById(l.horn).id, body: l.body === 'bike' ? 'bike' : 'classic', paint: PAINTS.some((p) => p.id === l.paint) ? l.paint : 'stock' };
 }
 
 export function lookOf(c) {
-  return { hat: hatById(c.hat).id, trail: trailById(c.trail).id, horn: hornById(c.horn).id };
+  return { hat: hatById(c.hat).id, trail: trailById(c.trail).id, horn: hornById(c.horn).id, paint: paintById(c.paint).id };
 }
+
+// The paint colour a look carries (null = the racer's own colours).
+export const lookPaint = (l) => (l && l.paint ? paintById(l.paint).color : null);
 
 export function owns(c, id) {
   return STARTER.includes(id) || (c.cos || []).includes(id);
