@@ -437,7 +437,7 @@ class App {
     const def0 = trackById(cfg.trackId);
     const trackDef = cfg.evOnly && def0.events ? { ...def0, events: def0.events.filter((id) => cfg.evOnly.includes(id)) } : def0;
     this.race = new Race(this, {
-      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
+      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.mode === 'tt' && !cfg.careerEv ? 'zoom' : cfg.speedClass, // free Time Trial is always Zoom: fair records
       difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
       look: lookOf(this.career), ghost: cfg.ghost || null, evMode, evSeed,
@@ -811,8 +811,7 @@ class App {
     const msg = me.place === 1 ? `You won the <em>${gp.cup.name}</em>!` : `You finished <em>${me.place}${ordinal(me.place).toLowerCase()}</em> overall`;
     this.audio.play(me.place <= 3 ? 'finish' : 'lose');
     if (me.place === 1) addToSet(this.career, 'cups', gp.cup.id);
-    const bonus = [150, 90, 60][me.place - 1] || 20;
-    const rw = this.rewardsFinish(grant(this.career, bonus, me.place <= 3 ? 150 : 50), [`Cup bonus for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
+    const rw = this.rewardsFinish(grant(this.career, 0, me.place <= 3 ? 150 : 50), [`Cup XP for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
     this.ui.results({
       title: 'Final standings',
       sub: gp.cup.name,
