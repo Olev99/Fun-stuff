@@ -203,6 +203,7 @@ Sync again whenever you switch devices. Pairing uses the same free WebRTC setup 
 - **Backup code:** **Settings → Back up** makes one line of text with your Career, coins, karts, trophies, records and the settings worth keeping (not steering or graphics). Tick **Include best-lap ghosts** to add some of them (the code gets longer). **Copy** it or **Share** it into Notes or a message. **Settings → Restore** takes a pasted code, checks it (size, checksum, version, every part is validated like a synced save, nothing unsafe is trusted), shows its level, coins, chapters done and League rank, and offers **Merge with this device** (keeps the best of both) or **Replace this device** (asks twice). After your first finished chapter, and then at most every 14 days while the game is not on the Home Screen, a note on the title screen offers **Back up now**.
 - **Offline play:** after one visit over the internet the whole game works without a connection (races, Career, Time Trial, battles against the computer; online play and syncing still need the internet). A service worker (`sw.js`, only on https or localhost) keeps a copy of every game file; each code file has the hash of its contents in its address, so a stored copy is never the wrong one. The game page and `version.json` are always fetched fresh when you are online.
 - **Updates:** a new version downloads quietly in the background and takes over the next time you open the game. If the game stays open, a **Update ready, tap to restart** note shows on the title screen (never during a race or in a lobby). If a download fails, the version you have keeps working. Old files are deleted when the new version takes over.
+- **If something goes wrong:** an error that keeps repeating stops the game behind a **Something went wrong** screen with **Back to menu** and the error text to copy for a report, instead of a frozen picture.
 - **If something looks stuck:** **Settings → Repair** (or open the game with `?nosw` added to the address) removes the stored files and reloads; your progress stays.
 - **About:** **Settings → About** (or the small version label on the title screen) shows the version, credits and licences, a plain privacy note (no accounts, no tracking, no ads; progress stays on your device) and the backup and repair buttons.
 - **Volume:** Settings has separate **Music volume** and **Sound effects volume** sliders. Sound pauses while the page is hidden. Held upright, a phone shows a "Turn your phone sideways" screen.
@@ -219,8 +220,9 @@ How it works:
 
 - Phones connect directly to each other over WebRTC. PeerJS's free public matchmaking server is used only to exchange the room code, so there is no game server to run.
 - The host's phone runs the computer racers, item boxes and standings.
-- Each phone drives its own kart, so steering never lags. Positions are shared about 20–30 times a second.
-- It works best when phones are on the same Wi-Fi. It usually works across different networks and mobile data too. A few carrier networks block direct connections; if joining times out, try Wi-Fi.
+- Each phone drives its own kart, so steering never lags. Positions are shared about 20–30 times a second on a fast channel that skips a lost packet instead of waiting for it; everything else (lobby, items, results) goes on a reliable one. Long messages, such as a ghost, are sent in pieces.
+- The host trusts only its players: it hands out items itself and only accepts an item it gave, checks finishes against its own clock, and turns away anyone who joins mid-race.
+- It works best when phones are on the same Wi-Fi. It usually works across different networks and mobile data too. A few carrier networks block direct connections; then joining says the race was found but the phones could not reach each other, so try the same Wi-Fi.
 - If a friend leaves mid-race, their kart becomes a computer racer. If the host leaves, everyone returns to the lobby screen.
 
 ## How to play
