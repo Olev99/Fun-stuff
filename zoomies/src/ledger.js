@@ -20,7 +20,7 @@ const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const cnt = (v, max = MAX) => (Number.isFinite(v) ? Math.min(max, Math.max(0, Math.round(v))) : 0);
 const isLegacy = (id) => id[0] === 'L';
 
-export const newLedger = () => ({ v: FMT, d: {}, gone: [], cl: {}, pt: 0, ph: '' });
+export const newLedger = () => ({ v: FMT, d: {}, gone: [], cl: {}, pt: 0, ph: '', lt: 0, lh: '', off: {} });
 
 // ---- this install's id (never inside a save or a backup) ----
 const DEV_KEY = 'zoomies-device';
@@ -108,8 +108,15 @@ export function cleanLedger(L) {
     }
   }
   if (isObj(L.cl)) for (const k of CLAIMS) { const h = cleanHex(L.cl[k]); if (h) out.cl[k] = h; }
-  out.pt = cnt(L.pt, 1e14);
-  out.ph = typeof L.ph === 'string' && /^[0-9a-z]{0,16}$/.test(L.ph) ? L.ph : '';
+  for (const [t, h] of [['pt', 'ph'], ['lt', 'lh']]) {
+    out[t] = cnt(L[t], 1e14);
+    out[h] = typeof L[h] === 'string' && /^[0-9a-z]{0,16}$/.test(L[h]) ? L[h] : '';
+  }
+  // Clamp offsets of the numbers last shown (career.js applyLedger): local bookkeeping, rebuilt on every load.
+  const o = isObj(L.off) ? L.off : {}, int = (v) => (Number.isFinite(v) ? Math.max(-MAX, Math.min(MAX, Math.round(v))) : 0);
+  if (int(o.c)) out.off.c = int(o.c);
+  if (int(o.k)) out.off.k = int(o.k);
+  if (isObj(o.p)) { const p = {}; for (const [k, v] of Object.entries(o.p).slice(0, MAX_KEYS)) if (KEY.test(k) && int(v)) p[k] = int(v); if (Object.keys(p).length) out.off.p = p; }
   return compact(out);
 }
 
@@ -150,12 +157,12 @@ export function joinLedger(A, B) {
     out.d[id] = !a || !b ? { ...(a || b) } : isLegacy(id) ? pickLegacy(a, b) : maxEntry(a, b);
   }
   for (const k of CLAIMS) { const h = orHex(A.cl[k], B.cl[k]); if (h) out.cl[k] = h; }
-  // What you drive and wear: the side changed last wins (ties: the larger stamp).
-  const w = A.pt > B.pt || (A.pt === B.pt && A.ph >= B.ph) ? A : B;
-  out.pt = w.pt; out.ph = w.ph;
+  // What you drive and wear (pt/ph) and the fitted parts (lt/lh): the side changed last wins, each on its own.
+  for (const [t, h] of [['pt', 'ph'], ['lt', 'lh']]) { const w = prefsWinner(A, B, t, h) === 'a' ? A : B; out[t] = w[t]; out[h] = w[h]; }
   return compact(out);
 }
-export const prefsWinner = (A, B) => (A.pt > B.pt || (A.pt === B.pt && A.ph >= B.ph) ? 'a' : 'b');
+// 'a' or 'b': whose stamp is newer (ties: the larger hash, so the choice is the same in any order).
+export const prefsWinner = (A, B, t = 'pt', h = 'ph') => (A[t] > B[t] || (A[t] === B[t] && A[h] >= B[h]) ? 'a' : 'b');
 
 // More than MAX_DEV devices: the least recently active fold into OVER (same sums on this
 // device) and their ids are remembered in `gone`, so if one comes back it is ignored rather

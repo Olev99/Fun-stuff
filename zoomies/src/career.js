@@ -430,7 +430,7 @@ export function cleanCareer(saved, dev = deviceId()) {
   }
   c.upgrades = {};
   c.pv = 2;
-  normalizeShop(c);
+  // (normalizeShop runs once the ledger has rebuilt the parts; a copy's own parts field is not trusted.)
   c.stars = mapObj(saved.stars, (v) => (Number.isFinite(v) ? count(v, 3) : undefined));
   const flag = (v) => (typeof v === 'boolean' || Number.isFinite(v) || isStr(v) ? v : undefined);
   c.done = mapObj(saved.done, flag);
@@ -461,6 +461,9 @@ export function cleanCareer(saved, dev = deviceId()) {
   normalizeShop(c);
   // Legend Rank rewards follow from the League stars, so a merged or imported save has exactly the ones it has earned.
   enforceLeagueRewards(c);
+  // A fix-up above (a fitted part no longer owned, say) is a new version: one tick later, so two
+  // devices that fixed it up differently still agree on which one wins.
+  for (const [t, hk, h] of [['pt', 'ph', prefsHash(c)], ['lt', 'lh', fitHash(c)]]) if (c.led[hk] && c.led[hk] !== h) { c.led[hk] = h; c.led[t]++; }
   return c;
 }
 
@@ -504,37 +507,49 @@ function harvest(c) {
 }
 
 // What the ledger and the claims say the save holds.
+// `raw` is the same before clamping (in debt, or more parts than MAX_PARTS).
 function view(c) {
   const T = totals(c.led), R = claims(c, count(T.x));
-  const parts = {}, sold = {}, soldFor = {};
+  const parts = {}, sold = {}, soldFor = {}, rawParts = {};
   let debt = 0;
   for (const id of new Set([...Object.keys(T.pa), ...Object.keys(T.ps), ...Object.keys(R.parts)])) {
     if (!isPart(id)) continue; // a part from a newer version: kept in the ledger, not shown
     const raw = (T.pa[id] || 0) + (R.parts[id] || 0) - (T.ps[id] || 0);
+    if (raw) rawParts[id] = raw;
     if (raw > 0) parts[id] = Math.min(MAX_PARTS, raw);
     // The same copy sold on two devices: the second sale's coins are taken back.
     else if (raw < 0) debt += -raw * Math.max(EARNED_SELL, Math.ceil((T.pv[id] || 0) / (T.ps[id] || 1)));
     if (T.ps[id]) sold[id] = Math.min(MAX_SOLD, T.ps[id]);
     if (T.pv[id]) soldFor[id] = T.pv[id];
   }
+  const raw = { coins: T.e - T.s + R.coins - debt, freeCaps: T.ke - T.ku + R.caps, parts: rawParts };
   return {
-    coins: count(T.e - T.s + R.coins - debt), freeCaps: count(T.ke - T.ku + R.caps), xp: count(T.x), earned: count(T.n + R.coins),
-    parts, sold, soldFor, st: T.st,
+    coins: count(raw.coins), freeCaps: count(raw.freeCaps), xp: count(T.x), earned: count(T.n + R.coins),
+    parts, sold, soldFor, st: T.st, raw,
   };
 }
 
+// Sets the visible numbers from the ledger. Where they had to be clamped, the offset is kept
+// (led.off) so the next reconcile measures this device's change from what it really showed.
 function applyLedger(c) {
   const v = view(c);
   for (const k of ['coins', 'freeCaps', 'xp', 'earned', 'parts', 'sold', 'soldFor']) c[k] = v[k];
+  const off = {}, p = {};
+  if (v.coins !== v.raw.coins) off.c = v.coins - v.raw.coins;
+  if (v.freeCaps !== v.raw.freeCaps) off.k = v.freeCaps - v.raw.freeCaps;
+  for (const [id, r] of Object.entries(v.raw.parts)) if ((v.parts[id] || 0) !== r) p[id] = (v.parts[id] || 0) - r;
+  if (Object.keys(p).length) off.p = p;
+  c.led.off = off;
   for (const [k, x] of Object.entries(c.stats)) if (isCounter(k, x)) delete c.stats[k];
   for (const [k, x] of Object.entries(v.st)) if (!Array.isArray(c.stats[k]) && !BEST_STATS.includes(k)) c.stats[k] = x;
   return c;
 }
 
-// Short hash of what you drive and wear, to stamp when it last changed.
-const PREFS = ['racer', 'body', 'paint', 'hat', 'trail', 'horn', 'loadouts'];
-function prefsHash(c) {
-  const s = JSON.stringify(PREFS.map((k) => c[k]));
+// Short hashes of what you drive and wear, and of the fitted parts, to stamp when each last changed.
+const PREFS = ['racer', 'body', 'paint', 'hat', 'trail', 'horn'];
+const prefsHash = (c) => hash36(JSON.stringify(PREFS.map((k) => c[k])));
+const fitHash = (c) => hash36(JSON.stringify(c.loadouts));
+function hash36(s) {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
   return (h >>> 0).toString(36);
@@ -549,22 +564,24 @@ export function reconcile(c, dev = deviceId()) {
   // XP first: level capsules follow from it.
   const x0 = count(c.xp) - count(totals(c.led).x);
   if (x0 > 0) credit(c.led, dev, { x: x0 });
-  const v = view(c), d = { st: {}, pa: {}, ps: {}, pv: {} };
+  // The base is what the ledger says now (with any new claims) plus the clamp offset it was shown with.
+  const v = view(c), d = { st: {}, pa: {}, ps: {}, pv: {} }, off = c.led.off || {}, offP = off.p || {};
   const up = (now, base, plus, minus) => { const x = count(now) - base; if (x > 0 && plus) d[plus] = x; if (x < 0 && minus) d[minus] = -x; };
-  up(c.coins, v.coins, 'e', 's');
-  up(c.freeCaps, v.freeCaps, 'ke', 'ku');
+  up(c.coins, v.raw.coins + (off.c || 0), 'e', 's');
+  up(c.freeCaps, v.raw.freeCaps + (off.k || 0), 'ke', 'ku');
   up(c.earned, v.earned, 'n');
-  for (const id of new Set([...Object.keys(c.parts || {}), ...Object.keys(v.parts)])) {
+  for (const id of new Set([...Object.keys(c.parts || {}), ...Object.keys(v.raw.parts), ...Object.keys(offP)])) {
     if (!isPart(id)) continue;
-    const x = count((c.parts || {})[id], MAX_PARTS) - (v.parts[id] || 0);
+    const x = count((c.parts || {})[id], MAX_PARTS) - ((v.raw.parts[id] || 0) + (offP[id] || 0));
     if (x > 0) d.pa[id] = x; else if (x < 0) d.ps[id] = -x;
   }
   for (const [id, n] of Object.entries(c.soldFor || {})) if (isPart(id) && count(n) > (v.soldFor[id] || 0)) d.pv[id] = count(n) - (v.soldFor[id] || 0);
   for (const [k, n] of Object.entries(c.stats)) if (isCounter(k, n) && STAT_KEY.test(k) && count(n) > (v.st[k] || 0)) d.st[k] = count(n) - (v.st[k] || 0);
   credit(c.led, dev, d);
   // First stamp (new or old save): no claim to be recent, so a fresh device never overrides your choices.
-  const h = prefsHash(c);
-  if (!c.led.ph) { c.led.ph = h; c.led.pt = count(c.xp); } else if (h !== c.led.ph) { c.led.ph = h; c.led.pt = Math.max(Date.now(), c.led.pt + 1); }
+  for (const [t, hk, h] of [['pt', 'ph', prefsHash(c)], ['lt', 'lh', fitHash(c)]]) {
+    if (!c.led[hk]) { c.led[hk] = h; c.led[t] = count(c.xp); } else if (h !== c.led[hk]) { c.led[hk] = h; c.led[t] = Math.max(Date.now(), c.led[t] + 1); }
+  }
   return applyLedger(c);
 }
 
@@ -579,6 +596,7 @@ function legacyLedger(c, sync) {
   const n = Math.max(0, c.earned - R.coins), X = c.coins - R.coins, e = Math.max(0, n, X), Y = c.freeCaps - R.caps;
   for (const [k, x] of Object.entries(c.stats)) if (isCounter(k, x) && STAT_KEY.test(k)) st[k] = x;
   for (const id of new Set([...Object.keys(c.parts), ...Object.keys(c.sold), ...Object.keys(R.parts)])) {
+    if (!isPart(id)) continue;
     const net = (c.parts[id] || 0) - (R.parts[id] || 0), sd = c.sold[id] || 0;
     pa[id] = Math.max(0, net + sd);
     ps[id] = pa[id] - net;
@@ -587,8 +605,8 @@ function legacyLedger(c, sync) {
   c.led.d[id] = { e, s: e - X, n, ke: Math.max(0, Y), ku: Math.max(0, -Y), x: c.xp, st, pa, ps };
   c.led = cleanLedger(c.led);
   harvest(c);
-  c.led.ph = prefsHash(c);
-  c.led.pt = count(c.xp);
+  c.led.ph = prefsHash(c); c.led.lh = fitHash(c);
+  c.led.pt = c.led.lt = count(c.xp);
 }
 
 export function loadCareer() {

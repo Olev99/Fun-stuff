@@ -23,7 +23,9 @@
 //     } },
 //     gone: [ids],                devices folded into '~' (ignored if they come back)
 //     cl: { dd, md, wk },         claim bit sets (hex): Daily, all-missions days, Weekly weeks
-//     pt, ph,                     when and what (hash) you drive and wear was last changed
+//     pt, ph, lt, lh,             when and what (hash) you drive and wear, and the fitted
+//                                 parts, were last changed (each taken from the newer side)
+//     off,                        clamp offsets of the numbers last shown (local bookkeeping)
 //   }
 //
 // Visible values are derived, never merged directly:
@@ -45,8 +47,8 @@
 // lineage, 'L' + their old sync id: two copies of the same old save are taken whole
 // (more XP wins, then less money left), so restoring an old backup again adds nothing.
 // More than MAX_DEV devices: the least recently active fold into '~'.
-// Everything else merges by union, max or min; what you drive and wear comes from
-// the save that changed it last.
+// Everything else merges by union, max or min; what you drive and wear, and the
+// fitted parts, come from the save that changed them last.
 
 import qrcode from '../vendor/qrcode.mjs';
 import { PeerTransport, LocalTransport, NetSession, makeCode } from './net.js';
@@ -124,7 +126,7 @@ export function mergeCareer(A, B, dev = deviceId()) {
   m.sockets = maxOf(a.sockets, b.sockets);
   m.drops = both(a.drops, b.drops, pick);
   m.pnew = !!(a.pnew || b.pnew);
-  m.loadouts = { ...other.loadouts, ...win.loadouts };
+  m.loadouts = (prefsWinner(a.led, b.led, 'lt', 'lh') === 'a' ? a : b).loadouts;
   m.upgrades = {};
   m.pv = 2;
   // Career events: most stars, first clears, best times.
