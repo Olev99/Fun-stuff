@@ -208,6 +208,7 @@ export class Race {
     this._v = new THREE.Vector3();
     this.rocket = { pressT: -1 };
     this.netClock = 0;
+    this.evClock = 0;
     this.placeCam(true);
   }
 
@@ -313,6 +314,10 @@ export class Race {
     }
 
     this._rubberBand();
+    // Track events run on a clock that never goes back: a guest's netClock snaps to each
+    // host snapshot and can step back by the network jitter, which would end and restart
+    // an event (losing its marks). The host's is its own clock, unchanged.
+    this.evClock = this.net && this.net.isGuest ? Math.max(this.evClock, this.netClock) : this.netClock;
     if (this.evs) this.evs.update(dt);
 
     const steps = Math.min(5, Math.max(1, Math.ceil(dt / PHYS_DT - 0.01)));
