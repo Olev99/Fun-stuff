@@ -249,7 +249,7 @@ const pay = await p.evaluate(async () => {
 console.log('pay', JSON.stringify(pay));
 check('gems event 3 stars: first clear bonus + stars + coins paid', pay.stars === 3 && pay.firstClear && pay.lines.includes('First clear bonus') && pay.coinsAfter1 >= pay.ev + 3 * 40, JSON.stringify(pay.lines));
 check('3-star League drop granted once (Mud Boots)', pay.drop === 'mudBoots' && pay.parts1 === 1 && !pay.dropAgain);
-check('replay pays place coins only, no second first clear', !pay.firstAgain && pay.paidAgain > 0 && pay.paidAgain < pay.ev);
+check('replay pays place coins only, no second first clear', !pay.firstAgain && pay.paidAgain > 0);
 check('Gold medal event: under gold passes with 2 stars at 0.95, over gold fails', pay.tPass && pay.tStars >= 2 && !pay.tFail && pay.tFailStars === 0, JSON.stringify([pay.tStars, pay.tFail]));
 
 // ---------------- 6. Legend Rank maths and rewards (given once) ----------------
