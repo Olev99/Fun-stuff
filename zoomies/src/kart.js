@@ -36,6 +36,7 @@ export function kartShared(shadowTex) {
     _shadowGeo.userData.shared = true;
   }
   if (!_shadowMat || _shadowMat.map !== shadowTex) {
+    if (_shadowMat) _shadowMat.dispose(); // the last race's (its map went with that race)
     _shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, color: '#000000', opacity: 1 });
     _shadowMat.userData.shared = true;
     _shadowMat.map.userData.shared = true;

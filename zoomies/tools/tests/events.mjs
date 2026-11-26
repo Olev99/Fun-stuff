@@ -10,7 +10,7 @@ mkdirSync('ev', { recursive: true });
 const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true });
 ctx.setDefaultTimeout(180000);
-const url = 'http://localhost:8000/index.html';
+const url = `http://localhost:${process.env.ZPORT || 8000}/index.html`;
 let errors = 0;
 const fail = (msg) => { errors++; console.log('FAIL', msg); };
 const ok = (cond, msg) => (cond ? console.log('ok  ', msg) : fail(msg));

@@ -441,7 +441,7 @@ export class Battle {
 
   dispose() {
     for (const k of this.race.karts) {
-      for (const g of k.balloonMeshes || []) g.userData.b.material.dispose();
+      for (const g of k.balloonMeshes || []) { g.userData.b.material.dispose(); g.userData.s.material.dispose(); }
     }
   }
 }

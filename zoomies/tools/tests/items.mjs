@@ -5,7 +5,7 @@ const p = await b.newPage({ viewport: { width: 852, height: 393 } });
 const errs = [];
 p.on('pageerror', e => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 600)); });
 p.on('console', m => { if (m.type() === 'error' && !m.text().includes('Failed to load')) { errs.push(m.text()); console.log('[err]', m.text().slice(0, 300)); } });
-await p.goto('http://localhost:8000/index.html');
+await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`);
 await p.waitForTimeout(3500);
 const log = await p.evaluate(() => {
   const a = window.zoomies;

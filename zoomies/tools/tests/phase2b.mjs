@@ -12,7 +12,7 @@ const watch = (pg) => {
   pg.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('Failed to load resource')) console.log('[console]', m.text().slice(0, 300)); });
 };
 watch(p);
-const URL = 'http://localhost:8000/index.html';
+const URL = `http://localhost:${process.env.ZPORT || 8000}/index.html`;
 const KEY = 'zoomies-career-v1';
 const boot = async (save) => {
   await p.close();
