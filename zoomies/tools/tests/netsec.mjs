@@ -94,6 +94,37 @@ if (parts.includes('leak')) {
   await ctx.close();
 }
 
+// ---- crash: an exception in the frame loop ----
+if (parts.includes('crash')) {
+  const ctx = await lowCtx();
+  const p = await page(ctx, 'crash');
+  await p.evaluate(() => {
+    const a = window.zoomies;
+    a.startRace({ mode: 'quick', trackId: 'sprout', reverse: false, player: 'mochi', grid: ['mochi', 'pip'], speedClass: 'zoom' });
+    a.race.skipIntro = true;
+    const up = a.race.update.bind(a.race);
+    let once = true;
+    a.race.update = (dt) => { if (once) { once = false; throw new Error('one slip'); } up(dt); };
+    a.paused = false;
+  });
+  await p.waitForTimeout(1500);
+  const one = await p.evaluate(() => [window.zoomies.ui.current, window.zoomies.race.time]);
+  check(one[0] !== 'oops' && one[1] > 0, `one error is let go and the race keeps running (${one[0]}, t=${one[1].toFixed(2)})`);
+  await p.evaluate(() => { window.zoomies.race.update = () => { throw new Error('boom-in-update'); }; });
+  await p.waitForFunction(() => window.zoomies.ui.current === 'oops', null, { timeout: 20000 }).catch(() => {});
+  const shown = await p.evaluate(() => [window.zoomies.ui.current, document.getElementById('oops-text').value, document.activeElement && document.activeElement.id]);
+  await p.screenshot({ path: 'crash-screen.png' });
+  check(shown[0] === 'oops' && shown[1].includes('boom-in-update'), `repeated errors show the error screen with the error text (${shown[0]})`);
+  check(shown[2] === 'oops-menu', 'Back to menu has the keyboard focus');
+  await p.keyboard.press('Enter');
+  await p.waitForTimeout(1500);
+  const back = await p.evaluate(() => { const a = window.zoomies; return [a.ui.current, a.race && a.race.mode, a.paused, a.race && a.race.time]; });
+  await p.waitForTimeout(800);
+  const t2 = await p.evaluate(() => window.zoomies.race && window.zoomies.race.time);
+  check(back[0] === 'title' && back[1] === 'demo' && !back[2] && t2 > back[3], `Back to menu returns to the title with a running demo (${back.join(' ')} -> ${t2 && t2.toFixed(2)})`);
+  await ctx.close();
+}
+
 // ---- wire: long messages travel in pieces; too long fails loudly ----
 if (parts.includes('wire')) {
   const { ctx, A, B } = await lobby('?net=local');
