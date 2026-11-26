@@ -23,6 +23,29 @@ export class SafeUI {
     $('bk-replace').addEventListener('click', () => this._replace());
     $('ver-label').textContent = `About · v${version}`;
     $('ab-version').textContent = `Version ${version}`;
+    // A save that could not be written (storage full or private mode): say so once a minute, offer a backup.
+    this.failT = 0;
+    window.addEventListener('zoomies-save-failed', () => this.saveFailed());
+  }
+
+  saveFailed() {
+    if (Date.now() - this.failT < 60000) return;
+    this.failT = Date.now();
+    let el = $('save-fail');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'save-fail';
+      el.setAttribute('role', 'alert');
+      el.style.cssText = 'position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:9999;max-width:calc(100vw - 32px);'
+        + 'display:flex;gap:10px;align-items:center;padding:8px 10px 8px 14px;border-radius:12px;background:#1d1537;color:#fff;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+      el.innerHTML = '<span>Could not save your progress on this device (storage full or private mode).</span>'
+        + '<button class="btn mint small" type="button">Back up now</button><button class="btn alt small" type="button" aria-label="Close">✕</button>';
+      const [go, x] = el.querySelectorAll('button');
+      go.addEventListener('click', () => { el.hidden = true; this.open('backup'); });
+      x.addEventListener('click', () => { el.hidden = true; });
+      document.body.appendChild(el);
+    }
+    el.hidden = false;
   }
 
   // Open 'backup', 'restore' (the same screen, aimed at the paste box), 'about' or run 'repair'.
@@ -123,7 +146,7 @@ export class SafeUI {
 
   _apply(mode) {
     if (!this.read) return;
-    applyBackup(this.app, this.read, mode);
+    if (!applyBackup(this.app, this.read, mode)) { $('bk-msg').className = 'bk-msg'; $('bk-msg').textContent = 'This device could not store it (storage full or private mode). Free some space and try again.'; return; }
     $('bk-msg').className = 'bk-msg ok';
     $('bk-msg').textContent = 'Restored! Restarting…';
     $('bk-preview').hidden = true;

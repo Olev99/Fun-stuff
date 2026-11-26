@@ -3,7 +3,7 @@ const ID = process.argv[2] || 'barnyard';
 const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
 const errs = []; p.on('pageerror', e => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 600)); });
-await p.goto('http://localhost:8000/index.html');
+await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`);
 await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
 // Headless: let the player be driven by the battle AI, run a whole battle in sim time.
 const out = await p.evaluate(async (id) => {

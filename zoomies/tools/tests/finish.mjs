@@ -12,7 +12,7 @@ const open = async (w, h, mobile) => {
   const p = await ctx.newPage();
   p.setDefaultTimeout(90000);
   p.on('pageerror', (e) => { errs.push(e.message); console.log('[pageerror]', e.message, e.stack?.slice(0, 500)); });
-  await p.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
   await p.evaluate(() => { window.zoomies.paused = true; });
   return p;

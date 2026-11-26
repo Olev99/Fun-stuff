@@ -8,7 +8,7 @@ const errs = [];
 for (const [n, p] of [['A', A], ['B', B]]) {
   p.on('pageerror', e => { errs.push(e.message); console.log(`[${n} pageerror]`, e.message, e.stack?.slice(0, 500)); });
 }
-const url = 'http://localhost:8000/index.html?net=local&lag=40';
+const url = `http://localhost:${process.env.ZPORT || 8000}/index.html?net=local&lag=40`;
 // Load A first and freeze its menu demo race before B loads: a running software-rendered demo
 // starves the second page's load (it took ~28 s of the 30 s limit once the world got richer).
 await A.goto(url); await A.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });

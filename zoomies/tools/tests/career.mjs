@@ -17,7 +17,7 @@ const boot = async (save) => {
   await p.close();
   p = await ctx.newPage();
   watch(p);
-  await p.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.evaluate(([k, s]) => { localStorage.removeItem(k); if (s) localStorage.setItem(k, JSON.stringify(s)); }, [KEY, save || null]);
   await p.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
@@ -404,7 +404,7 @@ const dctx = await b.newContext({ viewport: { width: 1470, height: 860 } });
 const d = await dctx.newPage();
 d.on('pageerror', e => { errs.push(e.message); console.log('[pageerror desktop]', e.message); });
 d.setDefaultTimeout(90000);
-await d.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+await d.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`, { waitUntil: 'domcontentloaded', timeout: 90000 });
 await d.evaluate(([k]) => { localStorage.setItem(k, JSON.stringify({ v: 1, pv: 2, coins: 2400, racer: 'mochi', racers: ['mochi'], body: 'classic', bodies: ['buggy', 'classic'], paint: 'stock', paints: ['stock'], stars: { 'c1-0': 3, 'c1-1': 3, 'c1-2': 2 }, done: { 'c1-0': true, 'c1-1': true, 'c1-2': true, 'c1-3': true, 'c1-b': true }, seen: { 'c1-prologue': true, 'c1-intro': true, 'c1-outro': true, 'c1-boss': true }, beaten: ['hopper', 'pip'], xp: 1500, parts: { engine1: 1, engine2: 1, tyres1: 1, tyres2: 1, turbo1: 1, armor1: 1, driftSpring: 1, gemVac: 1 }, bought: { engine2: 1 }, loadouts: { classic: { cur: ['engine2', 'tyres1', 'driftSpring'], pre: [['tyres2', 'armor1', 'gemVac'], ['engine2', 'turbo1', 'driftSpring'], []] } }, sockets: {}, drops: { 'c1-0': 'engine1', 'c1-b': 'driftSpring' }, pnew: true })); }, [KEY]);
 await d.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
 await d.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });

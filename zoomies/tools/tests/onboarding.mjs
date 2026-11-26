@@ -16,7 +16,7 @@ const open = async (touch) => {
   const ctx = await b.newContext(touch ? { viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true } : { viewport: { width: 1470, height: 860 } });
   const p = await ctx.newPage();
   watch(p);
-  await p.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 90000 });
   await p.waitForTimeout(800);
   return p;

@@ -4,7 +4,7 @@ const ctx = await b.newContext({ viewport: { width: 852, height: 393 }, isMobile
 const p = await ctx.newPage();
 p.on('console', m => { if (['error'].includes(m.type()) && !m.text().includes('Failed to load resource')) console.log('[console]', m.text().slice(0, 400)); });
 p.on('pageerror', e => console.log('[pageerror]', e.message, e.stack?.slice(0, 600)));
-await p.goto('http://localhost:8000/index.html');
+await p.goto(`http://localhost:${process.env.ZPORT || 8000}/index.html`);
 await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 30000 });
 const trackIds = (process.argv[2] || 'sprout,coral,dunes,frost,candy,neon,magma,cloud').split(',');
 const diffArg = process.argv[3] || 'normal';
