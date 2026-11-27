@@ -1190,7 +1190,7 @@ export class ItemSystem {
         const lob = type.startsWith('lob-');
         const mesh = this._projMesh(lob ? 'lob' : type, lob ? type.slice(4) : null);
         this.group.add(mesh);
-        p = { id, type: lob ? 'lob' : type, mesh, pos: mesh.position, owner: karts[oi] || null, age: 0, target: new THREE.Vector3(x, y, z) };
+        p = { id, type: lob ? 'lob' : type, mesh, pos: mesh.position, owner: (Number.isInteger(oi) && karts[oi]) || null, age: 0, target: new THREE.Vector3(x, y, z) };
         mesh.position.set(x, y, z);
         this.projectiles.push(p);
       }
@@ -1212,7 +1212,7 @@ export class ItemSystem {
         mesh.position.set(x, y, z);
         if (oil) mesh.scale.setScalar(3.2);
         this.group.add(mesh);
-        this.hazards.push({ id, type, mesh, pos: mesh.position, s: 0, d: 0, path: this.track, owner: karts[oi] || null, grace: 0.6, life: 99, r: oil ? 3.2 : 1.6 });
+        this.hazards.push({ id, type, mesh, pos: mesh.position, s: 0, d: 0, path: this.track, owner: (Number.isInteger(oi) && karts[oi]) || null, grace: 0.6, life: 99, r: oil ? 3.2 : 1.6 });
       }
     }
     for (const h of [...this.hazards]) if (!hseen.has(h.id)) this.removeHazard(h);

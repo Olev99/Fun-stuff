@@ -985,7 +985,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
 .bk-facts { display: flex; flex-wrap: wrap; gap: 6px; }
 .bk-facts span { font-family: var(--font-display); font-size: 12.5px; padding: 5px 9px 4px; border-radius: 10px; background: var(--ink-3); color: var(--cream); }
 .bk-facts b { font-weight: 400; color: var(--sun); }
-#bk-code, #bk-paste {
+#bk-code, #bk-paste, #oops-text {
   width: 100%; resize: none; font: 600 12px/1.3 ui-monospace, Menlo, monospace; padding: 7px 9px; border-radius: 10px; border: 3px solid var(--ink);
   background: var(--cream); color: var(--ink); -webkit-user-select: text; user-select: text; touch-action: manipulation; word-break: break-all;
 }
@@ -1616,6 +1616,15 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
       <button class="btn alt" data-go="settings">Settings</button>
       <button class="btn ghost" data-go="quit">Quit to menu</button>
     </div>
+  </div>
+</section>
+
+<section id="scr-oops" class="screen center shade-full" hidden>
+  <div class="dialog panel" style="width:min(440px,100%)">
+    <h2 class="title">Something went wrong</h2>
+    <p class="bk-note">The game hit a problem and stopped. Back to the menu should get you going again. If it keeps happening, copy the details below and send them to us.</p>
+    <textarea id="oops-text" readonly rows="4" spellcheck="false" aria-label="Error details"></textarea>
+    <div class="bottom-bar"><button class="btn alt small" id="oops-copy" data-go="copy">Copy error</button><button class="btn hot" id="oops-menu" data-go="menu">Back to menu</button></div>
   </div>
 </section>
 

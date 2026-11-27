@@ -1369,7 +1369,7 @@ export class TrackEvents {
     this.vis = 0;
     for (const it of Object.values(this.inst)) it.n = 0;
     const running = race.state === 'race' || race.state === 'finished';
-    const t = race.netClock;
+    const t = race.evClock;
     // The event whose window we are in (they never overlap).
     let e = null;
     if (running) for (const s of this.sched) if (t >= s.warnAt && t < s.end) { e = s; break; }

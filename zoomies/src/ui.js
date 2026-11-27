@@ -124,6 +124,10 @@ export class UI {
       case 'results':
         app.onResultsAction(action);
         break;
+      case 'oops':
+        if (action === 'menu') app.recover();
+        else if (action === 'copy') this._copyOops();
+        break;
       case 'career':
         app.careerUI.action(action);
         break;
@@ -870,6 +874,23 @@ export class UI {
       $('tilt-dot').style.transform = `translateX(${v * 70}px)`;
       if (inp.tiltLive) $('tilt-status').textContent = `Working. Angle ${Math.round(inp.tilt.angle)}°`;
     }
+  }
+
+  // The error screen (main.js onCrash).
+  oops(text) {
+    $('oops-text').value = text;
+    this.show('oops');
+    $('oops-menu').focus();
+  }
+
+  async _copyOops() {
+    const t = $('oops-text'), b = $('oops-copy');
+    let ok = false;
+    try { await navigator.clipboard.writeText(t.value); ok = true; } catch (e) {
+      try { t.focus(); t.select(); ok = document.execCommand('copy'); } catch (e2) { /* selected for a manual copy */ }
+    }
+    b.textContent = ok ? 'Copied!' : 'Press and hold to copy';
+    setTimeout(() => { b.textContent = 'Copy error'; }, 2000);
   }
 
   // ---------------- Multiplayer lobby ----------------

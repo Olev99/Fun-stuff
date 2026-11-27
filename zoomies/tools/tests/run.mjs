@@ -7,7 +7,7 @@
 //   node run.mjs battle-sim crater   one suite, with its own arguments
 //   node run.mjs balance      opt-in: seeded AI races, balance bands (report: node ../balance.mjs)
 //
-// It serves zoomies/ on http://localhost:8000 (or uses a server already
+// It serves zoomies/ on http://localhost:8000 ($ZPORT if set; or uses a server already
 // running there) and runs each script in zoomies/test-out/, where the
 // screenshots land. A suite fails on a non-zero exit, a page error, a
 // non-zero "errors N" line or a logged Content Security Policy violation.
@@ -37,6 +37,7 @@ const SUITES = {
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
   syncflow: ['syncflow.mjs', [], 8],
+  netsec: ['netsec.mjs', [], 15], // online hardening, GPU leaks, the crash screen
   events: ['events.mjs', [], 25],
   eventsint: ['eventsint.mjs', [], 20],
   shortcuts: ['shortcuts.mjs', [], 25],

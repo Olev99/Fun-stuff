@@ -153,6 +153,10 @@ class App {
     addEventListener('keydown', (e) => this.onKey(e));
     $('podium-ui').addEventListener('click', () => { if (this.race) this.race.endPodium(); });
     this.canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
+    // Errors outside the frame loop: remembered for the error screen; uncaught ones count
+    // towards it (a refused promise is usually a browser saying no, so it does not).
+    addEventListener('error', (e) => this.onCrash(e.error || e.message));
+    addEventListener('unhandledrejection', (e) => this.onCrash(e.reason, false));
     this.canvas.addEventListener('webglcontextrestored', () => location.reload());
 
     this.toTitle();
@@ -1102,7 +1106,13 @@ class App {
       this.ui.lobby('start', reason || 'Disconnected.');
     };
     ses.onError = (e) => {
-      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', (e && e.message) || 'Connection problem.');
+      const msg = ((e && e.message) || 'Connection problem.').slice(0, 140);
+      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', msg);
+      else if (performance.now() - (this._netErrAt ?? -1e9) > 8000) { // say it, but not every frame
+        this._netErrAt = performance.now();
+        if (this.ui.current === 'lobby') document.getElementById('lobby-error').textContent = msg;
+        else this.hud.toast(`Connection problem: ${msg}`);
+      }
     };
     ses.onStart = (cfg) => this.startNetRace(cfg);
     ses.onToLobby = () => this.returnToLobbyView();
@@ -1289,6 +1299,42 @@ class App {
   // ---------------- loop ----------------
   loop(now) {
     requestAnimationFrame(this.loop);
+    try {
+      this._frame(now);
+    } catch (e) {
+      this.onCrash(e);
+    }
+  }
+
+  // Something threw. One slip is let go; a few within seconds stop the game behind the
+  // error screen (Back to menu, and the error text to copy for a report).
+  onCrash(err, counts = true) {
+    if (!this.ui || this.ui.current === 'oops') return;
+    console.error(err);
+    this.lastError = `${VERSION} · ${platformName}\n${String((err && err.stack) || err).slice(0, 1500)}`;
+    if (!counts) return;
+    const now = performance.now();
+    if (now - (this._errAt ?? -1e9) > 5000) this._errN = 0;
+    this._errAt = now;
+    if (++this._errN < 3) return;
+    this.paused = true;
+    try { this.audio.stopEngine(); this.hud.show(false); } catch (e) { /* the screen matters more */ }
+    this.ui.oops(this.lastError);
+  }
+
+  // Back to menu from the error screen, letting go of whatever race broke.
+  recover() {
+    this._errN = 0;
+    this.menuOpen = false;
+    const r = this.race;
+    this.race = null;
+    this.view = null;
+    try { if (r) r.dispose(); } catch (e) { /* half broken: drop it */ }
+    if (this.session) this.leaveMP();
+    else this.toTitle();
+  }
+
+  _frame(now) {
     let dt = (now - this.last) / 1000;
     this.last = now;
     if (dt <= 0) return;
