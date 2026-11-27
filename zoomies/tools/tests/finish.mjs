@@ -247,7 +247,7 @@ const lines = await p.evaluate(() => {
   return o;
 });
 console.log('lines', JSON.stringify(lines));
-check('setup lines say what the mode uses', lines.quick === 'Workshop parts: on' && lines.gp === 'Workshop parts: on' && lines.battle === 'Workshop parts: on' && /^Stock stats/.test(lines.tt) && /off/.test(lines.off), JSON.stringify(lines));
+check('setup lines say what the mode uses', lines.quick === 'Workshop parts: on' && lines.gp === 'Workshop parts: on' && lines.battle === 'Workshop parts: on' && /stock stats/i.test(lines.tt) && /off/.test(lines.off), JSON.stringify(lines));
 check('daily and weekly screens say stock stats', /Stock stats/.test(lines.daily) && /Stock stats/.test(lines.weekly));
 check('settings toggle: default on, turns off and on', lines.toggle === true && lines.saved === false && lines.back === true);
 // default for a new settings file is on

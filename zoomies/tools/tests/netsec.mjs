@@ -12,9 +12,10 @@
 //           without it falls back to the reliable channel
 // node netsec.mjs [part,part...]   (all parts by default)
 import { chromium } from 'playwright-core';
+import { CHROME_PATH } from './chrome.mjs';
 const parts = (process.argv[2] || 'leak,crash,wire,clock,trust,loss,rtc').split(',');
 const PORT = process.env.ZPORT || 8000;
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 let fails = 0;
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) fails++; };
 

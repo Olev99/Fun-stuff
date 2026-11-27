@@ -5,6 +5,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { CHROME_PATH } from './chrome.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -127,7 +128,7 @@ check('League season multipliers 2.6/2.9/3.2', L.LEAGUE.map((s) => s.mult).join(
 }
 
 // ---- the real app ----
-const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 852, height: 393 }, isMobile: true, hasTouch: true })).newPage();
 p.setDefaultTimeout(60000);
 p.on('pageerror', (e) => console.log('[pageerror]', e.message));
