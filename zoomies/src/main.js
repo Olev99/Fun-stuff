@@ -32,7 +32,7 @@ import { NetSession } from './net.js';
 import { PostFX } from './post.js';
 import { installHeightFog } from './env.js';
 import {
-  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult, evPlan, evSeedFor,
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, paintById, aiLoadouts, applyResult, evPlan, evSeedFor,
 } from './career.js';
 import { kitOf } from './workshop.js';
 
@@ -343,7 +343,7 @@ class App {
   // such as a career rival), the player in the middle of the pack.
   makeGrid(player, gpOrder = null, must = []) {
     if (gpOrder) return gpOrder;
-    const req = must.filter((id) => id && id !== player);
+    const req = [...new Set(must.filter((id) => id && id !== player))]; // a rival can also be on the returning list: one seat each
     const pool = shuffle(CHARACTERS.map((c) => c.id).filter((id) => id !== player && !req.includes(id)));
     const others = shuffle([...req, ...pool.slice(0, 7 - req.length)]);
     others.splice(5, 0, player);
@@ -392,7 +392,8 @@ class App {
     const id = this.settings.vehicle;
     const lvl = levelOf((this.career && this.career.xp) || 0).level;
     const body = BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic';
-    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body) } : { body };
+    const paint = this.career ? paintById(this.career.paint).color : null; // bought, jackpot and League paints show in every mode
+    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body), paint } : { body, paint };
   }
 
   // The Settings toggle 'Use Workshop parts in quick modes' (default on).
@@ -437,7 +438,7 @@ class App {
     const def0 = trackById(cfg.trackId);
     const trackDef = cfg.evOnly && def0.events ? { ...def0, events: def0.events.filter((id) => cfg.evOnly.includes(id)) } : def0;
     this.race = new Race(this, {
-      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
+      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.mode === 'tt' && !cfg.careerEv ? 'zoom' : cfg.speedClass, // free Time Trial is always Zoom: fair records
       difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
       look: lookOf(this.career), ghost: cfg.ghost || null, evMode, evSeed,
@@ -726,7 +727,7 @@ class App {
     const lines = [];
     let title = pass ? 'Challenge complete!' : 'Not quite!';
     if (pass) {
-      const dr = completeDaily(this.career);
+      const dr = completeDaily(this.career, d.day);
       if (dr) {
         lines.push(`🔥 ${dr.streak}-day streak! Daily reward: a free prize capsule 🍬 · +${dr.xp} XP`);
         sum.coins += dr.coins;
@@ -811,8 +812,7 @@ class App {
     const msg = me.place === 1 ? `You won the <em>${gp.cup.name}</em>!` : `You finished <em>${me.place}${ordinal(me.place).toLowerCase()}</em> overall`;
     this.audio.play(me.place <= 3 ? 'finish' : 'lose');
     if (me.place === 1) addToSet(this.career, 'cups', gp.cup.id);
-    const bonus = [150, 90, 60][me.place - 1] || 20;
-    const rw = this.rewardsFinish(grant(this.career, bonus, me.place <= 3 ? 150 : 50), [`Cup bonus for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
+    const rw = this.rewardsFinish(grant(this.career, 0, me.place <= 3 ? 150 : 50), [`Cup XP for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
     this.ui.results({
       title: 'Final standings',
       sub: gp.cup.name,

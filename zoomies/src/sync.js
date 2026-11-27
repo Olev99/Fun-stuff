@@ -110,6 +110,7 @@ export function mergeCareer(A, B, dev = deviceId()) {
   // A bounded "highest day seen" (economy rules): the later one.
   const dm = [a.dayMax, b.dayMax].filter((x) => x !== undefined);
   if (dm.length) m.dayMax = dm.reduce((p, q) => (q > p ? q : p));
+  m.pity = Math.min(num(a.pity), num(b.pity)); // prize-machine pity counter: the lower one, so a sync never helps farm it
   const maxOf = (x, y) => {
     const out = {};
     for (const k of union(Object.keys(x || {}), Object.keys(y || {}))) out[k] = Math.max(num((x || {})[k]), num((y || {})[k]));

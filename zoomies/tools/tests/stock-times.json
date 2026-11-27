@@ -1,0 +1,10 @@
+{
+  "_note": "Best of several Hard-AI stock Time Trial runs per track:class (node tools/medal-times.mjs 4 sprout:chill:buggy,coral:chill:buggy,glacier:zoom,maple:zoom,neon:zoom,cloud:turbo,moon:turbo, plus an earlier 2-run pass). Story time targets must stay at or above these.",
+  "sprout:chill": 98.93,
+  "coral:chill": 99,
+  "glacier:zoom": 165.87,
+  "maple:zoom": 129.27,
+  "neon:zoom": 144.28,
+  "cloud:turbo": 145.02,
+  "moon:turbo": 126.97
+}

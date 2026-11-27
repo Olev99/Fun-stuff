@@ -218,7 +218,7 @@ export class UI {
   challengeCard(c, text) {
     this._thumb($('chal-thumb'), [trackById(c.trackId)], c.reverse);
     $('chal-text').textContent = text;
-    $('chal-sub').textContent = `${{ chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[c.speedClass]} speed. A see-through ghost drives their lap; cross the line first.`;
+    $('chal-sub').textContent = `Zoom speed (Time Trial always is). A see-through ghost drives their lap; cross the line first.`;
     this.app.previewTrack(c.trackId, c.reverse);
     this.show('challenge');
   }
@@ -580,7 +580,7 @@ export class UI {
     $('class-seg').hidden = this.mode === 'tt';
     $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
-    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats and no track events in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
+    $('ws-line').textContent = this.mode === 'tt' ? 'Time Trial always runs at Zoom speed, with stock stats and no track events, so records and medals stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
     this._syncClass();
     this._renderTrackCards();
     this.show('track');

@@ -15,6 +15,7 @@ import { SkidMarks } from './skids.js';
 import { Battle, BattleAI, MAX_BALLOONS } from './battle.js';
 import * as TX from './textures.js';
 import { TrackEvents } from './events.js';
+import { lookPaint } from './cosmetics.js';
 
 export const SPEED_CLASSES = {
   chill: { id: 'chill', name: 'Chill', top: 27 },
@@ -232,7 +233,7 @@ export class Race {
       const isPlayer = this.mode === 'mp' ? i === this.mySlot : this.mode !== 'demo' && id === opts.player;
       const lo = (opts.loadouts && opts.loadouts[i]) || (isPlayer && opts.playerLoadout) || {};
       const look = (opts.looks && opts.looks[i]) || (isPlayer && opts.look) || null;
-      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body || (look && look.body), upgrades: lo.upgrades, paint: lo.paint, look });
+      const k = new Kart(this, ch, { isPlayer, index: i, body: lo.body || (look && look.body), upgrades: lo.upgrades, paint: lo.paint || lookPaint(look), look });
       k.nick = (opts.nicks && opts.nicks[i]) || null;
       const slot = this.battle ? this.battle.startSlot(i, grid.length) : tr.gridSlot(i);
       k.placeAt(slot.s, this.mode === 'tt' ? 0 : slot.d);

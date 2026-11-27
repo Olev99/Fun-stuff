@@ -154,7 +154,7 @@ export const CHAPTERS = [
       },
       { id: 'c3-2', type: 'race', track: 'candy', goal: 3, title: 'Sugar Rush', reward: 280 },
       { id: 'c3-3', type: 'gems', track: 'frost', rev: true, n: 15, title: 'Ice Crystals', reward: 280, drop: 'turbo2' },
-      { id: 'c3-4', type: 'time', track: 'glacier', target: 126, title: 'Black Ice', reward: 300 },
+      { id: 'c3-4', type: 'time', track: 'glacier', target: 180, title: 'Black Ice', reward: 300 },
       { id: 'c3-b', type: 'duel', track: 'glacier', title: 'Penguin Showdown', reward: 700, boss: true, drop: 'iceStuds', bp: true },
     ],
   },
@@ -201,7 +201,7 @@ export const CHAPTERS = [
     ],
     events: [
       { id: 'c5-1', type: 'race', track: 'gear', goal: 3, title: 'Grease Monkey', reward: 400 },
-      { id: 'c5-2', type: 'time', track: 'neon', target: 113, title: 'Night Shift', reward: 400 },
+      { id: 'c5-2', type: 'time', track: 'neon', target: 156, title: 'Night Shift', reward: 400 },
       { id: 'c5-3', type: 'gems', track: 'gear', rev: true, n: 18, title: 'Nuts and Bolts', reward: 400 },
       { id: 'c5-4', type: 'race', track: 'neon', rev: true, goal: 2, title: 'Flipside Flyover', reward: 430, drop: 'armor2' },
       { id: 'c5-b', type: 'duel', track: 'gear', title: 'Man vs Machine', reward: 1000, boss: true, drop: 'slipSail', bp: true },
@@ -232,7 +232,7 @@ export const CHAPTERS = [
         ],
       },
       { id: 'c6-2', type: 'race', track: 'obsidian', goal: 2, title: 'Black Glass', reward: 500 },
-      { id: 'c6-3', type: 'time', track: 'cloud', target: 99, title: 'Head in the Clouds', reward: 480, drop: 'turbo2' },
+      { id: 'c6-3', type: 'time', track: 'cloud', target: 157, title: 'Head in the Clouds', reward: 480, drop: 'turbo2' },
       { id: 'c6-4', type: 'gems', track: 'obsidian', rev: true, n: 20, title: 'Lava Gems', reward: 480 },
       { id: 'c6-b', type: 'duel', track: 'magma', ev: 'wild', title: 'Dino Might', reward: 1200, boss: true, drop: 'bumperPlate', bp: true },
     ],
@@ -264,7 +264,7 @@ export const CHAPTERS = [
     ],
     events: [
       { id: 'c7-1', type: 'race', track: 'moon', goal: 3, title: 'One Small Step', reward: 560 },
-      { id: 'c7-2', type: 'time', track: 'moon', target: 94, title: 'Moonwalk', reward: 560 },
+      { id: 'c7-2', type: 'time', track: 'moon', target: 138, title: 'Moonwalk', reward: 560 },
       { id: 'c7-3', type: 'race', track: 'glacier', rev: true, goal: 3, title: 'Frozen Flip', reward: 580 },
       { id: 'c7-4', type: 'gems', track: 'cloud', ev: 'signature', n: 22, title: 'Sky High', reward: 560 },
       { id: 'c7-b', type: 'cup', tracks: ['moon', 'obsidian', 'glacier', 'neon'], title: 'Golden Wheel Cup', reward: 2500, boss: true, drop: 'rocketPill', bp: true },
@@ -331,7 +331,7 @@ export function newCareer() {
     pv: 2, upgrades: {}, parts: {}, bought: {}, sold: {}, soldFor: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
-    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0, pity: 0, dayMax: '', // pity: paid prize spins since a legendary; dayMax: latest day seen (clock-back guard)
     missions: { day: '', prog: {}, done: [], streak: 0, last: '' }, // daily missions (missions.js)
     weekly: emptyWeekly(), // Weekly Cup (weekly.js)
     mastery: emptyMastery(), // racer and ride mastery (mastery.js)
@@ -412,6 +412,8 @@ export function cleanCareer(saved, dev = deviceId()) {
   for (const k of ['racer', 'body', 'paint', 'hat', 'trail', 'horn']) if (isStr(saved[k])) c[k] = saved[k];
   for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) if (Array.isArray(saved[k])) c[k] = strList(saved[k]);
   c.champion = !!saved.champion;
+  c.pity = count(saved.pity, 100);
+  c.dayMax = typeof saved.dayMax === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(saved.dayMax) ? saved.dayMax : '';
   // Parts (see workshop.js). Old saves (no pv) had 4 upgrade levels per kart: they become parts.
   c.parts = mapObj(saved.parts, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));
   c.bought = mapObj(saved.bought, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));

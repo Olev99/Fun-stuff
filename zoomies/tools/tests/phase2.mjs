@@ -321,7 +321,7 @@ await shot('challenge-card');
 await p.tap('#scr-challenge [data-go="race"]');
 await p.waitForTimeout(1000);
 const started = await p.evaluate(() => ({ mode: window.zoomies.race.mode, track: window.zoomies.race.trackDef.id, ghost: !!window.zoomies.race.ghost, cls: window.zoomies.race.opts.speedClass }));
-check('Race the ghost starts a Time Trial against the link\'s ghost', started.mode === 'tt' && started.track === 'blossom' && started.ghost && started.cls === 'turbo', JSON.stringify(started));
+check('Race the ghost starts a Time Trial against the link\'s ghost', started.mode === 'tt' && started.track === 'blossom' && started.ghost && started.cls === 'zoom', JSON.stringify(started));
 await boot(null, '#ch=this-is-not-a-real-link');
 const junk = await p.evaluate(() => ({ cur: window.zoomies.ui.current, hash: location.hash }));
 check('a garbage link is ignored: title screen, no card, no error', junk.cur === 'title' && junk.hash === '', JSON.stringify(junk));

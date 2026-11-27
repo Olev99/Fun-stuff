@@ -53,11 +53,12 @@ function offer(c, prize, rnd) {
 }
 
 // Roll for a jackpot; on a hit, give it and return the prize.
-export function rollJackpot(c, rnd = Math.random) {
+// A free capsule never pays coins: the coin jackpot becomes a free part instead.
+export function rollJackpot(c, rnd = Math.random, free = false) {
   let r = rnd();
   for (const t of TABLE) {
     if ((r -= t.chance) >= 0) continue;
-    const it = offer(c, t.prize, rnd);
+    const it = offer(c, free && t.prize === 'coins' ? 'part' : t.prize, rnd);
     if (it) give(c, it);
     return it;
   }

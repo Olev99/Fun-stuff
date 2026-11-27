@@ -29,6 +29,7 @@ const SUITES = {
   picker: ['picker.mjs', [], 5],
   ledger: ['ledger.mjs', ['1000'], 5], // pure node: save ledger property test and sync/backup scenarios
   'race-sim': ['race-sim.mjs', ['sprout,odyssey'], 15],
+  rules: ['rules.mjs', [], 8],
   career: ['career.mjs', [], 15],
   league: ['league.mjs', [], 15],
   cup: ['cup.mjs', [], 10],

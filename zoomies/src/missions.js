@@ -31,6 +31,13 @@ export function dayStr(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+// Clock guard: c.dayMax is the latest day this save has seen. A device date before it (clock turned back)
+// is "behind": Daily, missions and the Weekly Cup pay nothing new, so nothing can be re-claimed.
+export function clockBack(c, day = dayStr()) {
+  if (!c.dayMax || day > c.dayMax) { c.dayMax = day; return false; }
+  return day < c.dayMax;
+}
+
 export function dayBefore(day) {
   const [y, m, d] = day.split('-').map(Number);
   return dayStr(new Date(y, m - 1, d - 1));
@@ -71,6 +78,7 @@ export const missionsAllDone = (c, day = dayStr()) => missionView(c, day).every(
 // it: { xp, gained: [{...goal, prog, was, done, justDone}], all, capsule }.
 // The caller adds `xp` to the race's XP; the free capsule is already counted.
 export function bumpMissions(c, info, day = dayStr()) {
+  if (clockBack(c, day)) return { xp: 0, gained: [], all: false, capsule: false };
   if (!c.missions || c.missions.day !== day) c.missions = { ...emptyMissions(), streak: (c.missions || {}).streak || 0, last: (c.missions || {}).last || '', day };
   const m = c.missions;
   const gained = [];
