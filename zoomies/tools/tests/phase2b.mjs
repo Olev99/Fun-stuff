@@ -226,7 +226,7 @@ const mig = await p.evaluate(async () => {
   old.xp = 1234; old.coins = 77; old.freeCaps = 2; old.racers = ['mochi', 'pip'];
   const c = cleanCareer(JSON.parse(JSON.stringify(old)));
   const a = cleanCareer({ v: 1 });
-  return { weekly: c.weekly, mastery: c.mastery, xp: c.xp, coins: c.coins, caps: c.freeCaps, racers: c.racers, bare: [a.weekly, a.mastery], round: JSON.stringify(cleanCareer(JSON.parse(JSON.stringify(c)))) === JSON.stringify(c) };
+  return { weekly: c.weekly, mastery: c.mastery, xp: c.xp, coins: c.coins, caps: c.freeCaps, racers: c.racers, bare: [a.weekly, a.mastery], round: (() => { const sorted = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x)); return sorted(cleanCareer(JSON.parse(JSON.stringify(c)))) === sorted(c); })() };
 });
 check('old save: weekly and mastery default to empty', JSON.stringify(mig.weekly) === JSON.stringify({ week: '', best: 0, trophies: [], streak: 0, last: '', capGiven: [] }) && JSON.stringify(mig.mastery) === JSON.stringify({ r: {}, b: {}, capLevels: 0 }));
 check('old save keeps everything else', mig.xp === 1234 && mig.coins === 77 && mig.caps === 2 && mig.racers.length === 2);

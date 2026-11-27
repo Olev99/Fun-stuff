@@ -46,6 +46,13 @@ function cleanPlayers(list) {
   return out;
 }
 
+// The lobby settings a guest receives from the host (shown in its lobby).
+const pick = (v, list, d) => (list.includes(v) ? v : d);
+export function cleanLobby(c) {
+  if (!isObj(c) || typeof c.track !== 'string' || c.track.length > 32) return null;
+  return { track: c.track, reverse: !!c.reverse, speedClass: pick(c.speedClass, ['chill', 'zoom', 'turbo'], 'zoom'), difficulty: pick(c.difficulty, ['easy', 'normal', 'hard'], 'normal'), ai: !!c.ai };
+}
+
 // The race setup a guest receives from the host.
 export function validStart(cfg) {
   if (!isObj(cfg) || !Array.isArray(cfg.grid) || cfg.grid.length > 16 || !Array.isArray(cfg.humans) || cfg.humans.length > MAX_PLAYERS) return false;
@@ -57,6 +64,77 @@ export function validStart(cfg) {
 
 const HEARTBEAT_MS = 1500;
 const PEER_TIMEOUT_MS = 9000;
+const RATE = 60, BURST = 120; // messages a second we take from one phone (its kart state is 30)
+const NET_MAX = 64 * 1024; // characters: no race message comes near this
+
+// ---- the wire ----
+// Every message travels as one JSON string. (PeerJS's JSON mode silently dropped anything of
+// 16,300 bytes or more, such as the ghost of a run slower than about 2.5 minutes.) A long
+// message goes in numbered pieces of at most FRAME characters, at worst 15 KB of UTF-8, which
+// every browser's data channel takes; the other side puts them back together.
+const FRAME = 5000;
+export const FRAME_LIMIT = 16300; // bytes: the test transport refuses a single piece this big
+export const MAX_MSG = 256 * 1024; // characters: refused when sent and when received
+let wireId = 0;
+
+export function toFrames(data) {
+  const s = JSON.stringify(data);
+  if (s.length <= FRAME) return [s];
+  if (s.length > MAX_MSG) throw new Error(`A message was too big to send (${Math.round(s.length / 1024)} KB).`);
+  const id = (wireId = (wireId + 1) % 1e6), parts = [];
+  for (let a = 0; a < s.length;) {
+    let e = Math.min(s.length, a + FRAME);
+    const c = s.charCodeAt(e - 1);
+    if (e < s.length && c >= 0xd800 && c < 0xdc00) e--; // never split an emoji's surrogate pair
+    parts.push(s.slice(a, e));
+    a = e;
+  }
+  return parts.map((p, i) => `~${id}:${i}:${parts.length}:${p}`);
+}
+
+// The receiving end: puts pieces back together and drops late or repeated fast messages.
+export class Inbox {
+  constructor() {
+    this.parts = new Map(); // peer -> the long message coming in (pieces arrive in order)
+    this.last = new Map(); // `${peer}|${type}` -> newest sequence number
+  }
+
+  // One string from a peer -> [message, size] once whole, else null.
+  take(from, d) {
+    if (typeof d !== 'string') return null; // shortcut: a phone on an older version (PeerJS JSON mode) is not understood; both must update
+    if (d[0] === '~') {
+      const m = /^~(\d{1,6}):(\d{1,3}):(\d{1,3}):/.exec(d);
+      if (!m) return null;
+      const id = +m[1], i = +m[2], n = +m[3];
+      let a = this.parts.get(from);
+      if (i === 0) {
+        if (n < 2 || n > Math.ceil(MAX_MSG / (FRAME - 1))) return null;
+        this.parts.set(from, (a = { id, n, got: [] }));
+      }
+      if (!a || a.id !== id || a.n !== n || a.got.length !== i) { this.parts.delete(from); return null; }
+      a.got.push(d.slice(m[0].length));
+      if (a.got.length < n) return null;
+      this.parts.delete(from);
+      d = a.got.join('');
+    }
+    if (d.length > MAX_MSG) return null;
+    let msg;
+    try { msg = JSON.parse(d); } catch (e) { return null; }
+    if (!isObj(msg)) return null;
+    // Fast messages (kart state, wheel input) are numbered: a late or repeated one is dropped.
+    if (Number.isInteger(msg.q)) {
+      const k = `${from}|${msg.t}`;
+      if (msg.q <= (this.last.get(k) ?? -1)) return null;
+      this.last.set(k, msg.q);
+    }
+    return [msg, d.length];
+  }
+
+  forget(from) {
+    this.parts.delete(from);
+    for (const k of this.last.keys()) if (k.startsWith(`${from}|`)) this.last.delete(k);
+  }
+}
 
 let peerLoad = null;
 function loadPeerJS() {
@@ -79,16 +157,20 @@ function loadPeerJS() {
 // uses PeerJS, so it needs neither.)
 const devMode = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
+// The servers that help two phones find a way to each other. STUN only works when one side
+// can be reached directly (most home Wi-Fi); phones on carrier networks often need a TURN
+// relay. A TURN entry goes here, { urls: 'turn:host:3478', username, credential }, once
+// there is one of our own to use. None is configured today.
+export const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+];
+
 function peerOptions() {
   const o = {
     debug: devMode && params.has('debug') ? 2 : 0,
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' },
-      ],
-    },
+    config: { iceServers: ICE_SERVERS },
   };
   // Optional self-hosted broker (dev only): ?peerhost=example.com&peerport=443&peerpath=/
   if (devMode && params.get('peerhost')) {
@@ -100,12 +182,19 @@ function peerOptions() {
   return o;
 }
 
+// Our own unreliable, unordered channel beside PeerJS's reliable one, on the same connection
+// (both phones open it with this id, so it needs no signalling). Kart state and wheel input
+// ride it: a lost packet is simply replaced by the next one instead of holding up the rest.
+const FAST_ID = 9;
+
 // ns keeps races and phone wheels (wheel.js) apart on the broker.
 export class PeerTransport {
   constructor(cb, ns = 'kart') {
     this.cb = cb;
     this.ns = ns;
     this.conns = new Map();
+    this.inbox = new Inbox();
+    this.q = 0;
   }
 
   async start(role, code) {
@@ -132,11 +221,16 @@ export class PeerTransport {
         this.peer.once('error', rej);
         setTimeout(() => rej(new Error('Timed out reaching the matchmaking server')), 12000);
       });
-      const conn = this.peer.connect(id, { reliable: true, serialization: 'json' });
+      const conn = this.peer.connect(id, { reliable: true, serialization: 'raw' });
+      // The broker found the room but no direct route opened (often a carrier network, see ICE_SERVERS).
+      const apart = () => new Error(this.ns === 'kart' ? 'Found the race, but the phones could not reach each other. Try the same Wi-Fi.' : 'Found it, but the two devices could not reach each other. Try the same Wi-Fi.');
+      let found = false;
+      conn.on('iceStateChanged', () => { found = true; });
       await new Promise((res, rej) => {
         conn.once('open', res);
-        this.peer.once('error', (e) => rej(e.type === 'peer-unavailable' ? new Error(this.ns === 'kart' ? 'No race found with that code' : 'Nothing found with that code') : e));
-        setTimeout(() => rej(new Error('Could not connect. Check the code and try again.')), 15000);
+        conn.once('error', () => rej(apart()));
+        this.peer.once('error', (e) => rej(e.type === 'peer-unavailable' ? new Error(this.ns === 'kart' ? 'No race found with that code. Check the code and try again.' : 'Nothing found with that code. Check the code and try again.') : e));
+        setTimeout(() => rej(found ? apart() : new Error('No answer from the other phone. Check your internet connection and try again.')), 15000);
       });
       this.conns.set('host', conn);
       this._wire(conn, 'host');
@@ -149,21 +243,64 @@ export class PeerTransport {
   }
 
   _wire(conn, id) {
-    conn.on('data', (d) => this.cb.message(id, d));
+    conn.on('data', (d) => this._recv(id, d));
     conn.on('close', () => {
       this.conns.delete(id);
+      this.inbox.forget(id);
       this.cb.leave(id);
     });
-    conn.on('error', () => {});
+    conn.on('error', (e) => this.cb.error(e));
+    this._fast(conn, id);
   }
 
-  send(to, data) {
+  _recv(id, d) {
+    const r = this.inbox.take(id, d);
+    if (r) this.cb.message(id, r[0], r[1]);
+  }
+
+  // Open the fast channel. It is used once the other phone is heard on it (so it has the
+  // channel too); until then, or if it never opens, everything rides the reliable channel.
+  _fast(conn, id) {
+    let ch;
+    try {
+      ch = conn.peerConnection.createDataChannel('zf', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
+    } catch (e) { return; }
+    let tries = 0;
+    const timer = setInterval(() => {
+      if (conn.fast || ++tries > 40 || ch.readyState === 'closed') clearInterval(timer);
+      else if (ch.readyState === 'open') try { ch.send('?'); } catch (e) { /* closing */ }
+    }, 250);
+    ch.onmessage = (e) => {
+      conn.fast = ch;
+      if (e.data === '?') try { ch.send('!'); } catch (err) { /* closing */ }
+      else if (e.data !== '!') this._recv(id, e.data);
+    };
+    ch.onclose = () => { conn.fast = null; clearInterval(timer); };
+  }
+
+  // fast: a message the next one replaces (kart state, wheel input): numbered, and sent on the
+  // fast channel when there is one and the message fits in one piece.
+  _frames(data, fast) {
+    if (fast) data.q = ++this.q;
+    try { return toFrames(data); } catch (e) { this.cb.error(e); return null; }
+  }
+
+  _out(c, frames, fast) {
+    if (!frames || !c.open) return;
+    const f = fast && frames.length === 1 && c.fast && c.fast.readyState === 'open' ? c.fast : null;
+    if (f && f.bufferedAmount > 65536) return; // a slow link: skip this one rather than queue it
+    try { for (const s of frames) (f || c).send(s); } catch (e) { this.cb.error(e); }
+  }
+
+  send(to, data, fast = false) {
     const c = this.conns.get(to);
-    if (c && c.open) c.send(data);
+    if (c) this._out(c, this._frames(data, fast), fast);
   }
 
-  broadcast(data) {
-    for (const c of this.conns.values()) if (c.open) c.send(data);
+  broadcast(data, fast = false) {
+    if (!this.conns.size) return;
+    const frames = this._frames(data, fast);
+    for (const c of this.conns.values()) this._out(c, frames, fast);
   }
 
   // Host: cut off one peer (stale or duplicate connection).
@@ -180,13 +317,19 @@ export class PeerTransport {
   }
 }
 
-// Same-browser transport for testing two tabs side by side.
+// Same-browser transport for testing two tabs side by side. It sends the same pieces as the
+// real one and refuses any single piece the real channels could not carry.
+// ?lag=ms delays every message, ?loss=percent drops that share of fast messages.
 export class LocalTransport {
   constructor(cb, ns = 'kart') {
     this.cb = cb;
     this.ns = ns;
     this.lag = +(params.get('lag') || 0);
+    this.loss = +(params.get('loss') || 0);
     this.peers = new Set();
+    this.gone = new Set(); // peers the host dropped: not heard any more
+    this.inbox = new Inbox();
+    this.q = 0;
   }
 
   start(role, code) {
@@ -196,7 +339,7 @@ export class LocalTransport {
     return new Promise((res, rej) => {
       this.ch.onmessage = (e) => {
         const m = e.data;
-        if (m.from === this.id || (m.to && m.to !== this.id)) return;
+        if (m.from === this.id || (m.to && m.to !== this.id) || this.gone.has(m.from)) return;
         const deliver = () => {
           if (m.kind === 'hello' && role === 'host') {
             this.peers.add(m.from);
@@ -208,7 +351,9 @@ export class LocalTransport {
             this.peers.delete(m.from);
             this.cb.leave(role === 'host' ? m.from : 'host');
           } else if (m.kind === 'msg') {
-            this.cb.message(role === 'host' ? m.from : 'host', m.data);
+            const from = role === 'host' ? m.from : 'host';
+            const r = this.inbox.take(from, m.data);
+            if (r) this.cb.message(from, r[0], r[1]);
           }
         };
         if (this.lag) setTimeout(deliver, this.lag); else deliver();
@@ -221,16 +366,32 @@ export class LocalTransport {
     });
   }
 
-  send(to, data) {
-    this.ch.postMessage({ from: this.id, to, kind: 'msg', data });
+  _post(to, data, fast) {
+    if (fast) data.q = ++this.q;
+    let frames;
+    try { frames = toFrames(data); } catch (e) { this.cb.error(e); return; }
+    if (fast && frames.length === 1 && Math.random() * 100 < this.loss) return;
+    for (const s of frames) this._postFrame(to, s);
   }
 
-  broadcast(data) {
-    this.ch.postMessage({ from: this.id, to: null, kind: 'msg', data });
+  _postFrame(to, s) {
+    if (s.length * 3 >= FRAME_LIMIT && new TextEncoder().encode(s).length >= FRAME_LIMIT) throw new Error(`Unchunked network message of ${s.length} characters`);
+    this.ch.postMessage({ from: this.id, to, kind: 'msg', data: s });
+  }
+
+  send(to, data, fast = false) {
+    this._post(to, data, fast);
+  }
+
+  broadcast(data, fast = false) {
+    this._post(null, data, fast);
   }
 
   drop(id) {
     this.peers.delete(id);
+    this.gone.add(id);
+    this.inbox.forget(id);
+    this.ch.postMessage({ from: this.id, to: id, kind: 'bye' });
   }
 
   close() {
@@ -252,7 +413,7 @@ export class NetSession {
     this.onClosed = null;
     this.closed = false;
     const cb = {
-      message: (from, msg) => this._message(from, msg),
+      message: (from, msg, size) => this._message(from, msg, size),
       join: (id) => this._join(id),
       leave: (id) => this._leave(id),
       error: (e) => { if (this.onError) this.onError(e); },
@@ -262,6 +423,7 @@ export class NetSession {
     this.inRace = false;
     this.cid = clientId();
     this.seen = new Map(); // peer id -> last time we heard from them
+    this.rate = new Map(); // peer id -> { n: messages it may still send, t }
     this.hb = setInterval(() => this._heartbeat(), HEARTBEAT_MS);
   }
 
@@ -294,6 +456,7 @@ export class NetSession {
 
   _drop(id) {
     this.seen.delete(id);
+    this.rate.delete(id);
     if (this.transport.drop) this.transport.drop(id);
     this._leave(id);
   }
@@ -338,10 +501,11 @@ export class NetSession {
     this.transport.send('host', { t: 'hello', char, cid: this.cid, nick: cleanNick(nick), look: cleanLook(look) });
   }
 
-  send(msg) {
+  // fast: kart state the next message replaces (rides the unreliable channel).
+  send(msg, fast = false) {
     if (this.closed) return;
-    if (this.isHost) this.transport.broadcast(msg);
-    else this.transport.send('host', msg);
+    if (this.isHost) this.transport.broadcast(msg, fast);
+    else this.transport.send('host', msg, fast);
   }
 
   sendTo(id, msg) {
@@ -351,7 +515,8 @@ export class NetSession {
   // ---- lobby (host) ----
   broadcastLobby() {
     if (!this.isHost) return;
-    this.send({ t: 'lobby', players: this.players, cfg: this.lobby });
+    // Each phone's private id (cid) stays with the host: anyone holding it could take that seat.
+    this.send({ t: 'lobby', players: this.players.map(({ cid, ...p }) => p), cfg: this.lobby });
     if (this.onLobby) this.onLobby();
   }
 
@@ -369,11 +534,26 @@ export class NetSession {
 
   _join(id) {
     if (!this.isHost) return;
-    if (this.inRace || this.players.length >= MAX_PLAYERS) {
-      this.sendTo(id, { t: 'full', reason: this.inRace ? 'A race is already running. Try again in a moment.' : 'This race is full.' });
-      return;
-    }
+    if (this.inRace || this.players.length >= MAX_PLAYERS) this._refuse(id);
     // player entry is created when their hello arrives
+  }
+
+  // Turn a phone away, then hang up on it once the message has had time to arrive.
+  _refuse(id) {
+    this.sendTo(id, { t: 'full', reason: this.inRace ? 'A race is already running. Try again in a moment.' : 'This race is full.' });
+    setTimeout(() => { if (!this.players.some((p) => p.id === id)) this._drop(id); }, 1000);
+  }
+
+  // At most RATE messages a second from one phone (bursts of BURST): a flood is dropped.
+  _allow(from) {
+    const now = performance.now();
+    let b = this.rate.get(from);
+    if (!b) this.rate.set(from, (b = { n: BURST, t: now }));
+    b.n = Math.min(BURST, b.n + ((now - b.t) * RATE) / 1000);
+    b.t = now;
+    if (b.n < 1) return false;
+    b.n--;
+    return true;
   }
 
   _leave(id) {
@@ -388,19 +568,19 @@ export class NetSession {
     }
   }
 
-  _message(from, msg) {
-    if (!msg || typeof msg !== 'object') return;
+  _message(from, msg, size = 0) {
+    if (!isObj(msg) || size > NET_MAX || !this._allow(from)) return;
+    // The host listens only to its players; anyone else may only say hello.
+    if (this.isHost && msg.t !== 'hello' && !this.players.some((p) => p.id === from)) return;
     this.seen.set(from, performance.now());
     if (msg.t === 'hb') return;
     if (this.isHost) {
       if (msg.t === 'hello') {
+        if (this.inRace) { this._refuse(from); return; }
         // Same phone connecting again: forget its old connection first.
-        const dup = msg.cid && this.players.find((p) => p.cid === msg.cid && p.id !== from);
+        const dup = typeof msg.cid === 'string' && msg.cid && this.players.find((p) => p.cid === msg.cid.slice(0, 16) && p.id !== from);
         if (dup) this._drop(dup.id);
-        if (this.inRace || this.players.length >= MAX_PLAYERS) {
-          this.sendTo(from, { t: 'full', reason: this.inRace ? 'A race is already running. Try again in a moment.' : 'This race is full.' });
-          return;
-        }
+        if (this.players.length >= MAX_PLAYERS && !this.players.some((p) => p.id === from)) { this._refuse(from); return; }
         if (!this.players.find((p) => p.id === from)) {
           const used = new Set(this.players.map((p) => p.name));
           let n = 2;
@@ -419,10 +599,10 @@ export class NetSession {
       if (msg.t === 'ready' && this.onReady) { this.onReady(from); return; }
     } else {
       if (msg.t === 'lobby') {
-        const players = cleanPlayers(msg.players);
-        if (!players || !isObj(msg.cfg)) return;
+        const players = cleanPlayers(msg.players), cfg = cleanLobby(msg.cfg);
+        if (!players || !cfg) return;
         this.players = players;
-        this.lobby = msg.cfg;
+        this.lobby = cfg;
         if (this.onLobby) this.onLobby();
         return;
       }

@@ -51,11 +51,13 @@ console.log('track events host:', evA.slice(0, 160), '| same on guest:', evA ===
 if (evA !== evB) console.log('events errors 1');
 await A.screenshot({ path: 'mp-race-host.png' });
 await B.screenshot({ path: 'mp-race-guest.png' });
-// Guest uses a ball; host should spawn it
+// Guest uses honey; host should spawn it (the host only spawns what it granted, so grant it there first)
+await A.evaluate(() => { const r = window.zoomies.race; r._granted(r.karts.find((q) => q.remote && q.human), 'honey'); });
 await B.evaluate(() => { const k = window.zoomies.race.player; k.item = 'honey'; k.itemCount = 1; window.zoomies.race.items.use(k); });
 await A.waitForTimeout(1500);
 console.log('A hazards:', await A.evaluate(() => window.zoomies.race.items.hazards.map(p => p.type + ' owner=' + (p.owner && p.owner.ch.id))));
 console.log('B hazards:', await B.evaluate(() => window.zoomies.race.items.hazards.map(p => p.type + ' owner=' + (p.owner && p.owner.ch.id))));
+if (!(await A.evaluate(() => window.zoomies.race.items.hazards.length + window.zoomies.race.items.projectiles.length))) console.log('FAIL the host did not spawn the guest item; errors 1');
 console.log('A', JSON.stringify(await st(A)));
 console.log('B', JSON.stringify(await st(B)));
 // finish both quickly

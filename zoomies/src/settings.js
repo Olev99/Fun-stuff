@@ -2,6 +2,7 @@ const KEY = 'zoomies.settings.v1';
 const REC = 'zoomies.records.v1';
 
 import { isTouch, isDesktop } from './platform.js';
+import { store } from './ledger.js';
 
 export const DEFAULTS = {
   // Phones: tilt | touch. Computers: keys (keyboard or gamepad) | wheel (a phone as a wheel).
@@ -72,12 +73,9 @@ export function loadRecords() {
   }
 }
 
+// Returns true when saved (a failed write shows a toast, see ledger.js store).
 export function saveRecords(r) {
-  try {
-    localStorage.setItem(REC, JSON.stringify(r));
-  } catch (e) {
-    /* ignore */
-  }
+  return store(REC, JSON.stringify(r), 'records');
 }
 
 // Render quality presets, tuned for iPhone 15 Pro and newer (A17 Pro GPU and

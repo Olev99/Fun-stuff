@@ -4,7 +4,7 @@ import { BODY_LIST } from './karts.js';
 import { ownedCount, COSMETIC_TOTAL, cosmeticById } from './cosmetics.js';
 import { rng } from './util.js';
 import { medalCount, bestTier, medalMax } from './medals.js';
-import { bumpMissions } from './missions.js';
+import { bumpMissions, clockBack, dayBefore } from './missions.js';
 import { addMastery } from './mastery.js';
 import { LEAGUE, LEAGUE_EVENTS, legendRank, MAX_RANK } from './league.js';
 
@@ -270,7 +270,7 @@ export function dailyGoalText(d) {
   return d.gems ? `Grab ${d.gems} gems and finish in the top 3` : place;
 }
 
-export const dailyDoneToday = (c) => !!(c.daily && c.daily.done === today());
+export const dailyDoneToday = (c) => !!(c.daily && c.daily.done === today()) || (!!c.dayMax && today() < c.dayMax);
 
 export function dailyStreak(c) {
   const dl = c.daily || {};
@@ -280,12 +280,13 @@ export function dailyStreak(c) {
 
 export const dailyReward = (streak) => 150 + 25 * Math.min(streak, 10);
 
-// Record a successful daily. Returns the reward (0 if already done today).
-export function completeDaily(c) {
+// Record a successful daily for `day` (the day the race started, so a run that crosses midnight still
+// fills its own slot). Returns the reward, or null if already done or the device clock was turned back.
+export function completeDaily(c, day = today()) {
   const dl = (c.daily = c.daily || { done: '', streak: 0, best: 0 });
-  const t = today();
-  if (dl.done === t) return null;
-  dl.streak = dl.done === yesterday() ? (dl.streak || 0) + 1 : 1;
+  const t = day;
+  if (dl.done === t || clockBack(c)) return null;
+  dl.streak = dl.done === dayBefore(t) ? (dl.streak || 0) + 1 : 1;
   dl.best = Math.max(dl.best || 0, dl.streak);
   dl.done = t;
   addStat(c, 'dailies');

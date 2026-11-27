@@ -3,11 +3,12 @@ import { BODIES, kartStats } from './karts.js';
 import { trackById, TRACKS } from './tracks.js';
 import { ARENAS } from './arenas.js';
 import { fmtTime } from './util.js';
-import { levelOf, oldLevel, DAILY_MODS, evSeedOf, MAX_EV_SEEN } from './profile.js';
+import { levelOf, oldLevel, DAILY_MODS, evSeedOf, MAX_EV_SEEN, ACHIEVEMENTS } from './profile.js';
 import { LEAGUE, legendRank, grantLeagueRewards, enforceLeagueRewards } from './league.js';
 import { emptyWeekly } from './weekly.js';
-import { RACER_IDS, BODY_IDS, MAX_XP, emptyMastery } from './mastery.js';
-import { partById, isPart, MAX_PARTS, MAX_SOLD, MAX_SOCKETS } from './parts.js';
+import { RACER_IDS, BODY_IDS, MAX_XP, emptyMastery, CAP_EVERY, totalLevels } from './mastery.js';
+import { partById, isPart, MAX_PARTS, MAX_SOLD, MAX_SOCKETS, EARNED_SELL } from './parts.js';
+import { newLedger, cleanLedger, totals, credit, deviceId, setBit, dayBit, weekBit, popcount, CLAIMS, store } from './ledger.js';
 import { normalize as normalizeShop, migrateUpgrades, grant as grantPart, kitOf } from './workshop.js';
 
 // Career: start in the scrapyard with the Rust Bucket and one racer, win
@@ -153,7 +154,7 @@ export const CHAPTERS = [
       },
       { id: 'c3-2', type: 'race', track: 'candy', goal: 3, title: 'Sugar Rush', reward: 280 },
       { id: 'c3-3', type: 'gems', track: 'frost', rev: true, n: 15, title: 'Ice Crystals', reward: 280, drop: 'turbo2' },
-      { id: 'c3-4', type: 'time', track: 'glacier', target: 126, title: 'Black Ice', reward: 300 },
+      { id: 'c3-4', type: 'time', track: 'glacier', target: 180, title: 'Black Ice', reward: 300 },
       { id: 'c3-b', type: 'duel', track: 'glacier', title: 'Penguin Showdown', reward: 700, boss: true, drop: 'iceStuds', bp: true },
     ],
   },
@@ -200,7 +201,7 @@ export const CHAPTERS = [
     ],
     events: [
       { id: 'c5-1', type: 'race', track: 'gear', goal: 3, title: 'Grease Monkey', reward: 400 },
-      { id: 'c5-2', type: 'time', track: 'neon', target: 113, title: 'Night Shift', reward: 400 },
+      { id: 'c5-2', type: 'time', track: 'neon', target: 156, title: 'Night Shift', reward: 400 },
       { id: 'c5-3', type: 'gems', track: 'gear', rev: true, n: 18, title: 'Nuts and Bolts', reward: 400 },
       { id: 'c5-4', type: 'race', track: 'neon', rev: true, goal: 2, title: 'Flipside Flyover', reward: 430, drop: 'armor2' },
       { id: 'c5-b', type: 'duel', track: 'gear', title: 'Man vs Machine', reward: 1000, boss: true, drop: 'slipSail', bp: true },
@@ -231,7 +232,7 @@ export const CHAPTERS = [
         ],
       },
       { id: 'c6-2', type: 'race', track: 'obsidian', goal: 2, title: 'Black Glass', reward: 500 },
-      { id: 'c6-3', type: 'time', track: 'cloud', target: 99, title: 'Head in the Clouds', reward: 480, drop: 'turbo2' },
+      { id: 'c6-3', type: 'time', track: 'cloud', target: 157, title: 'Head in the Clouds', reward: 480, drop: 'turbo2' },
       { id: 'c6-4', type: 'gems', track: 'obsidian', rev: true, n: 20, title: 'Lava Gems', reward: 480 },
       { id: 'c6-b', type: 'duel', track: 'magma', ev: 'wild', title: 'Dino Might', reward: 1200, boss: true, drop: 'bumperPlate', bp: true },
     ],
@@ -263,7 +264,7 @@ export const CHAPTERS = [
     ],
     events: [
       { id: 'c7-1', type: 'race', track: 'moon', goal: 3, title: 'One Small Step', reward: 560 },
-      { id: 'c7-2', type: 'time', track: 'moon', target: 94, title: 'Moonwalk', reward: 560 },
+      { id: 'c7-2', type: 'time', track: 'moon', target: 138, title: 'Moonwalk', reward: 560 },
       { id: 'c7-3', type: 'race', track: 'glacier', rev: true, goal: 3, title: 'Frozen Flip', reward: 580 },
       { id: 'c7-4', type: 'gems', track: 'cloud', ev: 'signature', n: 22, title: 'Sky High', reward: 560 },
       { id: 'c7-b', type: 'cup', tracks: ['moon', 'obsidian', 'glacier', 'neon'], title: 'Golden Wheel Cup', reward: 2500, boss: true, drop: 'rocketPill', bp: true },
@@ -327,16 +328,17 @@ export function newCareer() {
     v: 1, coins: 0, racer: 'mochi', racers: ['mochi'], body: 'buggy', bodies: ['buggy'],
     paint: 'stock', paints: ['stock'],
     // Gramps's Workshop (workshop.js): owned parts, what is fitted, extra sockets, parts already earned
-    pv: 2, upgrades: {}, parts: {}, bought: {}, sold: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
+    pv: 2, upgrades: {}, parts: {}, bought: {}, sold: {}, soldFor: {}, loadouts: {}, sockets: {}, drops: {}, pnew: false,
     stars: {}, done: {}, best: {}, seen: {}, beaten: [], champion: false, earned: 0,
     // profile: XP, lifetime stats, trophies, daily streak and cosmetics
-    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0,
+    xp: 0, stats: {}, evSeen: [], ach: {}, daily: { done: '', streak: 0, best: 0 }, freeCaps: 0, pity: 0, dayMax: '', // pity: paid prize spins since a legendary; dayMax: latest day seen (clock-back guard)
     missions: { day: '', prog: {}, done: [], streak: 0, last: '' }, // daily missions (missions.js)
     weekly: emptyWeekly(), // Weekly Cup (weekly.js)
     mastery: emptyMastery(), // racer and ride mastery (mastery.js)
     lvlPaid: 1, // highest level whose rewards were paid
     // gumball machine prizes: owned ids and what you're wearing
     cos: [], hat: 'nohat', trail: 'classic', horn: 'beep',
+    led: newLedger(), // per-device ledger: coins, capsules, XP, stats and parts are derived from it (sync.js)
   };
 }
 
@@ -360,7 +362,6 @@ function mapObj(o, f) {
   }
   return out;
 }
-const counts = (o) => mapObj(o, (v) => (Number.isFinite(v) ? count(v) : undefined));
 
 const DAY = /^\d{4}-\d\d-\d\d$/;
 const day = (v) => (typeof v === 'string' && DAY.test(v) ? v : '');
@@ -390,13 +391,20 @@ export function cleanMastery(m) {
   return { r: xps(m.r, RACER_IDS), b: xps(m.b, BODY_IDS), capLevels: Math.floor(count(m.capLevels, 1000) / 5) * 5 };
 }
 
-export function cleanCareer(saved) {
+// `dev`: whose device this save is on. A save from this device's storage (the default) credits any
+// change not yet in its ledger to this device; a save from elsewhere (sync, backup: dev = null)
+// shows only what its ledger holds, so a stale or edited copy cannot add coins.
+export function cleanCareer(saved, dev = deviceId()) {
   if (!isObj(saved)) return null;
   const c = newCareer();
-  // Unknown fields from newer versions: keep plain values only.
+  // Unknown fields from newer versions: plain values, and small objects (bounded JSON).
+  let extra = 0;
   for (const [k, v] of Object.entries(saved)) {
-    if (k in c || k === 'sync' || UNSAFE.has(k)) continue;
+    if (k in c || k === 'sync' || UNSAFE.has(k) || k.length > 32) continue;
     if (typeof v === 'boolean' || Number.isFinite(v) || (typeof v === 'string' && v.length <= 200)) c[k] = v;
+    else if (v && typeof v === 'object' && extra < 16) {
+      try { const j = JSON.stringify(v); if (j.length <= 2000 && !/"(__proto__|constructor|prototype)"/.test(j)) { c[k] = JSON.parse(j); extra++; } } catch (e) { /* skip */ }
+    }
   }
   for (const k of ['coins', 'xp', 'earned', 'freeCaps']) c[k] = count(saved[k]);
   // Saves from before the steeper level curve: their old level's rewards were paid.
@@ -404,10 +412,13 @@ export function cleanCareer(saved) {
   for (const k of ['racer', 'body', 'paint', 'hat', 'trail', 'horn']) if (isStr(saved[k])) c[k] = saved[k];
   for (const k of ['racers', 'bodies', 'paints', 'beaten', 'cos']) if (Array.isArray(saved[k])) c[k] = strList(saved[k]);
   c.champion = !!saved.champion;
+  c.pity = count(saved.pity, 100);
+  c.dayMax = typeof saved.dayMax === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(saved.dayMax) ? saved.dayMax : '';
   // Parts (see workshop.js). Old saves (no pv) had 4 upgrade levels per kart: they become parts.
   c.parts = mapObj(saved.parts, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));
   c.bought = mapObj(saved.bought, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_PARTS) : undefined));
   c.sold = mapObj(saved.sold, (v) => (Number.isFinite(v) && v > 0 ? count(v, MAX_SOLD) : undefined)); // old saves: none
+  c.soldFor = mapObj(saved.soldFor, (v) => (Number.isFinite(v) && v > 0 ? count(v) : undefined));
   c.sockets = mapObj(saved.sockets, (v) => (Number.isFinite(v) ? count(v, 1) : undefined));
   c.drops = mapObj(saved.drops, (v) => (isStr(v) && isPart(v) ? v : undefined));
   c.loadouts = mapObj(saved.loadouts, (l) => (isObj(l) ? {
@@ -421,7 +432,7 @@ export function cleanCareer(saved) {
   }
   c.upgrades = {};
   c.pv = 2;
-  normalizeShop(c);
+  // (normalizeShop runs once the ledger has rebuilt the parts; a copy's own parts field is not trusted.)
   c.stars = mapObj(saved.stars, (v) => (Number.isFinite(v) ? count(v, 3) : undefined));
   const flag = (v) => (typeof v === 'boolean' || Number.isFinite(v) || isStr(v) ? v : undefined);
   c.done = mapObj(saved.done, flag);
@@ -440,14 +451,166 @@ export function cleanCareer(saved) {
   c.missions = cleanMissions(saved.missions);
   c.weekly = cleanWeekly(saved.weekly);
   c.mastery = cleanMastery(saved.mastery);
+  // The ledger: a save from before it becomes one legacy entry; otherwise it is checked and the
+  // visible numbers are rebuilt from it.
+  if (!isObj(saved.led)) legacyLedger(c, saved.sync);
+  else {
+    c.led = cleanLedger(saved.led);
+    harvest(c);
+    if (dev) reconcile(c, dev);
+  }
+  applyLedger(c);
+  normalizeShop(c);
   // Legend Rank rewards follow from the League stars, so a merged or imported save has exactly the ones it has earned.
   enforceLeagueRewards(c);
-  const sy = saved.sync;
-  if (isObj(sy) && isStr(sy.id) && isObj(sy.base)) {
-    const b = sy.base;
-    c.sync = { id: sy.id, at: Number.isFinite(sy.at) ? sy.at : 0, base: { xp: count(b.xp), coins: count(b.coins), earned: count(b.earned), freeCaps: count(b.freeCaps), stats: counts(b.stats) } };
-  }
+  // A fix-up above (a fitted part no longer owned, say) is a new version: one tick later, so two
+  // devices that fixed it up differently still agree on which one wins.
+  for (const [t, hk, h] of [['pt', 'ph', prefsHash(c)], ['lt', 'lh', fitHash(c)]]) if (c.led[hk] && c.led[hk] !== h) { c.led[hk] = h; c.led[t]++; }
   return c;
+}
+
+// ---------------- the ledger (format: sync.js) ----------------
+// Counters that are bests, not running totals: merged by max, not in the ledger.
+export const BEST_STATS = ['dodgeBest'];
+const STAT_KEY = /^[A-Za-z][A-Za-z0-9_]{0,31}$/;
+const isCounter = (k, v) => typeof v === 'number' && !BEST_STATS.includes(k);
+let REWARD = null; // event id -> first clear coins
+const rewardOf = (id) => {
+  if (!REWARD) { REWARD = new Map(); for (const list of [CHAPTERS, LEAGUE]) for (const ch of list) for (const e of ch.events) REWARD.set(e.id, e.reward || 0); }
+  return REWARD.get(id);
+};
+
+// One-off rewards, paid once across all devices: they follow from the merged claim markers
+// (first clears and stars, trophies, levels and mastery paid, drops, and the day/week bit sets),
+// never from a device's own counters.
+// `xp`: the save's XP as its ledger says (a copy's own xp field is not trusted).
+export function claims(c, xp = c.xp) {
+  let coins = 0, caps = 0;
+  const parts = {};
+  for (const [id, v] of Object.entries(c.done)) if (v && rewardOf(id) !== undefined) coins += rewardOf(id);
+  for (const [id, s] of Object.entries(c.stars)) if (rewardOf(id) !== undefined) coins += Math.min(3, s) * STAR_COINS;
+  for (const a of ACHIEVEMENTS) if (c.ach[a.id]) coins += a.reward || 0;
+  // Level capsules (profile.js grant): every 5th level reached, also one a merge jumped past. lvlPaid
+  // counts only as far as the XP backs it (old saves: the old, flatter curve).
+  const lv = levelOf(xp || 0).level;
+  caps += Math.floor(Math.max(Math.min(c.lvlPaid || 0, Math.max(lv, oldLevel(xp || 0))), lv) / 5);
+  // Mastery capsules, as far as the mastery levels back them.
+  caps += Math.floor(Math.min((c.mastery && c.mastery.capLevels) || 0, totalLevels(c.mastery || {})) / CAP_EVERY);
+  for (const k of CLAIMS) caps += popcount(c.led.cl[k]);
+  for (const p of Object.values(c.drops)) if (isPart(p)) parts[p] = (parts[p] || 0) + 1;
+  return { coins, caps, parts };
+}
+
+// Daily, mission and Weekly capsules: the day or week they were paid becomes a bit in a claim set.
+function harvest(c) {
+  setBit(c.led, 'dd', dayBit(c.daily.done));
+  setBit(c.led, 'md', dayBit(c.missions.last));
+  for (const w of c.weekly.capGiven) setBit(c.led, 'wk', weekBit(w));
+}
+
+// What the ledger and the claims say the save holds.
+// `raw` is the same before clamping (in debt, or more parts than MAX_PARTS).
+function view(c) {
+  const T = totals(c.led), R = claims(c, count(T.x));
+  const parts = {}, sold = {}, soldFor = {}, rawParts = {};
+  let debt = 0;
+  for (const id of new Set([...Object.keys(T.pa), ...Object.keys(T.ps), ...Object.keys(R.parts)])) {
+    if (!isPart(id)) continue; // a part from a newer version: kept in the ledger, not shown
+    const raw = (T.pa[id] || 0) + (R.parts[id] || 0) - (T.ps[id] || 0);
+    if (raw) rawParts[id] = raw;
+    if (raw > 0) parts[id] = Math.min(MAX_PARTS, raw);
+    // The same copy sold on two devices: the second sale's coins are taken back.
+    else if (raw < 0) debt += -raw * Math.max(EARNED_SELL, Math.ceil((T.pv[id] || 0) / (T.ps[id] || 1)));
+    if (T.ps[id]) sold[id] = Math.min(MAX_SOLD, T.ps[id]);
+    if (T.pv[id]) soldFor[id] = T.pv[id];
+  }
+  const raw = { coins: T.e - T.s + R.coins - debt, freeCaps: T.ke - T.ku + R.caps, parts: rawParts };
+  return {
+    coins: count(raw.coins), freeCaps: count(raw.freeCaps), xp: count(T.x), earned: count(T.n + R.coins),
+    parts, sold, soldFor, st: T.st, raw, debt,
+  };
+}
+
+// Sets the visible numbers from the ledger. Where they had to be clamped, the offset is kept
+// (led.off) so the next reconcile measures this device's change from what it really showed.
+function applyLedger(c) {
+  const v = view(c);
+  for (const k of ['coins', 'freeCaps', 'xp', 'earned', 'parts', 'sold', 'soldFor']) c[k] = v[k];
+  const off = {}, p = {};
+  // The coin offset leaves the debt out: a drop claim that settles a copy sold twice pays the
+  // coins back in the view, not as a change this device made (reconcile adds the debt back).
+  if (v.coins !== v.raw.coins + v.debt) off.c = v.coins - v.raw.coins - v.debt;
+  if (v.freeCaps !== v.raw.freeCaps) off.k = v.freeCaps - v.raw.freeCaps;
+  for (const [id, r] of Object.entries(v.raw.parts)) if ((v.parts[id] || 0) !== r) p[id] = (v.parts[id] || 0) - r;
+  if (Object.keys(p).length) off.p = p;
+  c.led.off = off;
+  for (const [k, x] of Object.entries(c.stats)) if (isCounter(k, x)) delete c.stats[k];
+  for (const [k, x] of Object.entries(v.st)) if (!Array.isArray(c.stats[k]) && !BEST_STATS.includes(k)) c.stats[k] = x;
+  return c;
+}
+
+// Short hashes of what you drive and wear, and of the fitted parts, to stamp when each last changed.
+const PREFS = ['racer', 'body', 'paint', 'hat', 'trail', 'horn'];
+const prefsHash = (c) => hash36(JSON.stringify(PREFS.map((k) => c[k])));
+const fitHash = (c) => hash36(JSON.stringify(c.loadouts));
+function hash36(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36);
+}
+
+// Credit what changed on this save since its ledger last saw it to device `dev`:
+// rises go to the earned side, drops to the spent side. Then the visible numbers are rebuilt.
+export function reconcile(c, dev = deviceId()) {
+  if (!isObj(c.led) || !Array.isArray(c.led.gone)) c.led = cleanLedger(c.led);
+  c.stats = isObj(c.stats) ? c.stats : {};
+  harvest(c);
+  // XP first: level capsules follow from it.
+  const x0 = count(c.xp) - count(totals(c.led).x);
+  if (x0 > 0) credit(c.led, dev, { x: x0 });
+  // The base is what the ledger says now (with any new claims) plus the clamp offset it was shown with.
+  const v = view(c), d = { st: {}, pa: {}, ps: {}, pv: {} }, off = c.led.off || {}, offP = off.p || {};
+  const up = (now, base, plus, minus) => { const x = count(now) - base; if (x > 0 && plus) d[plus] = x; if (x < 0 && minus) d[minus] = -x; };
+  up(c.coins, v.raw.coins + v.debt + (off.c || 0), 'e', 's');
+  up(c.freeCaps, v.raw.freeCaps + (off.k || 0), 'ke', 'ku');
+  up(c.earned, v.earned, 'n');
+  for (const id of new Set([...Object.keys(c.parts || {}), ...Object.keys(v.raw.parts), ...Object.keys(offP)])) {
+    if (!isPart(id)) continue;
+    const x = count((c.parts || {})[id], MAX_PARTS) - ((v.raw.parts[id] || 0) + (offP[id] || 0));
+    if (x > 0) d.pa[id] = x; else if (x < 0) d.ps[id] = -x;
+  }
+  for (const [id, n] of Object.entries(c.soldFor || {})) if (isPart(id) && count(n) > (v.soldFor[id] || 0)) d.pv[id] = count(n) - (v.soldFor[id] || 0);
+  for (const [k, n] of Object.entries(c.stats)) if (isCounter(k, n) && STAT_KEY.test(k) && count(n) > (v.st[k] || 0)) d.st[k] = count(n) - (v.st[k] || 0);
+  credit(c.led, dev, d);
+  // First stamp (new or old save): no claim to be recent, so a fresh device never overrides your choices.
+  for (const [t, hk, h] of [['pt', 'ph', prefsHash(c)], ['lt', 'lh', fitHash(c)]]) {
+    if (!c.led[hk]) { c.led[hk] = h; c.led[t] = count(c.xp); } else if (h !== c.led[hk]) { c.led[hk] = h; c.led[t] = Math.max(Date.now(), c.led[t] + 1); }
+  }
+  return applyLedger(c);
+}
+
+// A save from before the ledger: its totals become one entry of a synthetic device named after its
+// lineage (its old sync id), the claims it already holds are left out, and nothing is lost or added.
+// Copies of the same old save (an old backup, the other synced device) share the id and are taken
+// whole by ledger.js pickLegacy, so merging them again can never refund spending.
+function legacyLedger(c, sync) {
+  c.led = newLedger();
+  harvest(c);
+  const R = claims(c), st = {}, pa = {}, ps = {};
+  const n = Math.max(0, c.earned - R.coins), X = c.coins - R.coins, e = Math.max(0, n, X), Y = c.freeCaps - R.caps;
+  for (const [k, x] of Object.entries(c.stats)) if (isCounter(k, x) && STAT_KEY.test(k)) st[k] = x;
+  for (const id of new Set([...Object.keys(c.parts), ...Object.keys(c.sold), ...Object.keys(R.parts)])) {
+    if (!isPart(id)) continue;
+    const net = (c.parts[id] || 0) - (R.parts[id] || 0), sd = c.sold[id] || 0;
+    pa[id] = Math.max(0, net + sd);
+    ps[id] = pa[id] - net;
+  }
+  const id = 'L' + (isObj(sync) && typeof sync.id === 'string' && /^[A-Za-z0-9]{1,12}$/.test(sync.id) ? sync.id : '');
+  c.led.d[id] = { e, s: e - X, n, ke: Math.max(0, Y), ku: Math.max(0, -Y), x: c.xp, st, pa, ps };
+  c.led = cleanLedger(c.led);
+  harvest(c);
+  c.led.ph = prefsHash(c); c.led.lh = fitHash(c);
+  c.led.pt = c.led.lt = count(c.xp);
 }
 
 export function loadCareer() {
@@ -465,8 +628,11 @@ export function loadCareer() {
   return null;
 }
 
+// Brings the ledger up to date with this device's changes, then writes (ledger.js store: old
+// ghosts make room, a failed write shows a toast). Returns true when saved.
 export function saveCareer(c) {
-  try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) { /* storage full or blocked */ }
+  try { reconcile(c); } catch (e) { /* never lose a save over the ledger */ }
+  return store(KEY, JSON.stringify(c), 'career');
 }
 
 export function resetCareer() {

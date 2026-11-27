@@ -77,7 +77,7 @@ All special parts must work in single-player and online (the host/guests already
 
 - New career fields: `parts` (owned counts by part id), `loadouts` (per vehicle, array of sockets, plus up to 3 presets), `sockets` (extra sockets bought), `drops` already earned.
 - **Migration:** an old save with `upgrades: { engine: L ... }` must still load. Convert: each level L>0 of a family gives the matching Tier part(s) (levels 1-2 -> Tier I, 3-4 -> Tier II, 5 -> Tier III; also keep 1 of that part in inventory), auto-sockets them on that vehicle (best first, up to the vehicle's sockets), and the rest go to inventory. No one loses value. Keep reading the old field for back-compat but write the new format.
-- `cleanCareer` (`career.js`) and `mergeCareer` (`sync.js`) must validate the new fields (bounded counts, known ids, array lengths) and merge them: owned parts take the higher count per id, loadouts take the side with more total progress.
+- `cleanCareer` (`career.js`) and `mergeCareer` (`sync.js`) must validate the new fields (bounded counts, known ids, array lengths) and merge them. Since November 2026 owned parts are not stored as merged totals: the save's per-device ledger (`led`, format at the top of `sync.js`) counts parts acquired, sold and their sale coins per device, plus event drops once, and `parts`, `sold` and `soldFor` are rebuilt from it; loadouts come from the device that changed them last.
 - The gumball machine jackpot "free upgrade level" becomes "a free random Tier I/II part".
 
 ## 6. UI

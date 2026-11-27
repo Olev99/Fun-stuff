@@ -2283,6 +2283,7 @@ export class World {
     disposeObject(this.group);
     for (const t of this.textures) t.dispose();
     if (this.envRT) this.envRT.dispose();
+    this.sun.dispose(); // frees its shadow map (32 MB at 4096)
   }
 }
 

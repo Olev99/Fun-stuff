@@ -20,59 +20,62 @@ const open = async (w, h, mobile) => {
 };
 let p = await open(852, 393, true);
 
-// ---------------- 3. sell then sync: sold counts ----------------
+// ---------------- 3. sell then sync: sold counts (per-device ledger, sync.js) ----------------
 const sync = await p.evaluate(async () => {
   const { mergeCareer } = await import('./src/sync.js');
-  const { newCareer, cleanCareer } = await import('./src/career.js');
+  const { newCareer, cleanCareer, reconcile } = await import('./src/career.js');
   const W = await import('./src/workshop.js');
-  const mk = (xp, f) => { const c = newCareer(); c.xp = xp; c.bodies = ['buggy', 'classic']; c.body = 'classic'; f(c); return cleanCareer(c); };
-  const both = (A, B) => [mergeCareer(A, B), mergeCareer(B, A)];
+  // A save made on device `id`, and the same save after a sync to device `id`.
+  const mk = (id, xp, f) => { const c = newCareer(); c.xp = xp; c.bodies = ['buggy', 'classic']; c.body = 'classic'; f(c); return cleanCareer(c, id); };
+  const copy = (c, id) => reconcile(cleanCareer(JSON.parse(JSON.stringify(c)), null), id);
+  const both = (A, B) => [mergeCareer(A, B, null), mergeCareer(B, A, null)];
   const out = {};
-  // Sell on A (2 copies, one sold), B still holds both.
-  const A1 = mk(900, (c) => { c.parts = { engine1: 2 }; c.bought = { engine1: 2 }; c.coins = 500; });
-  const sold = (() => { const c = JSON.parse(JSON.stringify(A1)); const r = W.sell(c, 'engine1'); return { c, r }; })();
-  const B1 = mk(400, (c) => { c.parts = { engine1: 2 }; c.bought = { engine1: 2 }; });
-  out.sellOne = { r: sold.r.ok, sold: sold.c.sold.engine1, parts: sold.c.parts.engine1, m: both(sold.c, B1).map((m) => [m.parts.engine1, m.sold.engine1]) };
+  // Sell on A (2 copies, one sold), B (synced earlier) still holds both.
+  const A1 = mk('A', 900, (c) => { c.parts = { engine1: 2 }; c.bought = { engine1: 2 }; c.coins = 500; });
+  const B1 = copy(A1, 'B');
+  const sold = (() => { const c = JSON.parse(JSON.stringify(A1)); const r = W.sell(c, 'engine1'); reconcile(c, 'A'); return { c, r }; })();
+  out.sellOne = { r: sold.r.ok, sold: sold.c.sold.engine1, parts: sold.c.parts.engine1, m: both(sold.c, B1).map((m) => [m.parts.engine1, m.sold.engine1, m.coins]) };
   // Selling the only copy: it must not come back, and a loadout that fitted it on B loses it.
-  const A2 = mk(300, (c) => { c.parts = { engine1: 1 }; c.bought = { engine1: 1 }; });
-  W.setFit(A2, 'classic', []); const s2 = W.sell(A2, 'engine1');
-  const B2 = mk(900, (c) => { c.parts = { engine1: 1 }; c.loadouts = { classic: { cur: ['engine1'], pre: [[], [], []] } }; });
+  const A2 = mk('A', 300, (c) => { c.parts = { engine1: 1 }; c.bought = { engine1: 1 }; });
+  const B2 = copy(A2, 'B'); B2.loadouts = { classic: { cur: ['engine1'], pre: [[], [], []] } }; reconcile(B2, 'B');
+  W.setFit(A2, 'classic', []); const s2 = W.sell(A2, 'engine1'); reconcile(A2, 'A');
   out.sellOnly = { r: s2.ok, m: both(A2, B2).map((m) => [m.parts.engine1 || 0, m.sold.engine1, m.loadouts.classic.cur.join(',')]) };
   // Buy on B after A sold one: the purchase is not lost.
-  const B3 = mk(400, (c) => { c.parts = { engine1: 3 }; c.bought = { engine1: 3 }; });
+  const B3 = copy(A1, 'B'); W.grant(B3, 'engine1', { paid: true }); reconcile(B3, 'B');
   out.buyB = both(sold.c, B3).map((m) => [m.parts.engine1, m.sold.engine1]);
-  // Sold on both devices (the same single copy).
-  const A4 = mk(900, (c) => { c.sold = { tyres1: 1 }; }), B4 = mk(400, (c) => { c.sold = { tyres1: 1 }; });
-  out.sellBoth = both(A4, B4).map((m) => [m.parts.tyres1 || 0, m.sold.tyres1]);
+  // The same single copy sold on both devices: gone, and its price is paid once.
+  const A4 = mk('A', 900, (c) => { c.parts = { tyres1: 1 }; c.bought = { tyres1: 1 }; }), B4 = copy(A4, 'B');
+  for (const [c, id] of [[A4, 'A'], [B4, 'B']]) { W.setFit(c, 'classic', []); W.setFit(c, 'buggy', []); W.sell(c, 'tyres1'); reconcile(c, id); }
+  out.sellBoth = both(A4, B4).map((m) => [m.parts.tyres1 || 0, m.coins]);
   // Merging twice changes nothing (idempotent), and old saves (no sold field) load with none.
-  const m1 = mergeCareer(sold.c, B1), m2 = mergeCareer(m1, B1), m3 = mergeCareer(m1, sold.c);
-  out.again = [m2.parts.engine1, m2.sold.engine1, m3.parts.engine1, m3.sold.engine1];
-  const old = cleanCareer({ ...newCareer(), parts: { engine1: 2 } });
-  delete old.sold;
-  out.old = { sold: JSON.stringify(cleanCareer(old).sold), parts: cleanCareer(old).parts.engine1 };
-  // Hostile sold values.
-  const H = cleanCareer({ ...newCareer(), parts: { engine1: 3, turbo1: 1 }, sold: { engine1: 1e12, turbo1: -5, nope: 4, tyres1: 'x', armor1: NaN, ['__proto__']: 3, ['x'.repeat(80)]: 2, driftSpring: 2.6 } });
-  out.hostile = { sold: H.sold, keys: Object.keys(H.sold).sort().join(',') };
-  const HM = mergeCareer(H, B1);
+  const m1 = mergeCareer(sold.c, B1, null), m2 = mergeCareer(m1, B1, null), m3 = mergeCareer(m1, sold.c, null);
+  out.again = [m2.parts.engine1, m2.sold.engine1, m3.parts.engine1, m3.sold.engine1, m2.coins === m1.coins && m3.coins === m1.coins];
+  const old = cleanCareer({ v: 1, parts: { engine1: 2 } });
+  out.old = { sold: JSON.stringify(old.sold), parts: old.parts.engine1 };
+  // Hostile sold values in an old save (no ledger) are bounded; in a ledger save the field is derived, so ignored.
+  const H = cleanCareer({ v: 1, parts: { engine1: 3, turbo1: 1 }, sold: { engine1: 1e12, turbo1: -5, nope: 4, tyres1: 'x', armor1: NaN, ['__proto__']: 3, ['x'.repeat(80)]: 2, driftSpring: 2.6 } });
+  out.hostile = { sold: H.sold, keys: Object.keys(H.sold).sort().join(','), parts: H.parts };
+  out.hostileLedger = cleanCareer({ ...newCareer(), sold: { engine1: 1e12 } }, null).sold;
+  const HM = mergeCareer(H, B1, null);
   out.hostileMerge = { parts: HM.parts, sold: HM.sold };
-  out.hostileSold = mergeCareer(cleanCareer({ ...newCareer(), sold: { engine1: 1e12 } }), B1); // a huge sold count only ever removes that part
-  const HA = cleanCareer({ ...newCareer(), sold: [1, 2, 3] }), HB = cleanCareer({ ...newCareer(), sold: 'x' });
+  out.hostileSold = mergeCareer(cleanCareer({ v: 1, sold: { engine1: 1e12 } }), B1, null); // a huge old sold count removes no one else's copies
+  const HA = cleanCareer({ v: 1, sold: [1, 2, 3] }), HB = cleanCareer({ ...newCareer(), sold: 'x' });
   out.hostileShape = [JSON.stringify(HA.sold), JSON.stringify(HB.sold)];
   // Counts stay within bounds after merging huge acquired counts.
-  const big = mergeCareer(mk(5, (c) => { c.parts = { engine1: 20 }; c.sold = { engine1: 1000 }; }), mk(4, (c) => { c.parts = { engine1: 20 }; c.sold = { engine1: 1000 }; }));
+  const big = mergeCareer({ v: 1, xp: 5, parts: { engine1: 20 }, sold: { engine1: 1000 } }, { v: 1, xp: 4, parts: { engine1: 20 }, sold: { engine1: 1000 } }, null);
   out.big = [big.parts.engine1, big.sold.engine1];
   return out;
 });
 console.log('sync', JSON.stringify(sync));
 check('sell: a sale lowers the count and records it', sync.sellOne.r && sync.sellOne.sold === 1 && sync.sellOne.parts === 1);
-check('sell on A, B still holds it: the sale survives the merge (both orders)', sync.sellOne.m.every(([n, s]) => n === 1 && s === 1), JSON.stringify(sync.sellOne.m));
+check('sell on A, B still holds it: the sale survives the merge, coins paid once (both orders)', sync.sellOne.m.every(([n, s, c]) => n === 1 && s === 1 && c === 680), JSON.stringify(sync.sellOne.m));
 check('sell the only copy: it does not come back, loadouts drop it (both orders)', sync.sellOnly.r && sync.sellOnly.m.every(([n, s, l]) => n === 0 && s === 1 && l === ''), JSON.stringify(sync.sellOnly.m));
 check('buy on B after a sale on A: purchase kept, sale kept (both orders)', sync.buyB.every(([n, s]) => n === 2 && s === 1), JSON.stringify(sync.buyB));
-check('sold on both devices: stays sold', sync.sellBoth.every(([n, s]) => n === 0 && s === 1), JSON.stringify(sync.sellBoth));
-check('merging again changes nothing', sync.again.join() === '1,1,1,1', sync.again.join());
+check('the same copy sold on both devices: stays sold, its price paid once', sync.sellBoth.every(([n, c]) => n === 0 && c === 150), JSON.stringify(sync.sellBoth));
+check('merging again changes nothing', sync.again.join() === '1,1,1,1,true', sync.again.join());
 check('old save without sold loads with none', sync.old.sold === '{}' && sync.old.parts === 2, JSON.stringify(sync.old));
-check('hostile sold values are bounded and cleaned', sync.hostile.sold.engine1 === 1000 && sync.hostile.sold.driftSpring === 3 && sync.hostile.keys === 'driftSpring,engine1', JSON.stringify(sync.hostile));
-check('hostile merge stays within bounds', Object.values(sync.hostileMerge.parts).every((n) => n >= 1 && n <= 20) && sync.hostileMerge.sold.engine1 === 1000 && sync.hostileMerge.parts.engine1 === 3 && !('engine1' in sync.hostileSold.parts), JSON.stringify([sync.hostileMerge, sync.hostileSold]));
+check('hostile sold values are bounded and cleaned', sync.hostile.sold.engine1 === 1000 && sync.hostile.sold.driftSpring === 3 && sync.hostile.keys === 'driftSpring,engine1' && sync.hostile.parts.engine1 === 3 && JSON.stringify(sync.hostileLedger) === '{}', JSON.stringify(sync.hostile));
+check('hostile merge stays within bounds', Object.values(sync.hostileMerge.parts).every((n) => n >= 1 && n <= 20) && sync.hostileMerge.sold.engine1 === 1000 && sync.hostileMerge.parts.engine1 === 5 && sync.hostileSold.parts.engine1 === 2, JSON.stringify([sync.hostileMerge, sync.hostileSold.parts]));
 check('sold of the wrong shape is ignored', sync.hostileShape.join() === '{},{}', sync.hostileShape.join());
 check('huge acquired counts stay bounded', sync.big.join() === '20,1000', sync.big.join());
 
@@ -244,7 +247,7 @@ const lines = await p.evaluate(() => {
   return o;
 });
 console.log('lines', JSON.stringify(lines));
-check('setup lines say what the mode uses', lines.quick === 'Workshop parts: on' && lines.gp === 'Workshop parts: on' && lines.battle === 'Workshop parts: on' && /^Stock stats/.test(lines.tt) && /off/.test(lines.off), JSON.stringify(lines));
+check('setup lines say what the mode uses', lines.quick === 'Workshop parts: on' && lines.gp === 'Workshop parts: on' && lines.battle === 'Workshop parts: on' && /stock stats/i.test(lines.tt) && /off/.test(lines.off), JSON.stringify(lines));
 check('daily and weekly screens say stock stats', /Stock stats/.test(lines.daily) && /Stock stats/.test(lines.weekly));
 check('settings toggle: default on, turns off and on', lines.toggle === true && lines.saved === false && lines.back === true);
 // default for a new settings file is on

@@ -1,13 +1,13 @@
 // Runs the headless browser tests and prints a pass/fail summary.
 //
 //   cd zoomies/tools/tests && npm install      (once: playwright-core)
-//   node run.mjs              quick suites (about 5 minutes)
+//   node run.mjs              quick suites (about 6 minutes)
 //   node run.mjs full         every suite (about 25 minutes)
 //   node run.mjs release      backup codes, offline play, updates, About (own temp servers)
 //   node run.mjs battle-sim crater   one suite, with its own arguments
 //   node run.mjs balance      opt-in: seeded AI races, balance bands (report: node ../balance.mjs)
 //
-// It serves zoomies/ on http://localhost:8000 (or uses a server already
+// It serves zoomies/ on http://localhost:8000 ($ZPORT if set; or uses a server already
 // running there) and runs each script in zoomies/test-out/, where the
 // screenshots land. A suite fails on a non-zero exit, a page error, a
 // non-zero "errors N" line or a logged Content Security Policy violation.
@@ -27,13 +27,17 @@ const SUITES = {
   'battle-sim': ['battle-sim.mjs', ['pinball'], 8],
   items: ['items.mjs', [], 5],
   picker: ['picker.mjs', [], 5],
+  ledger: ['ledger.mjs', ['1000'], 5], // pure node: save ledger property test and sync/backup scenarios
   'race-sim': ['race-sim.mjs', ['sprout,odyssey'], 15],
+  rules: ['rules.mjs', [], 8],
   career: ['career.mjs', [], 15],
   league: ['league.mjs', [], 15],
   cup: ['cup.mjs', [], 10],
   racers: ['racers.mjs', [], 6],
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
+  syncflow: ['syncflow.mjs', [], 8],
+  netsec: ['netsec.mjs', [], 15], // online hardening, GPU leaks, the crash screen
   events: ['events.mjs', [], 25],
   eventsint: ['eventsint.mjs', [], 20],
   shortcuts: ['shortcuts.mjs', [], 25],
@@ -45,7 +49,7 @@ const SUITES = {
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
   balance: ['balance-check.mjs', [], 12], // opt-in: seeded AI races, checks the balance bands
 };
-const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];
+const QUICK = ['tracks', 'battle-sim', 'items', 'picker', 'ledger'];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 

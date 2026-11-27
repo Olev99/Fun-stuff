@@ -21,7 +21,7 @@ const gold = (track) => +medalTimes(track)[2].toFixed(2);
 export const LEAGUE = [
   {
     id: 'L1', name: 'Comeback Season', ev: 'signature', rival: 'ember', alt: 'pip', field: ['hopper', 'zorp', 'pip', 'volt'], joins: [], league: true,
-    cls: 'zoom', diff: 'hard', bossDiff: 'hard', mult: 1.2,
+    cls: 'zoom', diff: 'hard', bossDiff: 'hard', mult: 2.6,
     blurb: 'The old champions are back, and every one of them has something to prove.',
     ai: { bodies: ['comet', 'classic', 'stomper'], up: 2 }, boss: { body: 'bolt', up: 3 },
     clue: 'Someone pinned a note to the finish banner: "A TRUE LEAGUE IS TESTED. -M". It smelled of honey.',
@@ -82,7 +82,7 @@ export const LEAGUE = [
   },
   {
     id: 'L2', name: 'Masked Rival', ev: 'signature', rival: 'mask', alt: 'ember', field: ['ember', 'volt', 'rexi'], joins: [], league: true,
-    cls: 'turbo', diff: 'hard', bossDiff: 'hard', mult: 1.35,
+    cls: 'turbo', diff: 'hard', bossDiff: 'hard', mult: 2.9,
     blurb: 'Someone in a mask keeps wrecking the events. Who, and why?',
     ai: { bodies: ['comet', 'stomper', 'classic'], up: 3 }, boss: { body: 'stomper', up: 4 },
     clue: 'The Masked Racer is huge, says "Heh", fixes everything afterwards and leaves honey on the evidence.',
@@ -143,7 +143,7 @@ export const LEAGUE = [
   },
   {
     id: 'L3', name: 'Gearbox Gus', ev: 'wild', rival: 'gearbox', alt: 'bruno', field: ['bruno', 'ember', 'hopper', 'pip'], joins: [], league: true,
-    cls: 'turbo', diff: 'hard', bossDiff: 'hard', mult: 1.5,
+    cls: 'turbo', diff: 'hard', bossDiff: 'hard', mult: 3.2,
     blurb: 'Gramps comes out of retirement. One race, properly, at last.',
     ai: { bodies: ['comet', 'stomper', 'bolt'], up: 4 }, boss: { body: 'bolt', up: 5 },
     clue: 'Gramps never raced his student. Seven lessons, one wrench, one Starbolt in the shed.',

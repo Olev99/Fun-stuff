@@ -354,7 +354,7 @@ export class WheelPad {
       this.t.send('host', {
         t: 'in', s: +this.steer.toFixed(3), d: this.btn.drift ? 1 : 0, b: this.btn.brake ? 1 : 0, lb: this.btn.back ? 1 : 0,
         is: this.itemSeq, ia: this.itemAim, us: this.uiSeq, ua: this.uiA,
-      });
+      }, true); // fast: the next frame's input replaces this one
     }
     if (performance.now() - this.fbAt > 2500) $('wp-state').classList.add('lost');
   }

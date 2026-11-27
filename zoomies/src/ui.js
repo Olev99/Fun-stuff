@@ -124,6 +124,10 @@ export class UI {
       case 'results':
         app.onResultsAction(action);
         break;
+      case 'oops':
+        if (action === 'menu') app.recover();
+        else if (action === 'copy') this._copyOops();
+        break;
       case 'career':
         app.careerUI.action(action);
         break;
@@ -218,7 +222,7 @@ export class UI {
   challengeCard(c, text) {
     this._thumb($('chal-thumb'), [trackById(c.trackId)], c.reverse);
     $('chal-text').textContent = text;
-    $('chal-sub').textContent = `${{ chill: 'Chill', zoom: 'Zoom', turbo: 'Turbo' }[c.speedClass]} speed. A see-through ghost drives their lap; cross the line first.`;
+    $('chal-sub').textContent = `Zoom speed (Time Trial always is). A see-through ghost drives their lap; cross the line first.`;
     this.app.previewTrack(c.trackId, c.reverse);
     this.show('challenge');
   }
@@ -580,7 +584,7 @@ export class UI {
     $('class-seg').hidden = this.mode === 'tt';
     $('diff-seg').hidden = this.mode === 'tt';
     $('reverse').checked = !!this.app.settings.reverse;
-    $('ws-line').textContent = this.mode === 'tt' ? 'Stock stats and no track events in this mode, so records stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
+    $('ws-line').textContent = this.mode === 'tt' ? 'Time Trial always runs at Zoom speed, with stock stats and no track events, so records and medals stay fair' : this.app.workshopOn() ? 'Workshop parts: on' : 'Workshop parts: off (Settings)';
     this._syncClass();
     this._renderTrackCards();
     this.show('track');
@@ -870,6 +874,23 @@ export class UI {
       $('tilt-dot').style.transform = `translateX(${v * 70}px)`;
       if (inp.tiltLive) $('tilt-status').textContent = `Working. Angle ${Math.round(inp.tilt.angle)}°`;
     }
+  }
+
+  // The error screen (main.js onCrash).
+  oops(text) {
+    $('oops-text').value = text;
+    this.show('oops');
+    $('oops-menu').focus();
+  }
+
+  async _copyOops() {
+    const t = $('oops-text'), b = $('oops-copy');
+    let ok = false;
+    try { await navigator.clipboard.writeText(t.value); ok = true; } catch (e) {
+      try { t.focus(); t.select(); ok = document.execCommand('copy'); } catch (e2) { /* selected for a manual copy */ }
+    }
+    b.textContent = ok ? 'Copied!' : 'Press and hold to copy';
+    setTimeout(() => { b.textContent = 'Copy error'; }, 2000);
   }
 
   // ---------------- Multiplayer lobby ----------------

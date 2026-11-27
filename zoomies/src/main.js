@@ -32,7 +32,7 @@ import { NetSession } from './net.js';
 import { PostFX } from './post.js';
 import { installHeightFog } from './env.js';
 import {
-  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, aiLoadouts, applyResult, evPlan, evSeedFor,
+  loadCareer, saveCareer, newCareer, resetCareer as clearCareer, eventById, modOf, rivalFor, playerLoadout, paintById, aiLoadouts, applyResult, evPlan, evSeedFor,
 } from './career.js';
 import { kitOf } from './workshop.js';
 
@@ -153,6 +153,10 @@ class App {
     addEventListener('keydown', (e) => this.onKey(e));
     $('podium-ui').addEventListener('click', () => { if (this.race) this.race.endPodium(); });
     this.canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
+    // Errors outside the frame loop: remembered for the error screen; uncaught ones count
+    // towards it (a refused promise is usually a browser saying no, so it does not).
+    addEventListener('error', (e) => this.onCrash(e.error || e.message));
+    addEventListener('unhandledrejection', (e) => this.onCrash(e.reason, false));
     this.canvas.addEventListener('webglcontextrestored', () => location.reload());
 
     this.toTitle();
@@ -343,7 +347,7 @@ class App {
   // such as a career rival), the player in the middle of the pack.
   makeGrid(player, gpOrder = null, must = []) {
     if (gpOrder) return gpOrder;
-    const req = must.filter((id) => id && id !== player);
+    const req = [...new Set(must.filter((id) => id && id !== player))]; // a rival can also be on the returning list: one seat each
     const pool = shuffle(CHARACTERS.map((c) => c.id).filter((id) => id !== player && !req.includes(id)));
     const others = shuffle([...req, ...pool.slice(0, 7 - req.length)]);
     others.splice(5, 0, player);
@@ -392,7 +396,8 @@ class App {
     const id = this.settings.vehicle;
     const lvl = levelOf((this.career && this.career.xp) || 0).level;
     const body = BODIES[id] && !bodyLocked(id, this.career, lvl) ? id : 'classic';
-    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body) } : { body };
+    const paint = this.career ? paintById(this.career.paint).color : null; // bought, jackpot and League paints show in every mode
+    return parts && this.workshopOn() ? { body, upgrades: kitOf(this.career, body), paint } : { body, paint };
   }
 
   // The Settings toggle 'Use Workshop parts in quick modes' (default on).
@@ -437,7 +442,7 @@ class App {
     const def0 = trackById(cfg.trackId);
     const trackDef = cfg.evOnly && def0.events ? { ...def0, events: def0.events.filter((id) => cfg.evOnly.includes(id)) } : def0;
     this.race = new Race(this, {
-      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.speedClass,
+      mode: cfg.mode, trackDef, reverse: cfg.reverse, player: cfg.player, grid, speedClass: cfg.mode === 'tt' && !cfg.careerEv ? 'zoom' : cfg.speedClass, // free Time Trial is always Zoom: fair records
       difficulty: cfg.difficulty || this.settings.difficulty, laps: cfg.laps || trackById(cfg.trackId).laps || 3,
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
       look: lookOf(this.career), ghost: cfg.ghost || null, evMode, evSeed,
@@ -726,7 +731,7 @@ class App {
     const lines = [];
     let title = pass ? 'Challenge complete!' : 'Not quite!';
     if (pass) {
-      const dr = completeDaily(this.career);
+      const dr = completeDaily(this.career, d.day);
       if (dr) {
         lines.push(`🔥 ${dr.streak}-day streak! Daily reward: a free prize capsule 🍬 · +${dr.xp} XP`);
         sum.coins += dr.coins;
@@ -811,8 +816,7 @@ class App {
     const msg = me.place === 1 ? `You won the <em>${gp.cup.name}</em>!` : `You finished <em>${me.place}${ordinal(me.place).toLowerCase()}</em> overall`;
     this.audio.play(me.place <= 3 ? 'finish' : 'lose');
     if (me.place === 1) addToSet(this.career, 'cups', gp.cup.id);
-    const bonus = [150, 90, 60][me.place - 1] || 20;
-    const rw = this.rewardsFinish(grant(this.career, bonus, me.place <= 3 ? 150 : 50), [`Cup bonus for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
+    const rw = this.rewardsFinish(grant(this.career, 0, me.place <= 3 ? 150 : 50), [`Cup XP for ${me.place}${ordinal(me.place).toLowerCase()} place`]);
     this.ui.results({
       title: 'Final standings',
       sub: gp.cup.name,
@@ -1102,7 +1106,13 @@ class App {
       this.ui.lobby('start', reason || 'Disconnected.');
     };
     ses.onError = (e) => {
-      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', (e && e.message) || 'Connection problem.');
+      const msg = ((e && e.message) || 'Connection problem.').slice(0, 140);
+      if (this.ui.current === 'lobby' && !ses.players.length) this.ui.lobby('start', msg);
+      else if (performance.now() - (this._netErrAt ?? -1e9) > 8000) { // say it, but not every frame
+        this._netErrAt = performance.now();
+        if (this.ui.current === 'lobby') document.getElementById('lobby-error').textContent = msg;
+        else this.hud.toast(`Connection problem: ${msg}`);
+      }
     };
     ses.onStart = (cfg) => this.startNetRace(cfg);
     ses.onToLobby = () => this.returnToLobbyView();
@@ -1289,6 +1299,42 @@ class App {
   // ---------------- loop ----------------
   loop(now) {
     requestAnimationFrame(this.loop);
+    try {
+      this._frame(now);
+    } catch (e) {
+      this.onCrash(e);
+    }
+  }
+
+  // Something threw. One slip is let go; a few within seconds stop the game behind the
+  // error screen (Back to menu, and the error text to copy for a report).
+  onCrash(err, counts = true) {
+    if (!this.ui || this.ui.current === 'oops') return;
+    console.error(err);
+    this.lastError = `${VERSION} · ${platformName}\n${String((err && err.stack) || err).slice(0, 1500)}`;
+    if (!counts) return;
+    const now = performance.now();
+    if (now - (this._errAt ?? -1e9) > 5000) this._errN = 0;
+    this._errAt = now;
+    if (++this._errN < 3) return;
+    this.paused = true;
+    try { this.audio.stopEngine(); this.hud.show(false); } catch (e) { /* the screen matters more */ }
+    this.ui.oops(this.lastError);
+  }
+
+  // Back to menu from the error screen, letting go of whatever race broke.
+  recover() {
+    this._errN = 0;
+    this.menuOpen = false;
+    const r = this.race;
+    this.race = null;
+    this.view = null;
+    try { if (r) r.dispose(); } catch (e) { /* half broken: drop it */ }
+    if (this.session) this.leaveMP();
+    else this.toTitle();
+  }
+
+  _frame(now) {
     let dt = (now - this.last) / 1000;
     this.last = now;
     if (dt <= 0) return;

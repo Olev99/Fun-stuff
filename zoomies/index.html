@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <!-- Content-Security-Policy: tools/stamp.mjs fills in the hashes of the inline scripts (script-src). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-gF1tMxsU6vQPYheVqzJm52/V/77gI5FshN3DSzNtV6Y='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nrmF3LaRu6kdWP8RtxF2y1f7UdctjcmRy8tGL7vCV8Q=' 'sha256-fHflm9AwKTCUTVLt5vD27nTyPaoozNF8biad8wadeCc='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="zoomies-version" content="653fabc">
+<meta name="zoomies-version" content="57db38a">
 <title>Zoomies!</title>
 <meta name="description" content="A tilt-to-steer kart racer for your phone. Drift, boost and bump your way to the podium.">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -985,7 +985,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
 .bk-facts { display: flex; flex-wrap: wrap; gap: 6px; }
 .bk-facts span { font-family: var(--font-display); font-size: 12.5px; padding: 5px 9px 4px; border-radius: 10px; background: var(--ink-3); color: var(--cream); }
 .bk-facts b { font-weight: 400; color: var(--sun); }
-#bk-code, #bk-paste {
+#bk-code, #bk-paste, #oops-text {
   width: 100%; resize: none; font: 600 12px/1.3 ui-monospace, Menlo, monospace; padding: 7px 9px; border-radius: 10px; border: 3px solid var(--ink);
   background: var(--cream); color: var(--ink); -webkit-user-select: text; user-select: text; touch-action: manipulation; word-break: break-all;
 }
@@ -1525,7 +1525,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
         <div id="bk-preview" hidden>
           <div class="bk-facts" id="bk-facts"></div>
           <div class="bk-row"><button class="btn mint small" id="bk-merge">Merge with this device</button><button class="btn hot small" id="bk-replace">Replace this device</button></div>
-          <p class="bk-note">Merge keeps the best of both. Replace makes this device match the backup exactly.</p>
+          <p class="bk-note">Merge adds this device's own progress to the backup's. Replace makes this device match the backup exactly.</p>
         </div>
       </div>
     </div>
@@ -1619,6 +1619,15 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
   </div>
 </section>
 
+<section id="scr-oops" class="screen center shade-full" hidden>
+  <div class="dialog panel" style="width:min(440px,100%)">
+    <h2 class="title">Something went wrong</h2>
+    <p class="bk-note">The game hit a problem and stopped. Back to the menu should get you going again. If it keeps happening, copy the details below and send them to us.</p>
+    <textarea id="oops-text" readonly rows="4" spellcheck="false" aria-label="Error details"></textarea>
+    <div class="bottom-bar"><button class="btn alt small" id="oops-copy" data-go="copy">Copy error</button><button class="btn hot" id="oops-menu" data-go="menu">Back to menu</button></div>
+  </div>
+</section>
+
 <section id="scr-results" class="screen center shade-full" hidden>
   <div class="dialog panel" style="width:min(560px,100%)">
     <div class="top-bar"><h2 class="title" id="res-title">Results</h2><span class="eyebrow" id="res-sub"></span></div>
@@ -1645,7 +1654,7 @@ html.desktop .intro-keys { display: flex; flex-wrap: wrap; justify-content: cent
     }
   }, 9000);
 </script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=7a6fe224", "./src/arenas.js": "./src/arenas.js?v=3c7b65f4", "./src/audio.js": "./src/audio.js?v=28191a7d", "./src/backup.js": "./src/backup.js?v=8c4c7717", "./src/battle.js": "./src/battle.js?v=dcd496e0", "./src/career.js": "./src/career.js?v=39f25d32", "./src/careerui.js": "./src/careerui.js?v=f995bd81", "./src/characters.js": "./src/characters.js?v=86619e10", "./src/coach.js": "./src/coach.js?v=d2a23bd0", "./src/cosmetics.js": "./src/cosmetics.js?v=242b95b1", "./src/env.js": "./src/env.js?v=de0c051a", "./src/events.js": "./src/events.js?v=7d47b43c", "./src/evint.js": "./src/evint.js?v=b1c86a32", "./src/ghost.js": "./src/ghost.js?v=ac13c7a6", "./src/ghostlink.js": "./src/ghostlink.js?v=7957bf0f", "./src/gumballui.js": "./src/gumballui.js?v=a36ce4ca", "./src/hud.js": "./src/hud.js?v=8f5592a4", "./src/input.js": "./src/input.js?v=e177d516", "./src/items.js": "./src/items.js?v=b633418c", "./src/kart.js": "./src/kart.js?v=cfca3f32", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/league.js": "./src/league.js?v=774d61f1", "./src/main.js": "./src/main.js?v=519e3ebe", "./src/mastery.js": "./src/mastery.js?v=eff00973", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=903fd996", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=1c454db3", "./src/nextup.js": "./src/nextup.js?v=b88378c8", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=a74ec9ae", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=3870611c", "./src/profile.js": "./src/profile.js?v=abaa1b6e", "./src/pwa.js": "./src/pwa.js?v=9f2ff847", "./src/race.js": "./src/race.js?v=c2eb2ad3", "./src/safeui.js": "./src/safeui.js?v=9bbad7bd", "./src/settings.js": "./src/settings.js?v=eb86117d", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=c6c406ed", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=0b41fa15", "./src/ui.js": "./src/ui.js?v=9a25dfcc", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/weekly.js": "./src/weekly.js?v=dc631afb", "./src/wheel.js": "./src/wheel.js?v=347fd8d0", "./src/workshop.js": "./src/workshop.js?v=95e28ab3", "./src/world.js": "./src/world.js?v=d59799e7", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
-<script type="module" src="./src/main.js?v=519e3ebe"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js?v=8b618bd9", "./src/ai.js": "./src/ai.js?v=7a6fe224", "./src/arenas.js": "./src/arenas.js?v=3c7b65f4", "./src/audio.js": "./src/audio.js?v=28191a7d", "./src/backup.js": "./src/backup.js?v=912036f1", "./src/battle.js": "./src/battle.js?v=dd2887c9", "./src/career.js": "./src/career.js?v=b5d57d1d", "./src/careerui.js": "./src/careerui.js?v=f995bd81", "./src/characters.js": "./src/characters.js?v=86619e10", "./src/coach.js": "./src/coach.js?v=d2a23bd0", "./src/cosmetics.js": "./src/cosmetics.js?v=abd1fa3e", "./src/env.js": "./src/env.js?v=de0c051a", "./src/events.js": "./src/events.js?v=9181b74f", "./src/evint.js": "./src/evint.js?v=b1c86a32", "./src/ghost.js": "./src/ghost.js?v=107fd34e", "./src/ghostlink.js": "./src/ghostlink.js?v=7957bf0f", "./src/gumballui.js": "./src/gumballui.js?v=a36ce4ca", "./src/hud.js": "./src/hud.js?v=8f5592a4", "./src/input.js": "./src/input.js?v=e177d516", "./src/items.js": "./src/items.js?v=49befc4f", "./src/kart.js": "./src/kart.js?v=29ec60cf", "./src/karts.js": "./src/karts.js?v=fb81fb32", "./src/league.js": "./src/league.js?v=5d268b5b", "./src/ledger.js": "./src/ledger.js?v=2f09ea2f", "./src/main.js": "./src/main.js?v=27de03e4", "./src/mastery.js": "./src/mastery.js?v=eff00973", "./src/medals.js": "./src/medals.js?v=c18eeb44", "./src/missions.js": "./src/missions.js?v=d4a9ad92", "./src/music.js": "./src/music.js?v=8b46ec01", "./src/nametags.js": "./src/nametags.js?v=a9083166", "./src/net.js": "./src/net.js?v=5b3f7685", "./src/nextup.js": "./src/nextup.js?v=b88378c8", "./src/particles.js": "./src/particles.js?v=3a9fc609", "./src/parts.js": "./src/parts.js?v=a74ec9ae", "./src/platform.js": "./src/platform.js?v=9b29beb2", "./src/post.js": "./src/post.js?v=275812a2", "./src/prizes.js": "./src/prizes.js?v=d0bd0c6d", "./src/profile.js": "./src/profile.js?v=4e78cd9e", "./src/pwa.js": "./src/pwa.js?v=9f2ff847", "./src/race.js": "./src/race.js?v=26c1e433", "./src/safeui.js": "./src/safeui.js?v=2b0684a1", "./src/settings.js": "./src/settings.js?v=183ab7fe", "./src/showroom.js": "./src/showroom.js?v=9c1ffc89", "./src/skids.js": "./src/skids.js?v=d3412579", "./src/sync.js": "./src/sync.js?v=a94059e2", "./src/textures.js": "./src/textures.js?v=3788ad43", "./src/track.js": "./src/track.js?v=1205e3cc", "./src/tracks.js": "./src/tracks.js?v=0b41fa15", "./src/ui.js": "./src/ui.js?v=f6035303", "./src/util.js": "./src/util.js?v=a73dbefb", "./src/weather.js": "./src/weather.js?v=ee78c56b", "./src/weekly.js": "./src/weekly.js?v=2e44e8c7", "./src/wheel.js": "./src/wheel.js?v=3d232793", "./src/workshop.js": "./src/workshop.js?v=95b4c77f", "./src/world.js": "./src/world.js?v=eb3564ff", "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=293e7e0e" } }</script>
+<script type="module" src="./src/main.js?v=27de03e4"></script>
 </body>
 </html>
