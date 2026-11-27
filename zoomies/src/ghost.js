@@ -3,6 +3,7 @@ import { kartGeometry, wheelGeometry, bodyById } from './karts.js';
 import { charById } from './characters.js';
 import { pbrMat } from './util.js';
 import { hatById } from './cosmetics.js';
+import { store } from './ledger.js';
 
 // Time trial ghosts: your best run on each track (and direction) is recorded
 // at 10 samples a second, saved on the phone and replayed as a see-through
@@ -53,7 +54,8 @@ export function parseGhost(raw) {
 }
 
 // The fields a ghost is stored with (drops anything else a synced copy carried).
-export const ghostJSON = (g) => JSON.stringify({ time: g.time, splits: g.splits, char: g.char, body: g.body, paint: g.paint ?? null, hat: g.hat ?? null, data: g.data });
+// `at`: when it was saved here, so the oldest ghosts make room first when storage is full (ledger.js store).
+export const ghostJSON = (g) => JSON.stringify({ time: g.time, splits: g.splits, char: g.char, body: g.body, paint: g.paint ?? null, hat: g.hat ?? null, data: g.data, at: Number.isFinite(g.at) ? g.at : 0 });
 
 export function loadGhost(key) {
   try {
@@ -80,13 +82,8 @@ export class GhostRecorder {
   save(key, time, splits, kart) {
     const old = loadGhost(key);
     if (old && old.time <= time) return false;
-    const g = { time, splits, char: kart.ch.id, body: kart.bodyDef.id, paint: kart.paint || null, hat: (kart.look && kart.look.hat) || null, data: toB64(new Int16Array(this.buf)) };
-    try {
-      localStorage.setItem(KEY + key, JSON.stringify(g));
-      return true;
-    } catch (e) {
-      return false;
-    }
+    const g = { time, splits, char: kart.ch.id, body: kart.bodyDef.id, paint: kart.paint || null, hat: (kart.look && kart.look.hat) || null, data: toB64(new Int16Array(this.buf)), at: Date.now() };
+    return store(KEY + key, JSON.stringify(g), 'ghost');
   }
 }
 

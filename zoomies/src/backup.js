@@ -1,6 +1,7 @@
 import { b64uEncode, b64uDecode, gzip, gunzip } from './ghostlink.js';
 import { cleanCareer, saveCareer, loadCareer, chaptersDone, CHAPTERS } from './career.js';
-import { mergeCareer, mergeRecords, cleanRecords, writeGhost, GHOST_KEY } from './sync.js';
+import { mergeCareer, mergeRecords, cleanRecords, writeGhost, GHOST_KEY, MAX_PEER_GHOST } from './sync.js';
+import { FMT, newDeviceId } from './ledger.js';
 import { parseGhost, ghostJSON } from './ghost.js';
 import { DEFAULTS, saveSettings, saveRecords } from './settings.js';
 import { rankInfo } from './league.js';
@@ -10,6 +11,9 @@ import { cleanNick } from './nametags.js';
 // Backup codes: everything that matters (the Career save, the settings worth
 // keeping, records and best-lap ghosts) as one line of text that can be saved
 // in Notes or sent to yourself:  ZB1 . base64url(gzip(JSON)) . checksum
+// The JSON carries `fmt` (the save ledger's format, see sync.js): a code from
+// a different format is refused; codes from before the ledger (no fmt) still
+// restore, their save becomes a legacy ledger entry (career.js).
 // A pasted code is hostile input: size-capped, checksummed, decompressed with
 // a bomb guard, and every part goes through the same validators as a synced
 // save. Reading a code never throws; it returns { error } instead.
@@ -54,10 +58,11 @@ function collectGhosts() {
 
 // { career, settings, records } -> { code, ghosts }. Ghosts are optional (they make the code longer).
 export async function buildBackup({ career, settings, records }, { ghosts = true } = {}) {
+  saveCareer(career); // bring the ledger up to date with this device first
   const g = ghosts ? collectGhosts() : {};
   const s = {};
   for (const k of SETTING_KEYS) if (settings && settings[k] !== undefined) s[k] = settings[k];
-  const bytes = await gzip(new TextEncoder().encode(JSON.stringify({ app: 'zoomies', at: Date.now(), career, settings: s, records: records || {}, ghosts: g })));
+  const bytes = await gzip(new TextEncoder().encode(JSON.stringify({ app: 'zoomies', fmt: FMT, at: Date.now(), career, settings: s, records: records || {}, ghosts: g })));
   return { code: `${PREFIX}.${b64uEncode(bytes)}.${fnv(bytes)}`, ghosts: Object.keys(g).length };
 }
 
@@ -90,13 +95,14 @@ export async function readBackup(text) {
     if (!raw) return { error: 'That code is not a valid backup.' };
     const d = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(raw));
     if (!isObj(d) || d.app !== 'zoomies') return { error: 'That code is not a Zoomies backup.' };
-    const career = cleanCareer(d.career);
+    if (d.fmt !== undefined && d.fmt !== FMT) return { error: d.fmt > FMT ? 'This backup comes from a newer version of Zoomies. Update the game (reload it) and try again.' : 'This backup comes from a different version of Zoomies and cannot be restored here.' };
+    const career = cleanCareer(d.career, null);
     if (!career) return { error: 'The save inside that code is not valid.' };
     const ghosts = {};
     if (isObj(d.ghosts)) {
       for (const [k, v] of Object.entries(d.ghosts).slice(0, 200)) {
         const g = GHOST_KEY.test(k) ? parseGhost(JSON.stringify(v)) : null;
-        if (g) ghosts[k] = ghostJSON(g);
+        if (g && g.data.length <= MAX_PEER_GHOST) ghosts[k] = ghostJSON({ ...g, at: Date.now() });
       }
     }
     return { career, settings: cleanSettings(d.settings), records: cleanRecords(d.records), ghosts, at: Number.isFinite(d.at) ? d.at : 0 };
@@ -114,27 +120,31 @@ export function describeBackup(b) {
 // Put a read backup on this device ('merge' combines it with the save here,
 // 'replace' makes this device exactly the backup, keeping only device-specific
 // settings). The caller reloads the page afterwards so every screen starts clean.
+// Returns false when this device could not store it (storage full or blocked).
 export function applyBackup(app, b, mode) {
   let career, records;
   if (mode === 'replace') {
-    career = b.career;
+    // A fresh device id: the backup's entry for the old one stays as it was, so a later
+    // sync with a device that saw more of it neither loses nor doubles anything.
+    newDeviceId();
+    career = cleanCareer(b.career, null);
     records = b.records;
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
         if (k && k.startsWith(GHOST)) localStorage.removeItem(k);
       }
-      for (const [k, raw] of Object.entries(b.ghosts)) localStorage.setItem(GHOST + k, raw);
-    } catch (e) { /* storage full or blocked */ }
+    } catch (e) { /* storage blocked */ }
     app.settings = { ...app.settings, ...b.settings };
     saveSettings(app.settings);
   } else {
     career = mergeCareer(app.career, b.career);
     records = mergeRecords(app.records, b.records);
-    for (const [k, raw] of Object.entries(b.ghosts)) writeGhost(k, raw);
   }
-  saveCareer(career);
-  saveRecords(records);
+  let ok = saveCareer(career);
+  ok = saveRecords(records) && ok;
+  for (const [k, raw] of Object.entries(b.ghosts)) writeGhost(k, raw);
   app.career = loadCareer() || career;
   app.records = records;
+  return ok;
 }

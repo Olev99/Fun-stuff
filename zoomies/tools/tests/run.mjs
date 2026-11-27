@@ -1,7 +1,7 @@
 // Runs the headless browser tests and prints a pass/fail summary.
 //
 //   cd zoomies/tools/tests && npm install      (once: playwright-core)
-//   node run.mjs              quick suites (about 5 minutes)
+//   node run.mjs              quick suites (about 6 minutes)
 //   node run.mjs full         every suite (about 25 minutes)
 //   node run.mjs release      backup codes, offline play, updates, About (own temp servers)
 //   node run.mjs battle-sim crater   one suite, with its own arguments
@@ -27,6 +27,7 @@ const SUITES = {
   'battle-sim': ['battle-sim.mjs', ['pinball'], 8],
   items: ['items.mjs', [], 5],
   picker: ['picker.mjs', [], 5],
+  ledger: ['ledger.mjs', ['1000'], 5], // pure node: save ledger property test and sync/backup scenarios
   'race-sim': ['race-sim.mjs', ['sprout,odyssey'], 15],
   career: ['career.mjs', [], 15],
   league: ['league.mjs', [], 15],
@@ -34,6 +35,7 @@ const SUITES = {
   racers: ['racers.mjs', [], 6],
   'battle-online': ['battle-online.mjs', [], 10],
   online: ['online.mjs', [], 10],
+  syncflow: ['syncflow.mjs', [], 8],
   events: ['events.mjs', [], 25],
   eventsint: ['eventsint.mjs', [], 20],
   shortcuts: ['shortcuts.mjs', [], 25],
@@ -45,7 +47,7 @@ const SUITES = {
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
   balance: ['balance-check.mjs', [], 12], // opt-in: seeded AI races, checks the balance bands
 };
-const QUICK = ['tracks', 'battle-sim', 'items', 'picker'];
+const QUICK = ['tracks', 'battle-sim', 'items', 'picker', 'ledger'];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 
