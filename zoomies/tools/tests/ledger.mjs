@@ -220,6 +220,15 @@ const sync = (host, guest, lost = false) => { host.c = S.mergeCareer(host.c, clo
   const sb = W.sell(B.c, 'engine1'); save(B);
   sync(A, B);
   check('t1 the same copy sold on two devices pays once', sa.ok && sb.ok && A.c.coins === 1000 && !A.c.parts.engine1 && B.c.coins === 1000, `${A.c.coins} ${JSON.stringify(A.c.parts)}`);
+  // A dropped copy sold on both, then a second drop of that part: it settles the second sale (seed 1 run 215).
+  const D = dev('D'), E = dev('E');
+  W.grant(D.c, 'armor1'); D.c.drops['c1-3'] = 'armor1'; save(D);
+  sync(D, E);
+  for (const x of [D, E]) { W.setFit(x.c, x.c.body, []); W.sell(x.c, 'armor1'); save(x); }
+  sync(D, E);
+  const owed = E.c.coins;
+  W.grant(E.c, 'armor1'); E.c.drops['c2-2'] = 'armor1'; save(E);
+  check('t1 a second drop settles a copy sold twice: both sales pay, no part left', E.c.coins === owed + PA.EARNED_SELL && !E.c.parts.armor1, `${E.c.coins}/${owed + PA.EARNED_SELL} ${JSON.stringify(E.c.parts)}`);
 }
 // t2 (R2-4): three devices, a lost reply, and a tie on what you drive.
 {

@@ -527,7 +527,7 @@ function view(c) {
   const raw = { coins: T.e - T.s + R.coins - debt, freeCaps: T.ke - T.ku + R.caps, parts: rawParts };
   return {
     coins: count(raw.coins), freeCaps: count(raw.freeCaps), xp: count(T.x), earned: count(T.n + R.coins),
-    parts, sold, soldFor, st: T.st, raw,
+    parts, sold, soldFor, st: T.st, raw, debt,
   };
 }
 
@@ -537,7 +537,9 @@ function applyLedger(c) {
   const v = view(c);
   for (const k of ['coins', 'freeCaps', 'xp', 'earned', 'parts', 'sold', 'soldFor']) c[k] = v[k];
   const off = {}, p = {};
-  if (v.coins !== v.raw.coins) off.c = v.coins - v.raw.coins;
+  // The coin offset leaves the debt out: a drop claim that settles a copy sold twice pays the
+  // coins back in the view, not as a change this device made (reconcile adds the debt back).
+  if (v.coins !== v.raw.coins + v.debt) off.c = v.coins - v.raw.coins - v.debt;
   if (v.freeCaps !== v.raw.freeCaps) off.k = v.freeCaps - v.raw.freeCaps;
   for (const [id, r] of Object.entries(v.raw.parts)) if ((v.parts[id] || 0) !== r) p[id] = (v.parts[id] || 0) - r;
   if (Object.keys(p).length) off.p = p;
@@ -569,7 +571,7 @@ export function reconcile(c, dev = deviceId()) {
   // The base is what the ledger says now (with any new claims) plus the clamp offset it was shown with.
   const v = view(c), d = { st: {}, pa: {}, ps: {}, pv: {} }, off = c.led.off || {}, offP = off.p || {};
   const up = (now, base, plus, minus) => { const x = count(now) - base; if (x > 0 && plus) d[plus] = x; if (x < 0 && minus) d[minus] = -x; };
-  up(c.coins, v.raw.coins + (off.c || 0), 'e', 's');
+  up(c.coins, v.raw.coins + v.debt + (off.c || 0), 'e', 's');
   up(c.freeCaps, v.raw.freeCaps + (off.k || 0), 'ke', 'ku');
   up(c.earned, v.earned, 'n');
   for (const id of new Set([...Object.keys(c.parts || {}), ...Object.keys(v.raw.parts), ...Object.keys(offP)])) {

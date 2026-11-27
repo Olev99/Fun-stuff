@@ -1,5 +1,5 @@
 {
- "v": "9e91b1b",
+ "v": "57db38a",
  "urls": [
   "index.html",
   "manifest.webmanifest",
@@ -18,7 +18,7 @@
   "src/audio.js?v=28191a7d",
   "src/backup.js?v=912036f1",
   "src/battle.js?v=dd2887c9",
-  "src/career.js?v=0014cc03",
+  "src/career.js?v=b5d57d1d",
   "src/careerui.js?v=f995bd81",
   "src/characters.js?v=86619e10",
   "src/coach.js?v=d2a23bd0",
