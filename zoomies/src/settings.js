@@ -28,6 +28,8 @@ export const DEFAULTS = {
   trackEvents: 'normal', // track events in quick races, cups and battles: off | normal | wild
   evWarn: 'full', // track event warnings: full (announcer line, 4-5 s) | short (3 s)
   workshopParts: true, // Workshop parts count in quick races, cups, battles and online (not in time trials or the daily and weekly)
+  textSize: 'normal', // normal | large (scales HUD and menu text)
+  leftHanded: false, // swap the touch controls' sides
   tiltZero: 0, // tilt angle that counts as level (set in the intro's tilt step)
 };
 
@@ -54,7 +56,14 @@ export function loadSettings() {
   // Touch steering makes no sense without a touch screen, and vice versa.
   if (isDesktop && (out.steering === 'tilt' || out.steering === 'touch')) out.steering = 'keys';
   if (!isDesktop && (out.steering === 'keys' || out.steering === 'wheel')) out.steering = 'tilt';
+  if (!['normal', 'large'].includes(out.textSize)) out.textSize = 'normal';
+  out.leftHanded = out.leftHanded === true;
   return out;
+}
+
+// Text size lives on <html> so the CSS variable reaches every screen.
+export function applyTextSize(s) {
+  document.documentElement.dataset.ts = s.textSize === 'large' ? 'large' : 'normal';
 }
 
 export function saveSettings(s) {

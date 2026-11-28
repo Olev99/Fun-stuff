@@ -160,7 +160,7 @@ export class GumballUI {
     if (!it) return;
     if (!owns(c, id)) {
       this.app.audio.play('uiBack');
-      this._note(it.rank ? `Reach Legend Rank ${it.rank} in the Legends League` : `Win it from the gumball machine (${RARITY[it.rarity].name})`);
+      this._note(it.rank ? `Reach Legend Rank ${it.rank} in the Legends League` : `Win it from the Prize Machine (${RARITY[it.rarity].name})`);
       return;
     }
     const kind = KINDS.find((k) => k.id === it.kind);

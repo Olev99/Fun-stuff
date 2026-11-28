@@ -683,7 +683,7 @@ export class CareerUI {
       ...r.paints.map((id) => paintById(id)).map((p) => `<i><u style="background:${p.color}"></u> ${esc(p.name)}</i>`),
     ];
     if (r.to >= MAX_RANK && r.up) chips.push('<i>🏛️ Title: Legend</i>');
-    const gifts = chips.length ? `<span class="rgifts">${chips.join('')}<small>Wear them in the Gumball machine (hats, trails, horns) and Garage (paint).</small></span>` : '';
+    const gifts = chips.length ? `<span class="rgifts">${chips.join('')}<small>Wear them in the Prize Machine (hats, trails, horns) and Garage (paint).</small></span>` : '';
     return `<p class="car-rank${r.up ? ' up' : ''}"><span class="rt">${head}</span>${bar}${gifts}</p>`;
   }
 

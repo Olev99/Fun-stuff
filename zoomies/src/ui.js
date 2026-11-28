@@ -5,18 +5,20 @@ import { TRACKS, CUPS, trackById } from './tracks.js';
 import { Track } from './track.js';
 import { THEMES } from './world.js';
 import { fmtTime, ordinal, clamp } from './util.js';
-import { saveSettings } from './settings.js';
+import { saveSettings, applyTextSize } from './settings.js';
 import { cleanNick } from './nametags.js';
 import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
 import { missionView, missionStreak, MISSION_XP } from './missions.js';
 import { nextUp } from './nextup.js';
 import { evDefs, evChip } from './evint.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
+import { TILT_HELP } from './input.js';
 import { isTouch } from './platform.js';
 import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, WEEKLY_XP_BASE } from './weekly.js';
 import { profileTitle, rankInfo, MAX_RANK, LEAGUE_MAX_STARS } from './league.js';
 import { masteryOf, titleFor, STAR_COLORS, RACER_IDS, BODY_IDS } from './mastery.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
+import { ITEMS } from './items.js';
 import { loadCup } from './cupsave.js';
 
 const $ = (id) => document.getElementById(id);
@@ -37,6 +39,7 @@ export class UI {
       });
     });
     $('btn-pause').addEventListener('click', () => this.app.pause());
+    $('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') this._go('lobby', 'join'); });
     this._bindSettings();
     this._bindTrackOptions();
   }
@@ -91,7 +94,8 @@ export class UI {
         else app.startFromMenu(this.mode);
         break;
       case 'settings':
-        if (action === 'wheelpad') app.wheelPad.open();
+        if (action === 'recal') this.recalibrate();
+        else if (action === 'wheelpad') app.wheelPad.open();
         else if (action === 'sync') app.sync.open('settings');
         else if (action === 'school') app.startSchool('title');
         else if (['backup', 'restore', 'about', 'repair'].includes(action)) app.safeUI.open(action);
@@ -119,6 +123,7 @@ export class UI {
       case 'pause':
         if (action === 'resume') app.resume();
         else if (action === 'rescue') app.rescuePlayer();
+        else if (action === 'recal') this.recalibrate();
         else if (action === 'restart') app.restart();
         else if (action === 'settings') this.overlay('settings', 'pause');
         else if (action === 'quit') (app.session ? app.leaveMP() : app.quitRace());
@@ -167,6 +172,7 @@ export class UI {
   overlay(name, from) {
     this.returnTo = from;
     if (name === 'settings') this._syncSettings();
+    if (name === 'help') $('help-items').innerHTML = Object.values(ITEMS).map((i) => `<div><span>${i.icon}</span>${i.name}: ${i.tip}</div>`).join('');
     // Driving School and the intro replay start from menus, not mid-race.
     document.querySelectorAll('#scr-settings .no-pause').forEach((el) => { el.hidden = from === 'pause'; });
     this.show(name);
@@ -347,7 +353,7 @@ export class UI {
     // What each new level brings: racers you can now hire and free capsules.
     const ups = sum && sum.ups.length ? sum.ups.map((L) => {
       const gets = CHARACTERS.filter((ch) => ch.lvl === L).map((ch) => `${ch.name} can be hired`);
-      if ((sum.caps || []).includes(L)) gets.push('free gumball 🍬');
+      if ((sum.caps || []).includes(L)) gets.push('free Prize Machine turn 🍬');
       return `<div class="rw-up">⭐ LEVEL ${L}!${gets.length ? ` · ${gets.join(' · ')}` : ''}</div>`;
     }).join('') : '';
     const md = sum && sum.medal ? `<div class="rw-ach rw-medal">${sum.medal.medal.icon} <b>${sum.medal.medal.name} medal!</b> · a new time target beaten <span>+${sum.medal.xp} XP</span></div>` : '';
@@ -708,7 +714,7 @@ export class UI {
         app.input.requestTilt().then((ok) => {
           if (!ok) {
             app.hud.toast('Tilt is not available here');
-            $('tilt-status').textContent = 'Tilt permission was not granted, so touch steering stays on.';
+            $('tilt-status').textContent = TILT_HELP;
             s().steering = 'touch';
           } else s().steering = 'tilt';
           saveSettings(s());
@@ -750,6 +756,16 @@ export class UI {
       saveSettings(s());
       this._syncSettings();
     });
+    $('set-text').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      s().textSize = b.dataset.v;
+      applyTextSize(s());
+      saveSettings(s());
+      this._syncSettings();
+    });
+    $('set-lefty').addEventListener('change', (e) => { s().leftHanded = e.target.checked; saveSettings(s()); app.applyControls(); });
     $('set-shake').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;
@@ -789,7 +805,10 @@ export class UI {
     $('set-ws').addEventListener('change', (e) => { s().workshopParts = e.target.checked; saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
     $('set-reset-career').addEventListener('click', () => {
+      if (this.returnTo === 'pause') return; // never from inside a race
       if (!confirm('Start over? Your level, coins, trophies, karts, racers and career progress will be lost.')) return;
+      const typed = prompt('This cannot be undone. Type RESET to erase everything.');
+      if (!typed || typed.trim().toUpperCase() !== 'RESET') return;
       app.resetCareer();
       app.audio.play('uiBack');
       $('set-reset-career').textContent = 'Done';
@@ -804,6 +823,8 @@ export class UI {
     document.querySelectorAll('#set-quality [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.quality));
     document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
     document.querySelectorAll('#set-assist [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.assist || 'off')));
+    document.querySelectorAll('#set-text [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.textSize));
+    $('set-lefty').checked = !!s.leftHanded;
     document.querySelectorAll('#set-shake [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.shake || 'normal')));
     document.querySelectorAll('#set-events [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.trackEvents || 'normal')));
     document.querySelectorAll('#set-evwarn [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.evWarn || 'full')));
@@ -820,6 +841,15 @@ export class UI {
     $('set-about').textContent = this.app.versionInfo;
   }
 
+  // Re-zero tilt at the current angle without replaying the intro (Settings and the pause menu).
+  recalibrate() {
+    const inp = this.app.input;
+    const ok = inp.tiltLive;
+    if (ok) { this.app.settings.tiltZero = inp.tilt.angle; saveSettings(this.app.settings); }
+    const msg = ok ? 'Level set ✓' : 'No tilt signal. Turn Tilt steering on first.';
+    document.querySelectorAll('[data-go="recal"]').forEach((b) => { b.dataset.t = b.dataset.t || b.textContent; b.textContent = msg; clearTimeout(b._rt); b._rt = setTimeout(() => { b.textContent = b.dataset.t; }, 1800); });
+  }
+
   // ---------------- First-run intro ----------------
   // One screen: on a phone a live tilt check with "Set level" and a touch
   // fallback (picked for you if motion access is refused or silent for 2 s);
@@ -833,7 +863,7 @@ export class UI {
     if (isTouch) {
       app.settings.steering = 'tilt';
       // Asked from inside the tap that opened this screen (iOS permission rules).
-      app.input.requestTilt().then((ok) => { if (!ok) this._introTouch('Motion access is off, so touch steering is on.'); });
+      app.input.requestTilt().then((ok) => { if (!ok) this._introTouch(TILT_HELP); });
     }
     this.show('intro');
   }
@@ -941,7 +971,7 @@ export class UI {
         <div class="row"><span class="lbl">Speed</span><div class="seg">${['chill', 'zoom', 'turbo'].map((c) => `<button data-lb="cls-${c}" class="${cfg.speedClass === c ? 'on' : ''}">${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
         <div class="row"><span class="lbl">Computer racers</span><div class="seg">${['off', 'easy', 'normal', 'hard'].map((d) => `<button data-lb="ai-${d}" class="${(d === 'off' ? !cfg.ai : cfg.ai && cfg.difficulty === d) ? 'on' : ''}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div></div>
         ${def.arena ? '' : `<div class="row"><span class="lbl">Reverse</span><label class="toggle"><input type="checkbox" data-lb="reverse" ${cfg.reverse ? 'checked' : ''} aria-label="Reverse"></label></div>`}`;
-      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>${def.arena ? 'Start battle' : 'Start race'}</button>`;
+      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn sky small" data-go="invite">Copy invite link</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>${def.arena ? 'Start battle' : 'Start race'}</button>`;
     } else {
       $('lobby-status').textContent = 'Connected';
       $('lobby-settings').innerHTML = `<div class="lobby-summary">${def.arena ? `Balloon Battle: <b>${def.name}</b>` : `Track: <b>${def.name}${cfg.reverse ? ' (reverse)' : ''}</b>`}<br>Speed: <b>${cls}</b><br>Computer racers: <b>${cfg.ai ? dif : 'Off'}</b><br><br>The host picks the track and starts the race.</div>`;

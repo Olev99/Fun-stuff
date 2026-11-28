@@ -3,6 +3,9 @@ import { clamp } from './util.js';
 const DEG = 180 / Math.PI;
 
 // Tilt (device orientation), on-screen touch controls and keyboard.
+// What actually helps when iOS has motion access off (reloading alone rarely asks again).
+export const TILT_HELP = 'Motion access is off. On iPhone open Settings > Safari > Motion & Orientation Access, turn it on, then reload. Touch steering works meanwhile.';
+
 export class Input {
   constructor(settings) {
     this.settings = settings;

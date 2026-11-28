@@ -43,13 +43,13 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - **Gramps's Workshop:** every vehicle has a few **sockets** (Rust Bucket 2; Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter 3; Comet, Stomper, Hog Wild and Vortex 4; Starbolt 5). Each socket holds one part, and swapping is free, so you can tune your ride for each track. A **Chassis Mod** (coins, once per vehicle) adds one more socket.
     - **Stat parts:** Engine (top speed), Turbo Coil (acceleration and drift-boost power), Tyres (steering and grip) and Armour (heavier bumps, shorter spin-outs), in Tier I, II and III. Tier III is "race-spec": a big bonus with a real drawback (Engine: slower acceleration, Turbo Coil: a little less top speed, Tyres: slower on sand and mud, Armour: slower acceleration). Only one part of each family fits at a time.
     - **Special parts:** Drift Spring (drift charges faster), Slip Sail (a longer, stronger slipstream), Scout Lamp (shortcut gems count double, shortcut entrances glow, sand and candy shortcuts slow you less), Gem Vac (gems from further away and a hit costs 1 gem, not 3), Mud Boots (mud, sand, grass and oil barely slow you), Ice Studs (snow and ice grip like tarmac, a small cost on dry roads), Rocket Pill (a stronger rocket start and a free boost off the grid), Wing Kit (glide further, bigger landing boost), Bumper Plate (your bumps shove rivals harder), Item Pouch (hold a second item) and Comeback Spring (a free boost after every hit when you are last). Each suits some tracks.
-    - **Getting parts:** parts are meant to be scarce, so every part, socket and Chassis Mod competes with karts, bikes and racers for your coins. Buy them in Gramps's Workshop (Tier I from the start; Tier II Engine and Tyres from chapter 3, Turbo Coil from chapter 4 and Armour from chapter 5; the 11 specials from chapter 2 (Gem Vac, Mud Boots) to chapter 6 (Wing Kit, Item Pouch, Comeback Spring); Tier III only after the Golden Wheel), earn them (a 3-star clear drops that event's own part: Tier I in chapters 1-2, a few Tier II from chapter 3, never Tier III; every chapter boss drops a different special Blueprint; drops show on the results screen) or win a free one from the gumball machine. Parts sell back for what you paid; earned parts sell for 40 coins, so there is no coin trick.
+    - **Getting parts:** parts are meant to be scarce, so every part, socket and Chassis Mod competes with karts, bikes and racers for your coins. Buy them in Gramps's Workshop (Tier I from the start; Tier II Engine and Tyres from chapter 3, Turbo Coil from chapter 4 and Armour from chapter 5; the 11 specials from chapter 2 (Gem Vac, Mud Boots) to chapter 6 (Wing Kit, Item Pouch, Comeback Spring); Tier III only after the Golden Wheel), earn them (a 3-star clear drops that event's own part: Tier I in chapters 1-2, a few Tier II from chapter 3, never Tier III; every chapter boss drops a different special Blueprint; drops show on the results screen) or win a free one from the Prize Machine. Parts sell back for what you paid; earned parts sell for 40 coins, so there is no coin trick.
     - **Parts in other modes:** whatever the Career unlocks works everywhere, so the parts fitted on your chosen ride also count in Quick Race, Grand Prix cups, Balloon Battle and online races and battles (online, only your own kart gets them). Time Trial (so records and medals stay fair; it also always runs at Zoom speed, and its screen says so), the Daily Challenge, the Weekly Cup and Driving School always use stock stats, and their screens say so. The race setup screens show "Workshop parts: on" or "Stock stats in this mode". **Settings → Use Workshop parts in quick modes** (on by default) turns it off. The computer racers and the Daily/Weekly difficulty do not change. `node tools/balance.mjs --tuned classic|bolt|boltstock` runs the AI balance with a fitted player. `node tools/economy.mjs` prints the coin income, shop stock and drops per chapter.
     - **Loadouts:** three saved presets per vehicle (Grip, Speed, Allround). Tap one to fit it, or tap Save and then a preset to store what you have fitted. The stat panel previews every change ("Handling 2.9 → 2.3") before you commit. A NEW PART badge on the hub tells you when something is waiting.
     - Parts are used in Career races. Old saves keep everything: each upgrade level you had became the matching part (levels 1-2 Tier I, 3-4 Tier II, 5 Tier III) and was fitted best first.
   - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt) and 4 motorbikes (Zoom Bike, Zip Scooter, Hog Wild and the Vortex), paint jobs and new racers. The Garage's Workshop tab opens Gramps's Workshop.
   - Bikes turn sharper and grip harder in drifts, lean into corners and pop a wheelie when boosting. Pick **Kart** or **Bike** on the racer screen for quick races, cups and online.
-  - Progress is saved on the phone. Settings has a reset.
+  - Progress is saved on the phone. Settings has **Start over**, hidden while a race is paused, which asks to confirm and then for the word RESET typed in.
   - **🏛️ Legends League:** the post-game, a second map on the Career hub that opens when you win the Golden Wheel (until then its card reads "Win the Golden Wheel to enter"). The Baron's company is falling apart, so he proposes a new circuit run by racers, and you are its first Legend. It is Career income and uses the same machinery as the chapters: stars, first-clear bonuses, drops, Gramps's tips and saves.
     - **3 seasons of 6 events (18), ids `L1-1` to `L3-6`:**
       - **Season 1, Comeback Season** (Zoom class, Hard racers on strong karts): the old champions return, each with a new motive. Reunion Tour, a gem hunt, a Gold-medal time attack, a reversed race, the 4-race Old Champions Cup and a duel with Ember.
@@ -68,7 +68,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
       | 8 | 🌠 Legend Aurora (boost trail), Legend Plum (paint) |
       | 10 | 🌟 Legend's Crest (hat), the **Legend** profile title and a 🏆 Legend trophy |
 
-      They are worn like gumball prizes (hats, trails and horns in the gumball collection, paints in the Garage), friends see the hats online, and the machine never gives them out. They do not count towards the 35-prize collection.
+      They are worn like Prize Machine prizes (hats, trails and horns in the collection, paints in the Garage), friends see the hats online, and the machine never gives them out. They do not count towards the 35-prize collection.
     - **4 League trophies:** League Debut (clear an event), Three-Season Run (clear all 3 seasons), Perfect League (3 stars on all 18 events) and Living Legend (Legend Rank 10).
     - Two extra story characters, the Masked Racer and Gramps Gearbox in racing gear, only appear in the League (they are not among the 20 racers). Syncing two devices keeps the most stars of each event and every clear, and the rank rewards follow the merged stars.
 - **Modes:**
@@ -105,7 +105,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
 - **Daily missions:** three small goals a day, the same for everyone (drift-boost 10 times, finish 3 races, win on a bike, collect 25 gems, pop balloons in a battle and more), shown with progress bars on the title screen. Each pays 100 XP, and finishing all three gives a free prize capsule. A 🔥 streak counts days in a row with all three done.
 - **Results screen:** the XP bar fills (through a level-up), the missions and medals you moved are listed, and a **Next up** line picks the closest goal (a mission nearly done, a medal just out of reach, the next level or the next Career event). **Race again** restarts the same race in one tap. Tap the rewards to skip the animation.
 - **Challenge a friend:** after a Time Trial, the results screen has **Challenge a friend**. It shares a link (the Share sheet on a phone, otherwise it is copied) holding the track, your time, your nickname and your ghost. The ghost is squeezed into the part of the link after the \#, which browsers never send to any server, and a typical link is 1.5 to 3.5 thousand characters. A friend who opens it sees "Beat Mia's 1:23.45 on Sprout Speedway!" and races a Time Trial against your ghost at Zoom speed (every Time Trial is Zoom, whatever class the link was made at). Links are checked carefully: anything oversized, garbled or about an unknown track is ignored.
-- **Gumball machine (🍬 Prizes):**
+- **Prize Machine (🍬 Prize Machine):**
   - Spend 600 coins, or a free capsule, on random prizes: 17 hats, 9 boost trails and 9 horns to win (35 in all), from common to legendary. The Legends League adds 3 hats, 2 trails and 2 horns that only Legend Rank gives. Inside a rarity you always get an item you do not own yet while one is left, and 40 paid spins in a row without a legendary guarantee a new one.
   - **Jackpots (8%):** real prizes instead of a cosmetic. A paint job (3%), a free random Tier I or II part for the Workshop (2.5%), 1,500 coins (1.5%; a free capsule turns this into a part instead), a kart or bike you don't own (0.7%) or a racer you haven't hired (0.3%). Jackpot karts, bikes and racers work everywhere, like ones bought in the Career.
   - Hats show on your racer everywhere, even to friends online, and so does your paint (bought, jackpot or League), in every mode including online. Trails colour your boost flames, and your horn honks when you overtake someone.
@@ -173,7 +173,9 @@ iOS only allows tilt controls on HTTPS pages opened directly in Safari, not insi
 3. Tap **Share → Add to Home Screen**. Launching from the icon gives full screen without Safari's bars.
 4. Tap a menu button and allow **Motion & Orientation** access when iOS asks.
 
-Hold the phone sideways like a steering wheel and turn it to steer. **Settings** has a live tilt check, a sensitivity slider and an invert option.
+Hold the phone sideways like a steering wheel and turn it to steer. **Settings** has a live tilt check, a sensitivity slider and an invert option. **Recalibrate tilt** (Settings, and in the pause menu on a phone) makes the angle you hold now the new straight ahead, without replaying the intro. If iOS has motion access off, the game says so: turn on Settings → Safari → Motion & Orientation Access, then reload; touch steering works meanwhile.
+
+**Accessibility (Settings):** **Text size** Normal or Large (scales menu and HUD text; labels never go below 11 px), **Left-handed layout** (mirrors the touch buttons and the steering pad), and while you drift a small meter at the top shows pips and a number (1 to 3) for the turbo you have charged, not just the spark colour.
 
 ## Playing on a Mac
 
@@ -208,16 +210,16 @@ Spending the same coins or capsules on two devices before they sync cannot be un
 - **Updates:** a new version downloads quietly in the background and takes over the next time you open the game. If the game stays open, a **Update ready, tap to restart** note shows on the title screen (never during a race or in a lobby). If a download fails, the version you have keeps working. Old files are deleted when the new version takes over.
 - **If something goes wrong:** an error that keeps repeating stops the game behind a **Something went wrong** screen with **Back to menu** and the error text to copy for a report, instead of a frozen picture.
 - **If something looks stuck:** **Settings → Repair** (or open the game with `?nosw` added to the address) removes the stored files and reloads; your progress stays.
-- **About:** **Settings → About** (or the small version label on the title screen) shows the version, credits and licences, a plain privacy note (no accounts, no tracking, no ads; progress stays on your device) and the backup and repair buttons.
+- **About:** **Settings → About** (or the small version label on the title screen) shows the version, credits and licences, a plain privacy note (no accounts, no tracking, no ads; progress stays on your device), a **Privacy and network** paragraph naming what online play contacts (the public PeerJS broker and the Google and Cloudflare STUN servers, nothing else), a support line with the GitHub issues link, and the backup and repair buttons.
 - **Volume:** Settings has separate **Music volume** and **Sound effects volume** sliders. Sound pauses while the page is hidden. Held upright, a phone shows a "Turn your phone sideways" screen.
 
 ## Racing with friends
 
 1. Everyone opens the game (same link), taps **Multiplayer** and types a name. The name floats over your kart on your friends' screens.
 2. One player taps **Host a race** and gets a 4-letter room code.
-3. Friends type the code and tap **Join**. Up to 4 phones can play, and each player picks a racer.
+3. Friends type the code and tap **Join** (or press Enter). The host can tap **Copy invite link**: opening that link fills in the room code, and the friend still taps Join. Up to 4 phones can play, and each player picks a racer.
 4. The host picks the track, speed and computer racers (Off, Easy, Normal or Hard), then taps **Start race**. The track picker also runs through the five battle arenas (marked 🎈): pick one and it's a Balloon Battle for up to 4 friends plus computer racers.
-5. After the race, the host can take everyone back to the lobby for the next one.
+5. After the race, the host taps **Race again** to take everyone back to the lobby with the same settings for the next one.
 
 How it works:
 
@@ -243,6 +245,8 @@ How it works:
 - **Look back:** hold the 👀 BACK button (or the minimap, or Q / C on a keyboard) to see behind you.
 - **Your ride:** on the racer screen, tap the vehicle button to pick a kart or bike for quick races, cups, time trials and online. Five are free (Rust Bucket, Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter). The rest unlock when you buy them in the Career Garage. Locked rides still show in the showroom so you can see what you're working towards.
 - **Hitting walls:** steer away and the kart swings back into the race direction. If you're ever pinned, the drone lifts you back onto the road after a few seconds, and the pause menu has **Stuck? Back on the road** to do it at once.
+- **Ghost result:** a Time Trial raced against a ghost says on the results screen "You beat Mia's ghost by 1.23 s" or "Ghost wins by 0.40 s" (your own ghost is just "your ghost").
+- **Help screen:** the ❓ button lists every item (read from the code, so it stays complete) and short notes on parts and the Workshop, track events, medals, daily missions, the Weekly Cup, Resume cup, ghost links, the Prize Machine and Balloon Battle.
 - **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
 - **Steering assist:** Off, Light or Strong in Settings (new saves start on Light). It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
@@ -276,8 +280,8 @@ zoomies/
   src/parts.js        stat parts, special parts, sockets and the kart-stats maths
   src/workshop.js     owning, fitting, buying, selling and migrating parts
   src/profile.js      player level, race rewards, achievements and the daily challenge
-  src/cosmetics.js    gumball machine prizes: hats, boost trails and horns
-  src/gumballui.js    the gumball machine and collection screens
+  src/cosmetics.js    Prize Machine prizes: hats, boost trails and horns
+  src/gumballui.js    the Prize Machine and collection screens
   src/platform.js     phone or computer (Mac) detection
   src/wheel.js        a phone as the steering wheel for a computer
   src/sync.js         syncing progress between devices (the save ledger's format is at its top)
