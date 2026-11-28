@@ -349,7 +349,7 @@ export class UI {
     // What each new level brings: racers you can now hire and free capsules.
     const ups = sum && sum.ups.length ? sum.ups.map((L) => {
       const gets = CHARACTERS.filter((ch) => ch.lvl === L).map((ch) => `${ch.name} can be hired`);
-      if ((sum.caps || []).includes(L)) gets.push('free gumball 🍬');
+      if ((sum.caps || []).includes(L)) gets.push('free Prize Machine turn 🍬');
       return `<div class="rw-up">⭐ LEVEL ${L}!${gets.length ? ` · ${gets.join(' · ')}` : ''}</div>`;
     }).join('') : '';
     const md = sum && sum.medal ? `<div class="rw-ach rw-medal">${sum.medal.medal.icon} <b>${sum.medal.medal.name} medal!</b> · a new time target beaten <span>+${sum.medal.xp} XP</span></div>` : '';
