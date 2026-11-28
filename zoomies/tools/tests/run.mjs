@@ -1,7 +1,8 @@
 // Runs the headless browser tests and prints a pass/fail summary.
 //
 //   cd zoomies/tools/tests && npm install      (once: playwright-core)
-//   node run.mjs              quick suites (about 6 minutes)
+//   node run.mjs              quick suites (about 4 minutes)
+//   node run.mjs node         pure node checks only (a second, no browser)
 //   node run.mjs full         every suite (about 25 minutes)
 //   node run.mjs release      backup codes, offline play, updates, About (own temp servers)
 //   node run.mjs battle-sim crater   one suite, with its own arguments
@@ -23,6 +24,7 @@ const out = join(root, 'test-out');
 
 const SUITES = {
   // name: [script, args, timeout minutes]
+  node: ['node-tier.mjs', [], 2], // pure node: track builds, event schedules, save and setup checks
   tracks: ['tracks.mjs', [], 6],
   'battle-sim': ['battle-sim.mjs', ['pinball'], 8],
   items: ['items.mjs', [], 5],
@@ -49,7 +51,7 @@ const SUITES = {
   'visual-audit': ['visual-audit.mjs', [], 30], // opt-in: in neither quick nor full
   balance: ['balance-check.mjs', [], 12], // opt-in: seeded AI races, checks the balance bands
 };
-const QUICK = ['tracks', 'battle-sim', 'items', 'picker', 'ledger'];
+const QUICK = ['node', 'tracks', 'battle-sim', 'items', 'picker', 'ledger'];
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 

@@ -7,7 +7,7 @@
 // waits; it takes over at the next launch or when the player taps "Update
 // ready" on the title screen. Anything else (the PeerJS broker, WebRTC) is
 // left alone. ?nosw (or Settings > Repair) removes the worker and the caches.
-const VERSION = '57db38a';
+const VERSION = '1831114';
 const CACHE = `zoomies-${VERSION}`;
 const SCOPE = self.registration.scope;
 const HOME = `${SCOPE}index.html`;
@@ -20,8 +20,16 @@ self.addEventListener('install', (e) => {
     // A stale precache.json next to a newer sw.js: give up now and try again at the next check.
     if (!list || list.v !== VERSION || !Array.isArray(list.urls)) throw new Error('precache list does not match');
     const cache = await caches.open(CACHE);
+    // A ?v=<hash> URL names its exact contents, so a copy in an older zoomies cache is reused instead of downloaded again.
+    const olds = await Promise.all((await caches.keys()).filter((k) => k.startsWith('zoomies-') && k !== CACHE).map((k) => caches.open(k)));
     await Promise.all(list.urls.map(async (u) => {
       const url = new URL(u, SCOPE).href;
+      if (/[?&]v=[0-9a-f]+$/.test(u)) {
+        for (const c of olds) {
+          const hit = await c.match(url);
+          if (hit && hit.ok) { await cache.put(url, hit); return; }
+        }
+      }
       const r = await fetch(url, { cache: 'reload' });
       if (!r.ok) throw new Error(`${r.status} ${url}`);
       await cache.put(url, r);
