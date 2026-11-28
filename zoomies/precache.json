@@ -1,5 +1,5 @@
 {
- "v": "3ea6895",
+ "v": "56f7414",
  "urls": [
   "index.html",
   "version.json",
@@ -37,7 +37,7 @@
   "src/karts.js?v=fb81fb32",
   "src/league.js?v=5d268b5b",
   "src/ledger.js?v=2f09ea2f",
-  "src/main.js?v=4b6fea99",
+  "src/main.js?v=27ef0c19",
   "src/mastery.js?v=eff00973",
   "src/medals.js?v=c18eeb44",
   "src/missions.js?v=d4a9ad92",

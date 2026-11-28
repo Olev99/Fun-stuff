@@ -1,5 +1,6 @@
 // Online hardening and resilience checks (review batch C and D):
 //   leak    10 races and previews: GPU textures and geometries stay flat
+//   dynres  dynamic resolution stops hunting and holds still behind a menu; the menu demo draws every other frame
 //   crash   an exception in the frame loop shows "Something went wrong" and Back to menu works
 //   wire    big messages (a 21 KB ghost) round-trip in pieces, an over-the-cap one fails loudly,
 //           the test transport refuses any single unchunked frame of 16 KB or more
@@ -13,7 +14,7 @@
 // node netsec.mjs [part,part...]   (all parts by default)
 import { chromium } from 'playwright-core';
 import { CHROME_PATH } from './chrome.mjs';
-const parts = (process.argv[2] || 'leak,crash,wire,clock,trust,loss,rtc').split(',');
+const parts = (process.argv[2] || 'leak,dynres,crash,wire,clock,trust,loss,rtc').split(',');
 const PORT = process.env.ZPORT || 8000;
 const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 let fails = 0;
@@ -95,6 +96,54 @@ if (parts.includes('leak')) {
   const grew = (j) => [2, 3, 4, 5].filter((i) => mem[i + 6][j] > mem[i][j]).map((i) => `${mem[i][j]}->${mem[i + 6][j]}`);
   check(!grew(0).length, `textures stay flat over 12 races and previews ${grew(0).join(' ')}`);
   check(!grew(1).length, `geometries stay flat ${grew(1).join(' ')}`);
+  await ctx.close();
+}
+
+// ---- dynres: dynamic resolution stops hunting; the menu demo draws every other frame ----
+if (parts.includes('dynres')) {
+  const ctx = await lowCtx();
+  const p = await page(ctx, 'dynres');
+  const r = await p.evaluate(() => {
+    const a = window.zoomies, demo = a.race, out = {};
+    // A model GPU: every level above 1.55x is too slow for 60 fps, everything at or below it is fine.
+    const run = (mode, secs, races = 1) => {
+      let changes = 0;
+      for (let n = 0; n < races; n++) {
+        a.race = a.view = { mode, setSize() {} };
+        for (let t = 0; t < (secs * 60) / races; t++) {
+          const pr = a.pr;
+          a._frameStats(pr > 1.55 ? 1 / 42 : 1 / 60);
+          if (a.pr !== pr) changes++;
+        }
+      }
+      return changes;
+    };
+    Object.assign(a, { minPR: 1, maxPR: 2, pr: 1.6, ft: 1 / 60, blockRaise: 0, drTimer: 0, goodTime: 0, prFail: {}, prChanges: [], capped: false, dtHist: [] });
+    out.oneRace = run('quick', 300);
+    out.fourRaces = run('quick', 300, 4);
+    a.pr = 2; a.ft = 1 / 60;
+    out.menu = run('demo', 30) + (a.pr === 2 ? 0 : 100);
+    // The demo race behind the title draws every other frame, a race every frame.
+    a.race = a.view = demo;
+    a.applyQuality();
+    let drew = false;
+    const r0 = a.renderer.render, p0 = a.post.render;
+    a.renderer.render = function (...x) { drew = true; return r0.apply(this, x); };
+    a.post.render = function (...x) { drew = true; return p0.apply(this, x); };
+    // Frames that drew anything (the post chain draws several passes per frame).
+    const frames = () => { let n = 0; a.paused = false; let now = a.last; for (let i = 0; i < 10; i++) { drew = false; a._frame((now += 1000 / 60)); n += drew; } a.paused = true; return n; };
+    out.demoDraws = frames();
+    a.race = a.view = { mode: 'quick', update() {}, setSize() {}, scene: demo.scene, camera: demo.camera, grade: demo.grade };
+    out.raceDraws = frames();
+    a.race = a.view = demo;
+    a.renderer.render = r0; a.post.render = p0;
+    return out;
+  });
+  console.log('dynamic resolution:', JSON.stringify(r));
+  check(r.oneRace <= 4, `one 5-minute race changes resolution at most 4 times (${r.oneRace})`);
+  check(r.fourRaces <= 16, `four races in 5 minutes change it at most 4 times each (${r.fourRaces})`);
+  check(r.menu === 0, 'the resolution holds still behind a menu');
+  check(r.demoDraws === 5 && r.raceDraws === 10, `the menu demo draws every other frame, a race every frame (${r.demoDraws}/10, ${r.raceDraws}/10)`);
   await ctx.close();
 }
 

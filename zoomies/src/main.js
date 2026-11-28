@@ -238,6 +238,7 @@ class App {
     this.drTimer = 0;
     this.goodTime = 0;
     this.blockRaise = 3;
+    this.prFail = {};
     if (!initial) this.resize();
   }
 
@@ -1375,8 +1376,13 @@ class App {
       this.coach.tick(dt);
       this._checkTilt();
       this._frameStats(dt);
-      if (this.post.active) this.post.render(this.view.scene, this.view.camera, this.view.grade, dt);
-      else this.renderer.render(this.view.scene, this.view.camera);
+      // The menu's demo race draws every other frame: half the GPU cost behind a menu. Races draw every frame.
+      this._drawDt = (this._drawDt || 0) + dt;
+      if (!this._menuDemo() || (this._demoOdd = !this._demoOdd)) {
+        if (this.post.active) this.post.render(this.view.scene, this.view.camera, this.view.grade, this._drawDt);
+        else this.renderer.render(this.view.scene, this.view.camera);
+        this._drawDt = 0;
+      }
     }
     this.ui.tick(dt);
     this.wheelHost.tick(dt);
@@ -1409,6 +1415,10 @@ class App {
     }
   }
 
+  _menuDemo() {
+    return !!this.race && this.view === this.race && this.race.mode === 'demo';
+  }
+
   _frameStats(dt) {
     this.ft += (dt - this.ft) * 0.08;
     this.fpsFrames++;
@@ -1423,7 +1433,14 @@ class App {
     }
     // Dynamic resolution. Low Power Mode caps Safari at 30 fps; a steady
     // 30 fps cadence is treated as the target so we don't blur the picture
-    // for nothing.
+    // for nothing. It holds still behind a menu (the demo draws every other frame
+    // there), and it stops hunting: a level that was too slow twice in one race is
+    // not tried again in that race, and no step up comes after 3 changes in a minute
+    // (each change reallocates the render targets).
+    if (this._menuDemo()) return;
+    if (this._drRace !== this.race) { this._drRace = this.race; this.prFail = {}; }
+    this.drClock = (this.drClock || 0) + dt;
+    this.prChanges = (this.prChanges || []).filter((t) => t > this.drClock - 60);
     this.dtHist = this.dtHist || [];
     this.dtHist.push(dt);
     if (this.dtHist.length > 90) this.dtHist.shift();
@@ -1440,6 +1457,9 @@ class App {
     if (this.ft > target * 1.18) {
       this.goodTime = 0;
       if (this.drTimer > 1.2 && this.pr > this.minPR + 0.01) {
+        const k = this.pr.toFixed(2);
+        this.prFail[k] = (this.prFail[k] || 0) + 1;
+        this.prChanges.push(this.drClock);
         this.pr = Math.max(this.minPR, this.pr - (this.ft > target * 1.5 ? 0.3 : 0.15));
         this.drTimer = 0;
         this.blockRaise = 15;
@@ -1447,8 +1467,10 @@ class App {
       }
     } else if (this.ft < target * 1.05) {
       this.goodTime += dt;
-      if (this.goodTime > 4 && this.blockRaise <= 0 && this.pr < this.maxPR - 0.01) {
-        this.pr = Math.min(this.maxPR, this.pr + 0.15);
+      const up = Math.min(this.maxPR, this.pr + 0.15);
+      if (this.goodTime > 4 && this.blockRaise <= 0 && this.pr < this.maxPR - 0.01 && (this.prFail[up.toFixed(2)] || 0) < 2 && this.prChanges.length < 3) {
+        this.prChanges.push(this.drClock);
+        this.pr = up;
         this.goodTime = 0;
         this.drTimer = 0;
         this.resize();
