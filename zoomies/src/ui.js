@@ -17,6 +17,7 @@ import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, 
 import { profileTitle, rankInfo, MAX_RANK, LEAGUE_MAX_STARS } from './league.js';
 import { masteryOf, titleFor, STAR_COLORS, RACER_IDS, BODY_IDS } from './mastery.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
+import { ITEMS } from './items.js';
 import { loadCup } from './cupsave.js';
 
 const $ = (id) => document.getElementById(id);
@@ -167,6 +168,7 @@ export class UI {
   overlay(name, from) {
     this.returnTo = from;
     if (name === 'settings') this._syncSettings();
+    if (name === 'help') $('help-items').innerHTML = Object.values(ITEMS).map((i) => `<div><span>${i.icon}</span>${i.name}: ${i.tip}</div>`).join('');
     // Driving School and the intro replay start from menus, not mid-race.
     document.querySelectorAll('#scr-settings .no-pause').forEach((el) => { el.hidden = from === 'pause'; });
     this.show(name);
