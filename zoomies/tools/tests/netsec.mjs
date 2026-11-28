@@ -25,7 +25,7 @@ async function page(ctx, name, query = '') {
   const p = await ctx.newPage();
   p.on('pageerror', (e) => console.log(`[${name} pageerror]`, e.message, e.stack?.slice(0, 400)));
   p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('Failed to load')) console.log(`[${name}]`, m.text().slice(0, 300)); });
-  await p.goto(`http://localhost:${PORT}/index.html${query}`);
+  await p.goto(`http://localhost:${PORT}/index.html${query}`, { timeout: 90000 });
   await p.waitForFunction(() => window.zoomies && window.zoomies.race, null, { timeout: 60000 });
   await p.evaluate(() => { window.zoomies.paused = true; });
   return p;
@@ -294,7 +294,7 @@ if (parts.includes('trust')) {
     s._message(bId, { t: 'box', i: bj, want: true }, 30);
     out.held = (k.netHeld || []).map((g) => `${g.it}x${g.n}`).join(',');
     const g = k.netHeld && k.netHeld[0];
-    if (g) for (let i = 0; i < g.n; i++) s._message(bId, { t: 'use', it: g.it, aim: 0, x: k.pos.x, z: k.pos.z, yaw: k.yaw, sp: 10 }, 60);
+    if (g) for (let i = 0, n = g.n; i < n; i++) s._message(bId, { t: 'use', it: g.it, aim: 0, x: k.pos.x, z: k.pos.z, yaw: k.yaw, sp: 10 }, 60);
     out.spent = (k.netHeld || []).length;
     s._message(bId, { t: 'box', i: bj, want: true }, 30); // the same box again: it is gone
     out.again = (k.netHeld || []).length;
