@@ -5,7 +5,7 @@ import { TRACKS, CUPS, trackById } from './tracks.js';
 import { Track } from './track.js';
 import { THEMES } from './world.js';
 import { fmtTime, ordinal, clamp } from './util.js';
-import { saveSettings } from './settings.js';
+import { saveSettings, applyTextSize } from './settings.js';
 import { cleanNick } from './nametags.js';
 import { BODY_LIST, FREE_BODIES, bodyById, bodyLocked, bodyIcon } from './karts.js';
 import { missionView, missionStreak, MISSION_XP } from './missions.js';
@@ -756,6 +756,16 @@ export class UI {
       saveSettings(s());
       this._syncSettings();
     });
+    $('set-text').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b) return;
+      app.audio.play('select');
+      s().textSize = b.dataset.v;
+      applyTextSize(s());
+      saveSettings(s());
+      this._syncSettings();
+    });
+    $('set-lefty').addEventListener('change', (e) => { s().leftHanded = e.target.checked; saveSettings(s()); app.applyControls(); });
     $('set-shake').addEventListener('click', (e) => {
       const b = e.target.closest('[data-v]');
       if (!b) return;
@@ -810,6 +820,8 @@ export class UI {
     document.querySelectorAll('#set-quality [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.quality));
     document.querySelectorAll('#set-tags [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.tags || 'all')));
     document.querySelectorAll('#set-assist [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.assist || 'off')));
+    document.querySelectorAll('#set-text [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === s.textSize));
+    $('set-lefty').checked = !!s.leftHanded;
     document.querySelectorAll('#set-shake [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.shake || 'normal')));
     document.querySelectorAll('#set-events [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.trackEvents || 'normal')));
     document.querySelectorAll('#set-evwarn [data-v]').forEach((b) => b.classList.toggle('on', b.dataset.v === (s.evWarn || 'full')));

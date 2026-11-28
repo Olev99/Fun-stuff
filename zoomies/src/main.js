@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadSettings, saveSettings, loadRecords, saveRecords, QUALITY, hasSettings } from './settings.js';
+import { loadSettings, saveSettings, applyTextSize, loadRecords, saveRecords, QUALITY, hasSettings } from './settings.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
@@ -72,6 +72,7 @@ class App {
     if (isMac) document.documentElement.classList.add('mac');
     this.uiZoom = 1;
     this.settings = loadSettings();
+    applyTextSize(this.settings);
     this.records = loadRecords();
     // One save for career progress, the wallet, XP, stats and achievements.
     const saved = loadCareer();
@@ -289,7 +290,7 @@ class App {
     const racing = this.race && this.race.mode !== 'demo' && !this.paused && !this.menuOpen && ['intro', 'countdown', 'race'].includes(this.race.state);
     el.hidden = !(isTouch && racing);
     const tilt = this.settings.steering === 'tilt' && this.input.tilt.listening;
-    el.className = tilt ? 'tilt' : 'touch';
+    el.className = (tilt ? 'tilt' : 'touch') + (this.settings.leftHanded ? ' lefty' : '');
   }
 
   // ---------------- views ----------------

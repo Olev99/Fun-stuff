@@ -34,6 +34,7 @@ export class HUD {
     this.styleEl = $('hud-style');
     this.rearEl = $('hud-rear');
     this.evEl = $('hud-ev');
+    this.driftEl = $('hud-drift');
     // Hold the minimap to look behind you.
     const look = (on) => (e) => { e.preventDefault(); this.app.input.lookBack = on; };
     this.map.addEventListener('pointerdown', look(true));
@@ -317,6 +318,12 @@ export class HUD {
 
     this._set('boost', p.boostTime > 0 || p.starTime > 0, (v) => this.speed.classList.toggle('on', v));
     this._set('draft', (p.draftT || 0) > 0.3 && p.boostTime <= 0, (v) => this.speed.classList.toggle('draft', v));
+    const dl = p.drifting && race.state === 'race' ? p.driftLevel + 1 : 0; // 0 hidden, 1 charging, 2-4 = turbo 1-3
+    this._set('drift', dl, (v) => {
+      this.driftEl.hidden = !v;
+      this.driftEl.querySelectorAll('i').forEach((pip, i) => pip.classList.toggle('on', i < v - 1));
+      this.driftEl.querySelector('b').textContent = v > 1 ? v - 1 : '·';
+    });
     this._set('rear', !!race.lookBack, (v) => { this.rearEl.hidden = !v; });
     this._set('wrong', p.wrongWay > 1.2 && race.state === 'race', (v) => { this.wrong.hidden = !v; });
     this._set('flash', Math.round(race.flash * 20), (v) => { this.flash.style.opacity = (v / 20) * 0.85; });
