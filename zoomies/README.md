@@ -49,7 +49,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
     - Parts are used in Career races. Old saves keep everything: each upgrade level you had became the matching part (levels 1-2 Tier I, 3-4 Tier II, 5 Tier III) and was fitted best first.
   - Spend coins in the **Garage** on 6 kart bodies (from the Rust Bucket to the Starbolt) and 4 motorbikes (Zoom Bike, Zip Scooter, Hog Wild and the Vortex), paint jobs and new racers. The Garage's Workshop tab opens Gramps's Workshop.
   - Bikes turn sharper and grip harder in drifts, lean into corners and pop a wheelie when boosting. Pick **Kart** or **Bike** on the racer screen for quick races, cups and online.
-  - Progress is saved on the phone. Settings has a reset.
+  - Progress is saved on the phone. Settings has **Start over**, hidden while a race is paused, which asks to confirm and then for the word RESET typed in.
   - **🏛️ Legends League:** the post-game, a second map on the Career hub that opens when you win the Golden Wheel (until then its card reads "Win the Golden Wheel to enter"). The Baron's company is falling apart, so he proposes a new circuit run by racers, and you are its first Legend. It is Career income and uses the same machinery as the chapters: stars, first-clear bonuses, drops, Gramps's tips and saves.
     - **3 seasons of 6 events (18), ids `L1-1` to `L3-6`:**
       - **Season 1, Comeback Season** (Zoom class, Hard racers on strong karts): the old champions return, each with a new motive. Reunion Tour, a gem hunt, a Gold-medal time attack, a reversed race, the 4-race Old Champions Cup and a duel with Ember.
@@ -173,7 +173,9 @@ iOS only allows tilt controls on HTTPS pages opened directly in Safari, not insi
 3. Tap **Share → Add to Home Screen**. Launching from the icon gives full screen without Safari's bars.
 4. Tap a menu button and allow **Motion & Orientation** access when iOS asks.
 
-Hold the phone sideways like a steering wheel and turn it to steer. **Settings** has a live tilt check, a sensitivity slider and an invert option.
+Hold the phone sideways like a steering wheel and turn it to steer. **Settings** has a live tilt check, a sensitivity slider and an invert option. **Recalibrate tilt** (Settings, and in the pause menu on a phone) makes the angle you hold now the new straight ahead, without replaying the intro. If iOS has motion access off, the game says so: turn on Settings → Safari → Motion & Orientation Access, then reload; touch steering works meanwhile.
+
+**Accessibility (Settings):** **Text size** Normal or Large (scales menu and HUD text; labels never go below 11 px), **Left-handed layout** (mirrors the touch buttons and the steering pad), and while you drift a small meter at the top shows pips and a number (1 to 3) for the turbo you have charged, not just the spark colour.
 
 ## Playing on a Mac
 
@@ -208,16 +210,16 @@ Spending the same coins or capsules on two devices before they sync cannot be un
 - **Updates:** a new version downloads quietly in the background and takes over the next time you open the game. If the game stays open, a **Update ready, tap to restart** note shows on the title screen (never during a race or in a lobby). If a download fails, the version you have keeps working. Old files are deleted when the new version takes over.
 - **If something goes wrong:** an error that keeps repeating stops the game behind a **Something went wrong** screen with **Back to menu** and the error text to copy for a report, instead of a frozen picture.
 - **If something looks stuck:** **Settings → Repair** (or open the game with `?nosw` added to the address) removes the stored files and reloads; your progress stays.
-- **About:** **Settings → About** (or the small version label on the title screen) shows the version, credits and licences, a plain privacy note (no accounts, no tracking, no ads; progress stays on your device) and the backup and repair buttons.
+- **About:** **Settings → About** (or the small version label on the title screen) shows the version, credits and licences, a plain privacy note (no accounts, no tracking, no ads; progress stays on your device), a **Privacy and network** paragraph naming what online play contacts (the public PeerJS broker and the Google and Cloudflare STUN servers, nothing else), a support line with the GitHub issues link, and the backup and repair buttons.
 - **Volume:** Settings has separate **Music volume** and **Sound effects volume** sliders. Sound pauses while the page is hidden. Held upright, a phone shows a "Turn your phone sideways" screen.
 
 ## Racing with friends
 
 1. Everyone opens the game (same link), taps **Multiplayer** and types a name. The name floats over your kart on your friends' screens.
 2. One player taps **Host a race** and gets a 4-letter room code.
-3. Friends type the code and tap **Join**. Up to 4 phones can play, and each player picks a racer.
+3. Friends type the code and tap **Join** (or press Enter). The host can tap **Copy invite link**: opening that link fills in the room code, and the friend still taps Join. Up to 4 phones can play, and each player picks a racer.
 4. The host picks the track, speed and computer racers (Off, Easy, Normal or Hard), then taps **Start race**. The track picker also runs through the five battle arenas (marked 🎈): pick one and it's a Balloon Battle for up to 4 friends plus computer racers.
-5. After the race, the host can take everyone back to the lobby for the next one.
+5. After the race, the host taps **Race again** to take everyone back to the lobby with the same settings for the next one.
 
 How it works:
 
@@ -243,6 +245,8 @@ How it works:
 - **Look back:** hold the 👀 BACK button (or the minimap, or Q / C on a keyboard) to see behind you.
 - **Your ride:** on the racer screen, tap the vehicle button to pick a kart or bike for quick races, cups, time trials and online. Five are free (Rust Bucket, Zoom Classic, Splish Splash, Zoom Bike and Zip Scooter). The rest unlock when you buy them in the Career Garage. Locked rides still show in the showroom so you can see what you're working towards.
 - **Hitting walls:** steer away and the kart swings back into the race direction. If you're ever pinned, the drone lifts you back onto the road after a few seconds, and the pause menu has **Stuck? Back on the road** to do it at once.
+- **Ghost result:** a Time Trial raced against a ghost says on the results screen "You beat Mia's ghost by 1.23 s" or "Ghost wins by 0.40 s" (your own ghost is just "your ghost").
+- **Help screen:** the ❓ button lists every item (read from the code, so it stays complete) and short notes on parts and the Workshop, track events, medals, daily missions, the Weekly Cup, Resume cup, ghost links, the Prize Machine and Balloon Battle.
 - **Ghosts:** in Time Trial (and career time trials) your best run on each track is saved on the phone and replayed as a see-through ghost kart, with a split at every lap (green when you're ahead, red when behind).
 - **Shortcut hunting:** shortcuts you've found are drawn on the minimap as dotted paths, and each track card shows how many you've found.
 - **Steering assist:** Off, Light or Strong in Settings (new saves start on Light). It nudges the steering along the road and away from walls without taking over, and backs off when you aim for a shortcut.
