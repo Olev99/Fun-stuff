@@ -39,6 +39,7 @@ export class UI {
       });
     });
     $('btn-pause').addEventListener('click', () => this.app.pause());
+    $('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') this._go('lobby', 'join'); });
     this._bindSettings();
     this._bindTrackOptions();
   }
@@ -955,7 +956,7 @@ export class UI {
         <div class="row"><span class="lbl">Speed</span><div class="seg">${['chill', 'zoom', 'turbo'].map((c) => `<button data-lb="cls-${c}" class="${cfg.speedClass === c ? 'on' : ''}">${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
         <div class="row"><span class="lbl">Computer racers</span><div class="seg">${['off', 'easy', 'normal', 'hard'].map((d) => `<button data-lb="ai-${d}" class="${(d === 'off' ? !cfg.ai : cfg.ai && cfg.difficulty === d) ? 'on' : ''}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div></div>
         ${def.arena ? '' : `<div class="row"><span class="lbl">Reverse</span><label class="toggle"><input type="checkbox" data-lb="reverse" ${cfg.reverse ? 'checked' : ''} aria-label="Reverse"></label></div>`}`;
-      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>${def.arena ? 'Start battle' : 'Start race'}</button>`;
+      $('lobby-buttons').innerHTML = `<button class="btn ghost small" data-go="leave">Leave</button><button class="btn alt small" data-go="char">Change racer</button><button class="btn sky small" data-go="invite">Copy invite link</button><button class="btn hot" data-go="start" ${ses.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>${def.arena ? 'Start battle' : 'Start race'}</button>`;
     } else {
       $('lobby-status').textContent = 'Connected';
       $('lobby-settings').innerHTML = `<div class="lobby-summary">${def.arena ? `Balloon Battle: <b>${def.name}</b>` : `Track: <b>${def.name}${cfg.reverse ? ' (reverse)' : ''}</b>`}<br>Speed: <b>${cls}</b><br>Computer racers: <b>${cfg.ai ? dif : 'Off'}</b><br><br>The host picks the track and starts the race.</div>`;

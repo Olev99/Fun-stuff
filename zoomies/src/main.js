@@ -163,6 +163,7 @@ class App {
     this.toTitle();
     this._checkVersion();
     this.checkChallenge();
+    this.checkInvite();
     // Opened from the QR code on a computer: become its steering wheel.
     if (this.wheelPad.wanted) this.wheelPad.open();
     else if (this.sync.wanted) this.sync.open('title');
@@ -618,7 +619,7 @@ class App {
         sub: `Online · ${race.battle ? 'Balloon Battle · ' : ''}${race.trackDef.name}`,
         html: rw + `<div class="results">${rows.map((r) => ui.row(r, cell(r))).join('')}</div>`
           + (host ? '' : '<p class="lobby-summary" style="margin:8px 0 0">Waiting for the host to pick the next race…</p>'),
-        buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Back to lobby', 'hot']] : [['leave', 'Leave', 'ghost small']],
+        buttons: host ? [['leave', 'Leave', 'ghost small'], ['lobby', 'Race again', 'hot big']] : [['leave', 'Leave', 'ghost small']],
       });
       return;
     }
@@ -1115,10 +1116,40 @@ class App {
     this.ui.lobby(this.session ? 'room' : 'start');
   }
 
+  // An invite link (#join=CODE) opens the lobby with the code typed in. It never joins by itself.
+  checkInvite() {
+    const m = /^#join=([A-Za-z0-9]{1,8})$/.exec(location.hash);
+    if (!m) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* keep the hash */ }
+    this.openMultiplayer();
+    document.getElementById('join-code').value = m[1].toUpperCase();
+    document.getElementById('lobby-error').textContent = 'Check your name, then tap Join.';
+  }
+
+  async copyInvite() {
+    const ses = this.session;
+    if (!ses || !ses.code) return;
+    const url = `${location.origin}${location.pathname}#join=${ses.code}`;
+    const btn = document.querySelector('#lobby-buttons [data-go="invite"]');
+    const say = (t) => { if (btn) { btn.textContent = t; setTimeout(() => { btn.textContent = 'Copy invite link'; }, 1800); } };
+    try {
+      await navigator.clipboard.writeText(url);
+      say('Link copied ✓');
+    } catch (e) {
+      const w = document.getElementById('lobby-ws');
+      w.textContent = 'Copy this link: ';
+      const inp = document.createElement('input');
+      inp.readOnly = true; inp.value = url; inp.className = 'chal-link';
+      inp.addEventListener('focus', () => inp.select());
+      w.appendChild(inp);
+    }
+  }
+
   onLobbyAction(action) {
     if (action === 'host') this.hostMP();
     else if (action === 'join') this.joinMP(document.getElementById('join-code').value.trim());
     else if (action === 'leave') this.leaveMP();
+    else if (action === 'invite') this.copyInvite();
     else if (action === 'char') { this.ui.mode = 'mp'; this.ui.charSelect(); }
     else if (action === 'start') this.startMP();
   }
