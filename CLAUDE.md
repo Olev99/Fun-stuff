@@ -106,6 +106,7 @@ How to apply it:
 Run `npm install` there once (it installs playwright-core). Chromium comes from `$CHROME` or `/opt/pw-browsers`.
 
 - **Quick check:** `node run.mjs` runs `tracks` (every track and arena builds), `battle-sim`, `items` and `picker`.
+- **Node tier and CI:** `node run.mjs node` (`node-tier.mjs`, about a second, no browser) checks track builds, event schedules, save round trips and online setup checks; it is in the quick suite, and `.github/workflows/ci.yml` runs the stamp check, this tier and the quick suite on every pull request and push to `main`.
 - **Everything:** `node run.mjs full` adds `race-sim`, `career`, `cup`, `racers`, `battle-online`, `online` and `shortcuts`.
 - **One suite:** `node run.mjs <suite> [args]`, for example `node run.mjs battle-sim crater` or `node run.mjs race-sim sprout,odyssey`.
 - **Output:** screenshots land in `zoomies/test-out/` (ignored by git).

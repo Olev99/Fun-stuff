@@ -1,0 +1,39 @@
+# Checks every pull request and every push to main: the stamp is fresh,
+# the pure-node tests pass, and the quick browser suite passes.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # A stale stamp means phones could mix old and new files: re-stamping must change nothing.
+      - name: Stamp is up to date
+        run: node zoomies/tools/stamp.mjs && git diff --exit-code
+      - name: Node tests (no browser)
+        run: node zoomies/tools/tests/node-tier.mjs
+      # Chromium for the browser suites, from the same Playwright version as package.json.
+      # Installed under /opt/pw-browsers, where chrome.mjs looks, so CHROME is not needed.
+      - name: Install Chromium
+        working-directory: zoomies/tools/tests
+        run: |
+          npm install
+          sudo mkdir -p /opt/pw-browsers && sudo chown "$USER" /opt/pw-browsers
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx -y playwright@$(node -p "require('./package.json').dependencies['playwright-core']") install --with-deps chromium
+      - name: Quick suite
+        working-directory: zoomies/tools/tests
+        run: node run.mjs
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-out
+          path: zoomies/test-out/
+          if-no-files-found: ignore
