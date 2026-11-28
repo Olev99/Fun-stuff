@@ -1,5 +1,5 @@
 {
- "v": "2ff27c5",
+ "v": "a9a871f",
  "urls": [
   "index.html",
   "version.json",
@@ -31,7 +31,7 @@
   "src/ghostlink.js?v=7957bf0f",
   "src/gumballui.js?v=53c25e2f",
   "src/hud.js?v=8f5592a4",
-  "src/input.js?v=e177d516",
+  "src/input.js?v=71e9a796",
   "src/items.js?v=486aa76d",
   "src/kart.js?v=29ec60cf",
   "src/karts.js?v=fb81fb32",
@@ -61,7 +61,7 @@
   "src/textures.js?v=3788ad43",
   "src/track.js?v=1205e3cc",
   "src/tracks.js?v=0b41fa15",
-  "src/ui.js?v=f571a8b2",
+  "src/ui.js?v=eb53fcd1",
   "src/util.js?v=a73dbefb",
   "src/weather.js?v=ee78c56b",
   "src/weekly.js?v=2e44e8c7",

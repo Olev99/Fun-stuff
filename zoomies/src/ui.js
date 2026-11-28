@@ -12,6 +12,7 @@ import { missionView, missionStreak, MISSION_XP } from './missions.js';
 import { nextUp } from './nextup.js';
 import { evDefs, evChip } from './evint.js';
 import { medalTimes, medalTier, medalCount, medalMax, MEDALS } from './medals.js';
+import { TILT_HELP } from './input.js';
 import { isTouch } from './platform.js';
 import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, WEEKLY_XP_BASE } from './weekly.js';
 import { profileTitle, rankInfo, MAX_RANK, LEAGUE_MAX_STARS } from './league.js';
@@ -92,7 +93,8 @@ export class UI {
         else app.startFromMenu(this.mode);
         break;
       case 'settings':
-        if (action === 'wheelpad') app.wheelPad.open();
+        if (action === 'recal') this.recalibrate();
+        else if (action === 'wheelpad') app.wheelPad.open();
         else if (action === 'sync') app.sync.open('settings');
         else if (action === 'school') app.startSchool('title');
         else if (['backup', 'restore', 'about', 'repair'].includes(action)) app.safeUI.open(action);
@@ -120,6 +122,7 @@ export class UI {
       case 'pause':
         if (action === 'resume') app.resume();
         else if (action === 'rescue') app.rescuePlayer();
+        else if (action === 'recal') this.recalibrate();
         else if (action === 'restart') app.restart();
         else if (action === 'settings') this.overlay('settings', 'pause');
         else if (action === 'quit') (app.session ? app.leaveMP() : app.quitRace());
@@ -710,7 +713,7 @@ export class UI {
         app.input.requestTilt().then((ok) => {
           if (!ok) {
             app.hud.toast('Tilt is not available here');
-            $('tilt-status').textContent = 'Tilt permission was not granted, so touch steering stays on.';
+            $('tilt-status').textContent = TILT_HELP;
             s().steering = 'touch';
           } else s().steering = 'tilt';
           saveSettings(s());
@@ -822,6 +825,15 @@ export class UI {
     $('set-about').textContent = this.app.versionInfo;
   }
 
+  // Re-zero tilt at the current angle without replaying the intro (Settings and the pause menu).
+  recalibrate() {
+    const inp = this.app.input;
+    const ok = inp.tiltLive;
+    if (ok) { this.app.settings.tiltZero = inp.tilt.angle; saveSettings(this.app.settings); }
+    const msg = ok ? 'Level set ✓' : 'No tilt signal. Turn Tilt steering on first.';
+    document.querySelectorAll('[data-go="recal"]').forEach((b) => { b.dataset.t = b.dataset.t || b.textContent; b.textContent = msg; clearTimeout(b._rt); b._rt = setTimeout(() => { b.textContent = b.dataset.t; }, 1800); });
+  }
+
   // ---------------- First-run intro ----------------
   // One screen: on a phone a live tilt check with "Set level" and a touch
   // fallback (picked for you if motion access is refused or silent for 2 s);
@@ -835,7 +847,7 @@ export class UI {
     if (isTouch) {
       app.settings.steering = 'tilt';
       // Asked from inside the tap that opened this screen (iOS permission rules).
-      app.input.requestTilt().then((ok) => { if (!ok) this._introTouch('Motion access is off, so touch steering is on.'); });
+      app.input.requestTilt().then((ok) => { if (!ok) this._introTouch(TILT_HELP); });
     }
     this.show('intro');
   }
