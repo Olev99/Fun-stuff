@@ -23,7 +23,10 @@ const files = [
 ];
 const v = {};
 for (const f of files) v[f] = hash(readFileSync(`${root}/${f}`));
-const version = hash(Object.entries(v).map(([f, h]) => f + h).join('|')).slice(0, 7);
+// Files the offline cache keeps without a ?v= stamp count towards the version too, so changing only one of them still reaches installed phones.
+const assets = ['manifest.webmanifest', 'vendor/peerjs.min.js', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
+  ...readdirSync(`${root}/vendor/fonts`).filter((f) => f.endsWith('.woff2')).sort().map((f) => `vendor/fonts/${f}`)];
+const version = hash([...Object.entries(v), ...assets.map((f) => [f, hash(readFileSync(`${root}/${f}`))])].map(([f, h]) => f + h).join('|')).slice(0, 7);
 
 const imports = { three: `./vendor/three.module.min.js?v=${v['vendor/three.module.min.js']}` };
 for (const f of files) if (f !== 'vendor/three.module.min.js') imports[`./${f}`] = `./${f}?v=${v[f]}`;
@@ -41,9 +44,7 @@ html = html.replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?
 writeFileSync(`${root}/index.html`, html);
 writeFileSync(`${root}/version.json`, `${JSON.stringify({ v: version })}\n`);
 // The offline cache (sw.js): the exact URLs the page loads, and the version the worker is stamped with.
-const urls = ['index.html', 'manifest.webmanifest', 'version.json', 'vendor/peerjs.min.js', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  ...readdirSync(`${root}/vendor/fonts`).filter((f) => f.endsWith('.woff2')).sort().map((f) => `vendor/fonts/${f}`),
-  ...Object.values(imports).map((u) => u.replace(/^\.\//, ''))];
+const urls = ['index.html', 'version.json', ...assets, ...Object.values(imports).map((u) => u.replace(/^\.\//, ''))];
 writeFileSync(`${root}/precache.json`, `${JSON.stringify({ v: version, urls }, null, 1)}\n`);
 if (existsSync(`${root}/sw.js`)) writeFileSync(`${root}/sw.js`, readFileSync(`${root}/sw.js`, 'utf8').replace(/^const VERSION = '[^']*';/m, `const VERSION = '${version}';`));
 console.log(`version ${version}, ${files.length} files stamped`);

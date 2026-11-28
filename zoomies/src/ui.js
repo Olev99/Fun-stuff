@@ -17,6 +17,7 @@ import { weeklyFor, weeklyBest, weeklyStreak, weekNum, timeLeftText, WEEKLY_XP, 
 import { profileTitle, rankInfo, MAX_RANK, LEAGUE_MAX_STARS } from './league.js';
 import { masteryOf, titleFor, STAR_COLORS, RACER_IDS, BODY_IDS } from './mastery.js';
 import { levelOf, ACHIEVEMENTS, dailyFor, dailyGoalText, dailyDoneToday, dailyStreak, dailyReward, dailyTrackName } from './profile.js';
+import { loadCup } from './cupsave.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -67,6 +68,7 @@ export class UI {
         else if (action === 'wheel') app.wheelHost.open('title');
         else if (action === 'about') app.safeUI.open('about');
         else if (action === 'story') app.startIntro();
+        else if (action === 'resume') app.resumeCup();
         else { this.mode = action; this.charSelect(); }
         break;
       case 'char':
@@ -179,6 +181,9 @@ export class UI {
   // ---------------- Title ----------------
   title() {
     $('scr-title').classList.toggle('first-run', !this.app.settings.introDone);
+    const cup = loadCup();
+    $('scr-title').classList.toggle('has-resume', !!cup);
+    if (cup) $('menu-resume').textContent = `${cup.name} · ${cup.next < cup.races ? `race ${cup.next + 1} of ${cup.races}` : 'final standings'}`;
     this.refreshChip();
     this.show('title');
     if (this.app.pwa) this.app.pwa.onTitle();
