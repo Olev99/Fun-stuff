@@ -805,7 +805,10 @@ export class UI {
     $('set-ws').addEventListener('change', (e) => { s().workshopParts = e.target.checked; saveSettings(s()); });
     $('set-fps').addEventListener('change', (e) => { s().showFps = e.target.checked; $('fps').hidden = !s().showFps; saveSettings(s()); });
     $('set-reset-career').addEventListener('click', () => {
+      if (this.returnTo === 'pause') return; // never from inside a race
       if (!confirm('Start over? Your level, coins, trophies, karts, racers and career progress will be lost.')) return;
+      const typed = prompt('This cannot be undone. Type RESET to erase everything.');
+      if (!typed || typed.trim().toUpperCase() !== 'RESET') return;
       app.resetCareer();
       app.audio.play('uiBack');
       $('set-reset-career').textContent = 'Done';

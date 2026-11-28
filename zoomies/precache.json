@@ -1,5 +1,5 @@
 {
- "v": "a2c6504",
+ "v": "d8df3f6",
  "urls": [
   "index.html",
   "version.json",
@@ -61,7 +61,7 @@
   "src/textures.js?v=3788ad43",
   "src/track.js?v=1205e3cc",
   "src/tracks.js?v=0b41fa15",
-  "src/ui.js?v=3faebe2f",
+  "src/ui.js?v=5e3a845e",
   "src/util.js?v=a73dbefb",
   "src/weather.js?v=ee78c56b",
   "src/weekly.js?v=2e44e8c7",
