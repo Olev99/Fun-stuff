@@ -352,6 +352,19 @@ const sA = site('A', 'A'), sB = site('B', 'B'), sC = site('C', 'C');
 const pre = JSON.parse(readFileSync(join(sA, 'precache.json'), 'utf8'));
 console.log(`     precache (${pre.urls.length} files, version ${pre.v}): ${pre.urls.join(' ')}`);
 check('stamp wrote precache.json and the worker version', pre.urls.length > 60 && /const VERSION = '[0-9a-f]{7}'/.test(readFileSync(join(sA, 'sw.js'), 'utf8')));
+{
+  // changing only a file that the cache keeps without a ?v= stamp (manifest, PeerJS, an icon, a font) still makes a new version
+  const sE = site('E', 'A'), vOf = () => JSON.parse(readFileSync(join(sE, 'precache.json'), 'utf8')).v;
+  const seen = [vOf()];
+  for (const f of ['manifest.webmanifest', 'vendor/peerjs.min.js', 'icons/icon-192.png', 'vendor/fonts/baloo2-latin.woff2']) {
+    appendFileSync(join(sE, f), '\n');
+    execFileSync(process.execPath, [join(sE, 'tools/stamp.mjs')], { stdio: 'pipe' });
+    seen.push(vOf());
+  }
+  const sw = readFileSync(join(sE, 'sw.js'), 'utf8'), ver = JSON.parse(readFileSync(join(sE, 'version.json'), 'utf8')).v;
+  check('manifest, PeerJS, icons and fonts are in the version hash', new Set(seen).size === seen.length && seen[0] === pre.v, seen.join(' '));
+  check('sw.js VERSION, precache.json and version.json agree', sw.includes(`const VERSION = '${vOf()}';`) && ver === vOf());
+}
 const web = await serve();
 web.root = sA;
 const ready = async (page, version) => {
@@ -431,8 +444,12 @@ const web2 = await serve();
   await ready(page, pre.v);
   web2.root = sC;
   const preC = JSON.parse(readFileSync(join(sC, 'precache.json'), 'utf8'));
+  web2.hits = [];
   await page.evaluate(() => window.zoomies.pwa.reg.update());
   await page.waitForFunction(() => { const n = document.getElementById('pwa-note'); return !n.hidden && n.dataset.kind === 'update'; }, null, { timeout: 30000 });
+  const got = web2.hits.filter((h) => /\.(js|mjs)$/.test(h));
+  check('the update downloads only the changed code (unchanged ?v= files come from the old cache)', got.includes('/src/util.js') && !got.includes('/vendor/three.module.min.js') && !got.includes('/src/main.js'), got.join(' '));
+  check('and the new cache is complete', (await cacheCount(page, `zoomies-${preC.v}`)) === preC.urls.length);
   check('"Update ready, tap to restart" shows on the title screen', /Update ready/.test(await page.textContent('#pwa-note')) && /restart/i.test(await page.textContent('#pn-go')));
   check('the page still runs the old version until the player taps', (await page.evaluate(() => window.__mark)) === 'A');
   await shot(page, 'release-update-toast');

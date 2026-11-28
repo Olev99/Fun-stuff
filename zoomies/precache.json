@@ -1,9 +1,9 @@
 {
- "v": "1f498af",
+ "v": "3ea6895",
  "urls": [
   "index.html",
-  "manifest.webmanifest",
   "version.json",
+  "manifest.webmanifest",
   "vendor/peerjs.min.js",
   "icons/icon-180.png",
   "icons/icon-192.png",
