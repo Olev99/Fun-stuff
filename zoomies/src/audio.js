@@ -573,8 +573,9 @@ export class Audio {
     e.bus.gain.value = 0.16;
     e.bus.connect(this.sfx);
     e.voice = this._engineVoice(e.bus, 1);
-    e.rival = this._engineVoice(e.bus, 0.55);
+    e.rival = null; // made when a rival comes near, stopped when none is
     e.rivalRpm = 3000;
+    e.rivalFar = 0;
     // turbo whine while boosting
     e.turbo = c.createOscillator();
     e.turbo.type = 'triangle';
@@ -609,6 +610,7 @@ export class Audio {
     if (!e || !this.ready) return;
     const c = this.ctx;
     const t = c.currentTime;
+    if (t - e.last < 0.03) return; // about 30 updates a second: the smoothing below fills the gaps
     const dt = Math.min(0.1, Math.max(0.001, t - e.last));
     e.last = t;
     const IDLE = 1900, RED = 12200;
@@ -641,12 +643,17 @@ export class Audio {
     // Nearest rival: fades in when close, panned to their side, with a
     // little Doppler from the closing speed.
     const r = s.rival;
-    if (r && s.active) {
-      const near = Math.max(0, 1 - r.dist / 26);
+    const near = r && s.active ? Math.max(0, 1 - r.dist / 26) : 0;
+    if (near > 0) {
+      e.rivalFar = 0;
+      if (!e.rival) e.rival = this._engineVoice(e.bus, 0.55);
       const rr = IDLE + (RED - IDLE) * Math.min(1, 0.35 + Math.max(0, r.speed) * 0.55) * (1 + (r.closing || 0) * 0.004);
       e.rivalRpm += (rr - e.rivalRpm) * (1 - Math.exp(-4 * dt));
       this._setVoice(e.rival, e.rivalRpm, 0.7, near * near, t, r.pan);
-    } else this._setVoice(e.rival, 3000, 0, 0, t);
+    } else if (e.rival) {
+      this._setVoice(e.rival, 3000, 0, 0, t);
+      if ((e.rivalFar += dt) > 2) { this._stopVoice(e.rival, t); e.rival = null; } // silent for 2 s: stop its nodes
+    }
     // turbo
     e.turbo.frequency.setTargetAtTime(1500 + (e.rpm / RED) * 1600, t, 0.1);
     e.turboG.gain.setTargetAtTime(s.boost && s.active ? 0.05 : 0, t, s.boost ? 0.05 : 0.2);
@@ -670,7 +677,7 @@ export class Audio {
     if (!e) return;
     const t = this.ctx.currentTime;
     this._stopVoice(e.voice, t);
-    this._stopVoice(e.rival, t);
+    if (e.rival) this._stopVoice(e.rival, t);
     e.turboG.gain.setTargetAtTime(0, t, 0.05);
     e.sqG.gain.setTargetAtTime(0, t, 0.05);
     e.sqToneG.gain.setTargetAtTime(0, t, 0.05);

@@ -1,5 +1,5 @@
 {
- "v": "56f7414",
+ "v": "1831114",
  "urls": [
   "index.html",
   "version.json",
@@ -15,7 +15,7 @@
   "vendor/three.module.min.js?v=8b618bd9",
   "src/ai.js?v=7a6fe224",
   "src/arenas.js?v=3c7b65f4",
-  "src/audio.js?v=28191a7d",
+  "src/audio.js?v=3dcb8e6c",
   "src/backup.js?v=912036f1",
   "src/battle.js?v=dd2887c9",
   "src/career.js?v=b5d57d1d",

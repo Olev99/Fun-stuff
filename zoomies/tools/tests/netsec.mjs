@@ -1,6 +1,7 @@
 // Online hardening and resilience checks (review batch C and D):
 //   leak    10 races and previews: GPU textures and geometries stay flat
 //   dynres  dynamic resolution stops hunting and holds still behind a menu; the menu demo draws every other frame
+//   audio   the engine sound updates about 30 times a second; the rival voice exists only while a rival is near
 //   crash   an exception in the frame loop shows "Something went wrong" and Back to menu works
 //   wire    big messages (a 21 KB ghost) round-trip in pieces, an over-the-cap one fails loudly,
 //           the test transport refuses any single unchunked frame of 16 KB or more
@@ -14,7 +15,7 @@
 // node netsec.mjs [part,part...]   (all parts by default)
 import { chromium } from 'playwright-core';
 import { CHROME_PATH } from './chrome.mjs';
-const parts = (process.argv[2] || 'leak,dynres,crash,wire,clock,trust,loss,rtc').split(',');
+const parts = (process.argv[2] || 'leak,dynres,audio,crash,wire,clock,trust,loss,rtc').split(',');
 const PORT = process.env.ZPORT || 8000;
 const b = await chromium.launch({ executablePath: CHROME_PATH, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 let fails = 0;
@@ -144,6 +145,39 @@ if (parts.includes('dynres')) {
   check(r.fourRaces <= 16, `four races in 5 minutes change it at most 4 times each (${r.fourRaces})`);
   check(r.menu === 0, 'the resolution holds still behind a menu');
   check(r.demoDraws === 5 && r.raceDraws === 10, `the menu demo draws every other frame, a race every frame (${r.demoDraws}/10, ${r.raceDraws}/10)`);
+  await ctx.close();
+}
+
+// ---- audio: the engine sound updates about 30 times a second; the rival voice only exists while a rival is near ----
+if (parts.includes('audio')) {
+  const ctx = await lowCtx();
+  const p = await page(ctx, 'audio');
+  const r = await p.evaluate(async () => {
+    const au = window.zoomies.audio, sleep = (ms) => new Promise((ok) => setTimeout(ok, ms)), out = {};
+    au.unlock();
+    await sleep(300);
+    out.ready = !!au.ready && au.ctx.state === 'running';
+    au.startEngine();
+    let updates = 0;
+    const sv = au._setVoice;
+    au._setVoice = function (v, ...x) { if (v === au.engine.voice) updates++; return sv.call(this, v, ...x); };
+    const drive = async (dist, secs) => { const t0 = au.ctx.currentTime; let calls = 0; while (au.ctx.currentTime - t0 < secs) { au.updateEngine({ speed: 0.6, throttle: 1, active: true, rival: { dist, speed: 0.6, pan: 0.3 } }); calls++; await sleep(4); } return calls; };
+    out.noRivalAtStart = au.engine.rival === null;
+    out.calls = await drive(10, 1);
+    out.updates = updates;
+    out.nearMade = !!au.engine.rival;
+    await drive(200, 2.6);
+    out.farStopped = au.engine.rival === null;
+    await drive(8, 0.2);
+    out.backAgain = !!au.engine.rival;
+    au._setVoice = sv;
+    au.stopEngine();
+    return out;
+  });
+  console.log('engine audio:', JSON.stringify(r));
+  check(r.ready, 'audio runs in the test browser');
+  check(r.updates >= 20 && r.updates <= 36 && r.calls > r.updates * 2, `engine voice updates about 30 times a second however often it is asked (${r.updates} of ${r.calls})`);
+  check(r.noRivalAtStart && r.nearMade && r.farStopped && r.backAgain, 'the rival voice is made when a rival comes near and stopped 2 s after the last one leaves');
   await ctx.close();
 }
 
