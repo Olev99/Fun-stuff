@@ -466,6 +466,7 @@ class App {
       loadouts, playerLoadout: cfg.playerLoadout, careerEv: cfg.careerEv || null, mods: cfg.mods || null, dailyEv: cfg.dailyEv || null,
       look: lookOf(this.career), ghost: cfg.ghost || null, evMode, evSeed,
     });
+    this.race.ghostOwner = cfg.ghost && this.challenge ? this.challenge.name : null; // whose ghost a challenge link brought
     this.race.setSize(this.w, this.h, this.pr);
     this.view = this.race;
     this.ui.hideAll();
@@ -654,11 +655,14 @@ class App {
       if (race.newGhost && race.ghost) addStat(this.career, 'ghosts');
       const rw = this.profileAward(race, me, { record: newBest, xpBonus: medal ? medal.xp : 0, medal });
       const tier = race.track.reverse ? 0 : medalTier(race.trackDef.id, rec.tt), nx = race.track.reverse ? null : nextMedal(race.trackDef.id, rec.tt);
+      const gt = race.ghost && race.ghost.g.time, gd = gt ? total - gt : 0;
+      const gname = race.ghostOwner ? `${race.ghostOwner}'s ghost` : 'your ghost';
+      const ghostLine = gt ? `<div class="medal-line">👻 ${gd < 0 ? `You beat ${gname} by <b>${(-gd).toFixed(2)} s</b>` : `Ghost wins by <b>${gd.toFixed(2)} s</b>${race.ghostOwner ? ` (${race.ghostOwner}'s)` : ''}`}</div>` : '';
       const medalLine = race.track.reverse ? '' : `<div class="medal-line">${tier ? `${MEDALS[tier - 1].icon} <b>${MEDALS[tier - 1].name}</b>` : 'No medal yet'}${nx ? ` · next medal ${nx.medal.icon} ${nx.medal.name} in <b>${nx.gap.toFixed(2)}s</b> (${fmtTime(nx.target)})` : ' · every medal won!'}</div>`;
       ui.results({
         title: newBest ? 'New record!' : 'Time trial',
         sub: race.trackDef.name,
-        html: `${rw}<div class="big-msg"><em>${fmtTime(total)}</em></div>${medalLine}
+        html: `${rw}<div class="big-msg"><em>${fmtTime(total)}</em></div>${ghostLine}${medalLine}
           <div class="tt-times">${me.lapTimes.map((t, i) => `<div><small>Lap ${i + 1}</small>${fmtTime(t)}</div>`).join('')}
           <div><small>Best total</small>${fmtTime(rec.tt)}</div><div><small>Best lap</small>${fmtTime(rec.lap)}</div></div>
           ${race.newGhost ? '<p class="car-goal" style="text-align:center;margin:8px 0 0">👻 Ghost saved. Race against it next time!</p>' : ''}<div class="medal-line" id="chal-msg"></div>`,
