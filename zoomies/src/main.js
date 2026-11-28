@@ -18,6 +18,7 @@ import { weeklyFor, weeklyFinish, weekNum } from './weekly.js';
 import { medalAward, medalTier, nextMedal, MEDALS } from './medals.js';
 import { encodeChallenge, challengeUrl, decodeChallenge, hasChallenge, challengeText } from './ghostlink.js';
 import { loadGhost } from './ghost.js';
+import { saveCup, loadCup, clearCup } from './cupsave.js';
 import { Showroom } from './showroom.js';
 import { Coach } from './coach.js';
 import { Race } from './race.js';
@@ -354,19 +355,35 @@ class App {
     return others;
   }
 
-  // A cup keeps the same eight racers for all its races.
-  _gpField(gp, must = []) {
+  // A cup keeps the same eight racers for all its races. A resumed cup (cupsave.js) brings its field and standings back.
+  _gpField(gp, must = [], resume = null) {
+    if (resume) {
+      Object.assign(gp, { field: resume.field, points: resume.points, index: resume.next, wins: resume.wins, gems: resume.gems });
+      return;
+    }
+    clearCup(); // a new cup replaces any saved one
     gp.field = this.makeGrid(gp.player, null, must);
     gp.points = {};
     for (const id of gp.field) gp.points[id] = 0;
   }
 
-  startFromMenu(mode) {
+  // "Resume cup" on the title screen: the saved cup carries on with the race after the last one finished.
+  resumeCup() {
+    const r = loadCup();
+    if (!r || (r.kind === 'career' && r.player !== this.career.racer)) { clearCup(); this.ui.title(); return; }
+    if (r.kind === 'career') this.startCareerEvent(r.id, r);
+    else if (r.kind === 'weekly') this.startWeekly(r);
+    else this.startFromMenu('gp', r);
+  }
+
+  startFromMenu(mode, resume = null) {
     const s = this.settings;
     if (mode === 'gp') {
-      const cup = CUPS.find((c) => c.id === s.cup) || CUPS[0];
-      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: s.speedClass, player: this.menuChar(), extra: { playerLoadout: this.menuLoadout(true) } };
-      this._gpField(this.gp);
+      const cup = CUPS.find((c) => c.id === (resume ? resume.id : s.cup)) || CUPS[0];
+      this.careerRun = null;
+      this.dailyRun = null;
+      this.gp = { cup, tracks: cup.tracks, reverse: cup.reverse, index: 0, points: {}, speedClass: resume ? resume.cls : s.speedClass, player: resume ? resume.player : this.menuChar(), extra: { playerLoadout: this.menuLoadout(true) } };
+      this._gpField(this.gp, [], resume);
       this.startGPRace();
     } else if (mode === 'battle') {
       // Balloon Battle: a smaller field, spread round the arena.
@@ -407,6 +424,7 @@ class App {
 
   startGPRace() {
     const gp = this.gp;
+    if (gp.index >= gp.tracks.length) { this.showGPFinal(); return; } // resumed after the last race: straight to the standings
     let order = gp.field;
     if (gp.index > 0) {
       // Leader starts at the back.
@@ -656,6 +674,7 @@ class App {
       const last = gp.index >= gp.tracks.length - 1;
       if (me.place === 1) gp.wins = (gp.wins || 0) + 1;
       gp.gems = (gp.gems || 0) + (race.player.gemsGot || 0);
+      saveCup(gp, this.careerRun && this.careerRun.attempt); // before the XP, so a reload never pays a race twice
       const quit = gp.careerEv ? 'career' : 'menu';
       // Career cups pay out at the end; their races only give XP.
       const rw = this.profileAward(race, me, gp.careerEv ? { coins: 0 } : {});
@@ -754,16 +773,16 @@ class App {
 
   // ---------------- weekly cup ----------------
   // This week's special Grand Prix: 4 tracks, one twist, retry as often as you like.
-  startWeekly() {
+  startWeekly(resume = null) {
     const w = weeklyFor();
-    const player = this.menuChar();
+    const player = resume ? resume.player : this.menuChar();
     this.careerRun = null;
     this.dailyRun = null;
     this.gp = {
       cup: { id: `weekly-${w.week}`, name: w.name }, weekly: w, tracks: w.tracks, reverse: false, index: 0, points: {}, speedClass: w.cls, player,
       extra: { playerLoadout: this.menuLoadout(), mods: w.mod, difficulty: w.diff },
     };
-    this._gpField(this.gp);
+    this._gpField(this.gp, [], resume);
     this.startGPRace();
   }
 
@@ -797,6 +816,7 @@ class App {
       this.race.startPodium(table, me, () => this.showGPFinal(true));
       return;
     }
+    clearCup(); // the cup is over: its payout below happens once
     if (gp.careerEv) {
       this.onCareerCupFinal(table, me);
       return;
@@ -829,6 +849,7 @@ class App {
   onResultsAction(action) {
     switch (action) {
       case 'career':
+        if (this.gp) clearCup();
         this.openCareer();
         break;
       case 'daily':
@@ -867,6 +888,7 @@ class App {
         this.ui.trackSelect();
         break;
       case 'menu':
+        if (this.gp) clearCup(); // Quit ends the cup
         this.toTitle();
         break;
       case 'next':
@@ -970,6 +992,7 @@ class App {
   // ---------------- career ----------------
   // Leave a race from the pause menu: career players go back to the hub.
   quitRace() {
+    if (this.gp) clearCup();
     if (this.careerRun || (this.schoolRun && this.schoolFrom === 'career')) this.openCareer();
     else this.toTitle();
   }
@@ -999,12 +1022,13 @@ class App {
 
   resetCareer() {
     clearCareer();
+    clearCup();
     this.career = newCareer();
     this.careerUI.ci = null;
     this.careerUI.league = false;
   }
 
-  startCareerEvent(evId) {
+  startCareerEvent(evId, resume = null) {
     const c = this.career;
     const { ev, chapter } = eventById(evId);
     const player = c.racer;
@@ -1015,7 +1039,8 @@ class App {
     // Track events: the story decides (evPlan); a retry gets a new seed, a replay of one attempt does not.
     const plan = evPlan(ev, chapter);
     this.evTries = this.evTries || {};
-    const attempt = (this.evTries[evId] = (this.evTries[evId] || 0) + 1);
+    const attempt = resume ? resume.attempt : (this.evTries[evId] || 0) + 1;
+    this.evTries[evId] = Math.max(attempt, this.evTries[evId] || 0);
     const base = {
       trackId: ev.track, reverse: !!ev.rev, player, speedClass: cls, difficulty: chapter.diff, playerLoadout: lo, careerEv: ev, laps: ev.laps || 0, mods,
       evMode: plan.mode, evOnly: plan.only, evSeed: plan.mode === 'off' ? 0 : evSeedFor(evId, attempt),
@@ -1025,7 +1050,7 @@ class App {
       this.gp = {
         cup: { id: ev.id, name: ev.title }, tracks: ev.tracks, reverse: false, index: 0, points: {}, speedClass: cls, player, careerEv: ev, wins: 0, gems: 0,
       };
-      this._gpField(this.gp, [rival, ...(chapter.field || [])]);
+      this._gpField(this.gp, [rival, ...(chapter.field || [])], resume);
       const others = this.gp.field.filter((id) => id !== player);
       this.gp.extra = { difficulty: chapter.bossDiff, playerLoadout: lo, loadoutsById: aiLoadouts(chapter, others, rival), careerEv: ev, mods, evMode: plan.mode, evOnly: plan.only };
       this.startGPRace();

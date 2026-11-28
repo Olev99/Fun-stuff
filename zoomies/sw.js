@@ -7,7 +7,7 @@
 // waits; it takes over at the next launch or when the player taps "Update
 // ready" on the title screen. Anything else (the PeerJS broker, WebRTC) is
 // left alone. ?nosw (or Settings > Repair) removes the worker and the caches.
-const VERSION = '57db38a';
+const VERSION = '1f498af';
 const CACHE = `zoomies-${VERSION}`;
 const SCOPE = self.registration.scope;
 const HOME = `${SCOPE}index.html`;

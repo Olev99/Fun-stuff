@@ -76,6 +76,7 @@ A tilt-to-steer kart racer that runs in the browser on your iPhone. No App Store
   - Daily Challenge: a new track, twist and goal every day.
   - Weekly Cup: one special Grand Prix a week, with a twist.
   - Grand Prix: 9 cups of 4 races with points. A cup pays XP only (150 for the podium, 50 otherwise), no coins.
+  - **Resume cup:** a Grand Prix, Weekly Cup or Career cup (the Golden Wheel too) is saved after each race. If the game is closed, reloaded or loses its screen mid-cup, the title screen shows **Resume cup** with the next race; it carries on with the same racers and points. A saved cup lasts a day (a Weekly Cup only within its week); Quit, finishing the cup or starting another one drops it.
   - Quick Race.
   - Time Trial (always at Zoom speed, so records, medals and ghosts stay comparable), with saved records, a ghost, medals on every track and "Challenge a friend" links.
   - Balloon Battle (see below).
@@ -268,6 +269,7 @@ How it works:
 zoomies/
   index.html          UI, HUD and styles
   src/main.js         app shell, menus, Grand Prix, career and multiplayer flow, dynamic resolution
+  src/cupsave.js      the saved cup in progress behind "Resume cup", and its checks
   src/career.js       career chapters, events, story, event hints, scoring and save data
   src/league.js       the Legends League: seasons, events, Legend Rank and its rewards
   src/careerui.js     career hub, garage, Gramps's Workshop, story dialogue and career results

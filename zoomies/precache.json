@@ -1,5 +1,5 @@
 {
- "v": "57db38a",
+ "v": "1f498af",
  "urls": [
   "index.html",
   "manifest.webmanifest",
@@ -23,6 +23,7 @@
   "src/characters.js?v=86619e10",
   "src/coach.js?v=d2a23bd0",
   "src/cosmetics.js?v=abd1fa3e",
+  "src/cupsave.js?v=1aeffdc2",
   "src/env.js?v=de0c051a",
   "src/events.js?v=9181b74f",
   "src/evint.js?v=b1c86a32",
@@ -36,7 +37,7 @@
   "src/karts.js?v=fb81fb32",
   "src/league.js?v=5d268b5b",
   "src/ledger.js?v=2f09ea2f",
-  "src/main.js?v=27de03e4",
+  "src/main.js?v=4b6fea99",
   "src/mastery.js?v=eff00973",
   "src/medals.js?v=c18eeb44",
   "src/missions.js?v=d4a9ad92",
@@ -60,7 +61,7 @@
   "src/textures.js?v=3788ad43",
   "src/track.js?v=1205e3cc",
   "src/tracks.js?v=0b41fa15",
-  "src/ui.js?v=f6035303",
+  "src/ui.js?v=c7168f1b",
   "src/util.js?v=a73dbefb",
   "src/weather.js?v=ee78c56b",
   "src/weekly.js?v=2e44e8c7",
